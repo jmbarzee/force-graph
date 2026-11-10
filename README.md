@@ -413,9 +413,8 @@ The charge force is O(n²) over the visible nodes: a few hundred draw
 smoothly, a few thousand do not. The push/pull and layout controls bound their
 tokens by a ceiling (an axis with more values than the ceiling is offered but
 cannot be tuned on, and a tuning that outgrows it returns to the style axis).
-What is not built is filed on jmbarzee/temporal-architect: colour by another
-axis (#194), an opaque `Taxonomy` (#195), undirected edges (#196), per-edge
-weight (#197), the pane's strings in other languages (#198), the React 19
-types gate (#200).
+What is not built is filed as issues: colour by another axis (#9), an opaque
+`Taxonomy` (#10), undirected edges (#11), per-edge weight (#12), the pane's
+strings in other languages (#13), the React 19 types gate (#14).
 
 `src/index.ts` names the whole surface.
