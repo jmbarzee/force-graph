@@ -5,8 +5,7 @@
 // declarations of modules the entry never exports — the force model among them —
 // and host-side declarations whose imports leave the package. This
 // walks the relative imports from the entry's declaration and deletes every
-// `.d.ts` (and its map) it does not reach. Run by `build:lib`, so the artifact is
-// pruned whether or not a gate runs after it.
+// `.d.ts` (and its map) it does not reach.
 
 import { readdirSync, readFileSync, rmSync, statSync } from 'node:fs'
 import { dirname, join, resolve } from 'node:path'

@@ -38,7 +38,7 @@ export function themeOfMarker(marker: ThemeMarker | null): Theme | undefined {
 
 /** What the host has decided ABOVE `el`: the nearest marking ancestor, else the OS. */
 export function hostTheme(el: Element | null): Theme {
-  // No window (a server render, the harness): light, the same answer as a host that declares nothing.
+  // No window (a server render): light, the same answer as a host that declares nothing.
   if (typeof window === 'undefined') return 'light'
   let marker: Element | null = el?.parentElement?.closest(THEME_MARKER_SELECTOR) ?? null
   while (marker) {

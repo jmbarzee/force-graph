@@ -4,9 +4,7 @@
 // the simulation SPRINGS falls in. That last set is the simulation's own
 // predicate (`sprungEdges`), not the graduated edges the canvas draws: a
 // graduated edge is re-pointed for drawing and never sprung, so a token
-// classified over it would tune nothing. One function, read by
-// the view and by the harness, so the harness pins what the view offers
-// rather than re-deriving it.
+// classified over it would tune nothing.
 
 import type { GraphEdge } from '../../graph/model'
 import type { PhysicsSubject, ResolvedPhysics } from '../../graph/forces'

@@ -447,12 +447,10 @@ export interface ReheatPlan extends ReheatPolicy {
 }
 
 /**
- * Fold the per-axis reheat policies of every axis that changed. Pure and
- * outside React, so the harness pins it: a declared policy nothing reads is
- * not policy. Several axes can move at once (a view switch does exactly
- * that), so the policies combine rather than the last one winning: the
- * strongest reheat, and any axis that wants seeding, refitting or resuming
- * gets it.
+ * Fold the per-axis reheat policies of every axis that changed. Several axes
+ * can move at once (a view switch does exactly that), so the policies combine
+ * rather than the last one winning: the strongest reheat, and any axis that
+ * wants seeding, refitting or resuming gets it.
  */
 export function foldReheatPolicy(
   changedAxes: readonly ResolvedAxisDescriptor[],

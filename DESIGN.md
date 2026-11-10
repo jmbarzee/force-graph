@@ -1,12 +1,8 @@
 # force-graph — design notes
 
 What a maintainer needs that the README — the host's contract — does not say:
-the invariants the library holds and why it holds them. They were settled
-during the extraction of this library from temporal-architect's visualizer
-(the stacked pull requests jmbarzee/temporal-architect#158 to
-jmbarzee/temporal-architect#218 and their reviews);
-the per-unit record went with the scaffolding when the tree was reduced to
-the product, and these notes are what it distilled to.
+the invariants the library holds and why. They were settled in
+jmbarzee/temporal-architect#158–#218 and their reviews.
 
 ## The model
 
@@ -21,7 +17,7 @@ the product, and these notes are what it distilled to.
   builds the node, never derived by the engine.
 - **The library knows no domain.** No word of a host's vocabulary enters it;
   the taxonomy is injected, and every consumer resolves through the container
-  it is handed. The visualizer's adapter is where Temporal lives.
+  it is handed.
 - **Resolution never throws and allocates nothing in the draw loop.** A miss
   resolves to a declared fallback and is said once per taxonomy; every keyed
   lookup on a host string goes through `hasOwn`, because a value named
@@ -84,6 +80,6 @@ the product, and these notes are what it distilled to.
   a contract, and a change to it is a breaking change to every host.
 - **Every shipped declaration carries a doc comment that states the contract,
   not the history.**
-- **Two hosts keep it honest.** temporal-architect's visualizer consumes the
-  package; the course catalog (`examples/course-catalog`) is written against
-  the public entry alone, and is the check that the README suffices.
+- **The course catalog keeps it honest.** `examples/course-catalog` is written
+  against the public entry alone, and CI typechecks it: the check that the
+  README suffices.

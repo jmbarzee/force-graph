@@ -39,7 +39,7 @@ export function useControlledWarning(name: string, controlled: boolean): void {
   React.useEffect(() => {
     if (wasRef.current !== controlled && !saidRef.current) {
       saidRef.current = true
-      console.warn(`[graph-view] \`${name}\` changed from ${wasRef.current ? 'controlled to uncontrolled' : 'uncontrolled to controlled'}: pass a value on every render (null for none), or on none.`)
+      console.warn(`[force-graph] \`${name}\` changed from ${wasRef.current ? 'controlled to uncontrolled' : 'uncontrolled to controlled'}: pass a value on every render (null for none), or on none.`)
     }
     wasRef.current = controlled
   }, [controlled, name])

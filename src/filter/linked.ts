@@ -1,7 +1,5 @@
 // The linked-views reducer: what a switch between two views does to their
-// filters. Pure, so a host that keeps its own state can call it, and so the
-// hook that keeps the state for a host (`useLinkedViews`) is a thin shell
-// around something the harness can pin.
+// filters. Pure, so a host that keeps its own state can call it.
 
 import type { AxisId } from '../graph/axis'
 import type { Graph } from '../graph/model'

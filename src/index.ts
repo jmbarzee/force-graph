@@ -1,16 +1,5 @@
-// Public entry point for the force-graph library.
-//
-// A force-directed graph view with composable axes. A host declares its
-// taxonomy — the axes its nodes carry, the values on each, their colours, sizes
-// and physics, how edges classify — through `createTaxonomy(spec)`, builds a
-// `Graph` of nodes carrying their axis values, and mounts `GraphView`. The view
-// lays out, filters, highlights and tunes the graph without knowing what any of
-// it means. The surface is what a host needs to declare a taxonomy, build
-// a graph and mount the view: what a host imports plus the types its spec
-// names. Named re-exports, not `export *`, so the surface is grep-able in
-// one place and the surface gate can read it; the harness in the host package
-// reaches internals by deep path, which the published `exports` map does not
-// offer.
+// The public surface: what a host imports plus the types its spec names.
+// Named re-exports, not `export *`, so it reads in one place.
 
 import './styles/tokens.css'
 

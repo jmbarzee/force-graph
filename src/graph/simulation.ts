@@ -550,8 +550,7 @@ export class Simulation {
   private nodeMap: Map<string, SimNode>
 
   // Source of randomness for the degenerate-frame breakers and the position
-  // jitter. Defaults to the platform generator, so app behaviour is unchanged;
-  // the verification harness passes a seeded one to make a run reproducible.
+  // jitter. Defaults to the platform generator, so app behaviour is unchanged.
   private rng: Rng
 
   // The taxonomy the link force resolves spring categories through. Held rather

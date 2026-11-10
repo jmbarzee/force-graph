@@ -59,8 +59,7 @@ export function getHighlightedEdgeIds(
 /**
  * The highlight for an active node: the library's directional walk
  * from it, handed to the taxonomy's hook to widen or replace, with the lit
- * edges derived from the lit nodes when the hook names none. One function for
- * the view's hook and the harness, so what is pinned is what is drawn.
+ * edges derived from the lit nodes when the hook names none.
  */
 export function highlightOf(
   taxonomy: Taxonomy,

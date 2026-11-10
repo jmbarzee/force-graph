@@ -1,7 +1,6 @@
 import { describe, expect, it } from 'vitest'
 import { followResize, screenToWorld } from './viewport'
 
-// jmbarzee/temporal-architect#210: the camera follows a pane resize.
 describe('followResize', () => {
   const vp = { x: 120, y: -40, scale: 1.5 }
   const centre = (v: typeof vp, w: number, h: number) => screenToWorld(v, w / 2, h / 2)

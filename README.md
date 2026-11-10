@@ -413,13 +413,9 @@ The charge force is O(n²) over the visible nodes: a few hundred draw
 smoothly, a few thousand do not. The push/pull and layout controls bound their
 tokens by a ceiling (an axis with more values than the ceiling is offered but
 cannot be tuned on, and a tuning that outgrows it returns to the style axis).
-What is not built is filed: colour by another axis
-(jmbarzee/temporal-architect#194), an opaque `Taxonomy`
-(jmbarzee/temporal-architect#195), undirected edges
-(jmbarzee/temporal-architect#196), per-edge weight
-(jmbarzee/temporal-architect#197), the pane's strings in other languages
-(jmbarzee/temporal-architect#198), the React 19 types gate
-(jmbarzee/temporal-architect#200).
+What is not built is filed on jmbarzee/temporal-architect: colour by another
+axis (#194), an opaque `Taxonomy` (#195), undirected edges (#196), per-edge
+weight (#197), the pane's strings in other languages (#198), the React 19
+types gate (#200).
 
-`src/index.ts` names the whole surface; the tarball ships `dist-lib/`, this
-file and the licence.
+`src/index.ts` names the whole surface.

@@ -61,7 +61,7 @@ export type ContextLine = ReactNode | readonly ReactNode[]
  * chrome of its own in the scheme's colours; `edgeTypes` for a legend;
  * `searchText` to match as the view matches. The rest is the engine's
  * interface — resolution for the draw loop — and a host has no call to read
- * it (jmbarzee/temporal-architect#195 is the opaque form).
+ * it.
  */
 export interface Taxonomy {
   /**

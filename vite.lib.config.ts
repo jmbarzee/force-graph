@@ -1,7 +1,4 @@
-// Library build config for `@jmbarzee/force-graph`: an ESM bundle with
-// externalized React peer dependencies, one sibling stylesheet (the tokens and
-// every component's rules), and per-file `.d.ts` declarations pruned to what the
-// entry reaches (`verify/prune-dts.mjs`).
+// Declarations are pruned afterwards by verify/prune-dts.mjs (build:lib).
 import { defineConfig } from 'vite'
 import react from '@vitejs/plugin-react'
 import dts from 'vite-plugin-dts'
@@ -11,7 +8,6 @@ export default defineConfig({
   plugins: [
     react(),
     dts({
-      rollupTypes: true,
       include: ['src/**/*.ts', 'src/**/*.tsx'],
       exclude: ['**/*.test.*'],
     }),

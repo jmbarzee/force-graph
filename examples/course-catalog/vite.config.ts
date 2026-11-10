@@ -1,4 +1,3 @@
-// Run from the repository root: npx vite --config examples/course-catalog/vite.config.ts
 // The library resolves from source, as a published install would resolve it
 // from dist-lib; React is deduped to the one copy beside the library.
 import { defineConfig } from 'vite'
