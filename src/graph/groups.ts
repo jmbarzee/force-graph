@@ -13,9 +13,7 @@ import type { Theme } from './scheme'
 // A small cycling palette per theme. Identity is carried by the host's legend,
 // so colours only need to separate the handful of sibling groups shown at
 // once — not be globally unique. The light set is the same ten hues a few
-// stops deeper, so a glow reads on a pale canvas. Smarter assignment
-// (structural map-colouring, stable semantic hue) is deferred — see
-// https://github.com/jmbarzee/temporal-architect/issues/44.
+// stops deeper, so a glow reads on a pale canvas.
 /** The cycling glow palette per theme; a group with no `color` of its own takes the slot for its place in the list. */
 export const GROUP_PALETTE: Readonly<Record<Theme, readonly string[]>> = {
   dark: [
