@@ -1,7 +1,8 @@
 # force-graph — design notes
 
-What a maintainer needs that the README — the host's contract — does not say:
-the invariants the library holds and why.
+What a maintainer needs that the README — the host's contract — and
+[SPEC](SPEC.md) — the view's behaviour — do not say: the invariants the
+library holds and why.
 
 ## The model
 
@@ -25,9 +26,8 @@ the invariants the library holds and why.
   value on the push axis still repels; the guard's job is to keep a number
   finite, not to invent a non-participant.
 - **Containment is a tree the host declares** (`parentId`); the view derives
-  the edge. A dependency edge whose end is hidden is re-pointed to a visible
-  ancestor or spliced through, by the hidden value's `whenHidden`; two landing
-  on one visible pair collapse by the host's rule.
+  the edge. A hidden end graduates as
+  [README § Collapse rules](README.md#collapse-rules) says.
 
 ## The forces
 
@@ -38,40 +38,32 @@ the invariants the library holds and why.
 - **Per-bucket tuning is one constructed value, and sparse**: the mapping with
   only the overrides the user set. Everything else resolves to the taxonomy's
   declared physics at read time, so there is no dense table to go stale after
-  a taxonomy swap. Push and pull share one axis.
+  a taxonomy swap.
 - **Two symmetric layout axes**, each a node axis — rest bands re-centred on
   the median of the bands present — or a computed scalar over a span. One
   frame seeds, ticks and draws the overlay, so they cannot disagree.
-- **Springs resolve by axis.** On the style axis the declared table and the
-  taxonomy's classification apply verbatim; on any other axis there is one
-  category per unordered bucket pair per relation. A spring left out, anywhere,
-  is the middling spring, so no type's declared spring moves another's; an
-  edge no type claims pulls nothing while push and pull key on the style axis.
+- **A spring left out is the middling spring**, on any push axis, so no
+  type's declared spring moves another's.
 - **The random source is injected.** Production uses `Math.random`; a seeded
   source is for a test that wants the same layout twice.
-- **Controls offer what the visible set holds**, read over the whole graph so a
-  filter may reveal the rest, bounded by a token ceiling; an axis past the
-  ceiling returns to the style axis with nothing overridden, and says so once.
 
 ## The state
 
-- **Every piece of state follows the React convention**: the value and its
-  callback to control it, neither to let the view keep it, the callback alone
-  to be told, and a `default*` for where the view's own starts. A controlled
-  value is never rewritten by the view.
+- **Every piece of state follows the React convention** of
+  [README § The view](README.md#the-view).
 - **The filter is axis-keyed, copy-on-write and compared by content.**
   Removing an axis from the bar unfilters it. Re-seeding on a new graph follows
   the axes the user has not touched — explicit state the bar reports with
   every write, never an inference from the previous graph's opening selection.
-- **Each axis's reheat follows from `emptyMeans`**: an allow-list refits the
-  camera and seeds revealed nodes at their ancestors; a narrowing axis keeps
-  the camera and reheats in place.
+- **Each axis's reheat follows from `keepCamera`**: an axis that refits (an
+  allow-list's default) seeds revealed nodes at their ancestors; one that
+  keeps the camera reheats in place.
 - **A focus request is a value** (`{ id, key }`): it waits for its node, lands
   on the commit after the graph that brought it, and widens by whole chips.
 - **The colour scheme is the taxonomy's, both themes at once.** One resolver
-  decides the theme — the host's `systemTheme`, else a `data-theme` above, else
-  the OS — and the scheme rides inline as custom properties, so a host's chrome
-  reads the same tints the canvas draws with.
+  decides the theme ([README § Theming](README.md#theming)), and the scheme
+  rides inline as custom properties, so a host's chrome reads the same tints
+  the canvas draws with.
 
 ## The surface
 

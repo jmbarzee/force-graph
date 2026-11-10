@@ -9,7 +9,8 @@ their values on those axes, and mounts `GraphView`. The view lays the graph out 
 pull on any axis the nodes carry, two layout axes keyed on an axis or a
 computed scalar), filters it on any declared axis, highlights it, and lets the
 user tune the forces — without knowing what any node or edge means. The host's
-vocabulary never enters this package.
+vocabulary never enters this package. What the user sees and does is
+[SPEC.md](SPEC.md).
 
 ## Install
 
@@ -295,15 +296,14 @@ the console. Everything else is optional.
   refused; with `classifyEdge` given, its answer stands. Derived containment
   edges are `in:<id>` (numbered on a collision) and reach `highlight` and
   `collapse`. An error diagnostic drops the edge, or the later node of a
-  duplicated id, or clears the `parentId`, it names. The search dropdown lists visible matches; hidden ones badge the
-  chip hiding them. The pane's theme observer watches every `data-theme` in
-  the document unless `systemTheme` is given.
+  duplicated id, or clears the `parentId`, it names. The pane's theme
+  observer watches every `data-theme` in the document unless `systemTheme` is
+  given.
 - **Keyboard.** `keyboard` scopes the shortcuts: `pane` (the default — the
   focusable root handles the keys that reach it, so a page keeps Tab and
   Space for its own controls), `global` (the window — a page that is the
-  pane, or a tab shell's active tab) or `none` (a hidden tab). Tab cycles
-  nodes, Enter selects, Escape closes, arrows pan, `+`/`-` zoom, F fits, `/`
-  opens search (while the search is offered), Space pauses, `?` lists them.
+  pane, or a tab shell's active tab) or `none` (a hidden tab). The keys are
+  [SPEC § Keyboard](SPEC.md#keyboard).
 
 ## Two views sharing a bar
 
@@ -342,9 +342,8 @@ last `linked.focus` asked of it with `onFocusResult` (a `FilterBar` ignores
 those two); it throws for a view the hook was not given (`views` is read
 once). `linked.active` is the view shown.
 `linked.switchTo(to, transition?)` switches from the active view and makes
-`to` active: a manual switch (the default) adopts the active view's
-selections except where locked, a focus widens the destination to show its
-target. `linked.focus(view, node)` is the focus switch and the request in one.
+`to` active, reconciling as [SPEC § Linked views](SPEC.md#linked-views) says
+(a manual switch is the default). `linked.focus(view, node)` is the focus switch and the request in one.
 `linked.updateFilter(view, fn)` rewrites one view's filter and
 `linked.updateFilters(fn)` every view's (a stale value pruned when the data
 changes — `reseedFilter` is the rule the hook itself applies to every view
@@ -358,7 +357,8 @@ its own data, the `counts`. The lock toggles appear only when `locks` is
 controlled with its callback — `useLinkedViews` does — or `chrome.locks` asks.
 The bar tracks the values that just turned on for its chip flash
 (`RecentlyChanged`, a set per axis); a host with its own rule passes
-`recentlyChanged`.
+`recentlyChanged`. `refreshFlash` flashes the bar each time the host bumps
+it.
 
 What the pane computes for its own bar is exported for the second view:
 `passesSelection({ filter, taxonomy, axes, node })` decides visibility on the
@@ -387,8 +387,8 @@ stylesheet per theme (`--gv-color-bg`, `--gv-color-text`, `--gv-accent`,
 `--gv-font-sans`, …), and every class is `gv-*`; a host overrides a token by
 redeclaring it on an ancestor. Each style value's fill and border are
 published on the pane under the name `taxonomy.colorVar(value)` answers —
-`--gv-node-` and the value id in kebab case (`nexusEndpoint` →
-`--gv-node-nexus-endpoint`), or a numbered name when the id kebab-cases to
+`--gv-node-` and the value id in kebab case (a value id such as
+`teachingLab` → `--gv-node-teaching-lab`), or a numbered name when the id kebab-cases to
 nothing or to another value's — and `-border` for the border. A host's own
 chrome beside the pane reads the same tints through `schemeVars(taxonomy,
 theme)` inline, or `schemeStylesheet(taxonomy, darkSelector?)` mounted once
@@ -411,8 +411,7 @@ draw in lanes.
 
 The charge force is O(n²) over the visible nodes: a few hundred draw
 smoothly, a few thousand do not. The push/pull and layout controls bound their
-tokens by a ceiling (an axis with more values than the ceiling is offered but
-cannot be tuned on, and a tuning that outgrows it returns to the style axis).
+tokens by a ceiling ([SPEC § The control panel](SPEC.md#the-control-panel)).
 What is not built is filed as issues: colour by another axis
 ([#9](https://github.com/jmbarzee/force-graph/issues/9)), an opaque `Taxonomy`
 ([#10](https://github.com/jmbarzee/force-graph/issues/10)), undirected edges
