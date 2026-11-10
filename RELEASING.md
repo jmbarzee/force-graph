@@ -1,12 +1,11 @@
 # Releasing
 
-Tag a commit on `main` as `vX.Y.Z` and push the tag:
+From a clean checkout of `origin/main`:
 
 ```sh
-git tag v0.1.0 origin/main
-git push origin v0.1.0
+make release          # the next minor; TYPE=patch, or VERSION=X.Y.Z
 ```
 
-`release.yml` reruns the checks at that commit, stamps the tag's version into `package.json` (nothing is committed), builds, and publishes to npm with provenance through trusted publishing: no token.
+It tags `vX.Y.Z` and pushes the tag; `release.yml` reruns the checks at that commit and publishes it to npm with provenance. The version comes from the tag (`package.json` is never bumped), and npm trusted publishing needs no token.
 
-npm configures a trusted publisher only for a package that exists, so the first version is published by hand once; the publisher is repository `jmbarzee/force-graph`, workflow `release.yml`.
+npm configures a trusted publisher only for a package that exists, so `0.0.1` was published by hand first (`npm version 0.0.1 --no-git-tag-version && npm publish`); the first tag is higher. The trusted publisher is repository `jmbarzee/force-graph`, workflow `release.yml`.
