@@ -329,10 +329,10 @@ export function FilterBar({
                     // invisible state that reads as a bug.
                     //
                     // "Stops filtering" is NOT "empty", and that difference is
-                    // this axis's `emptyMeans` again. On the file axis an empty
-                    // selection matches everything; on the kind axis it matches
-                    // NOTHING, so clearing it would blank the view instead of
-                    // unfiltering it. Match-everything is therefore empty for
+                    // this axis's `emptyMeans` again. On a narrowing axis an
+                    // empty selection matches everything; on an allow-list it
+                    // matches NOTHING, so clearing it would blank the view
+                    // instead of unfiltering it. Match-everything is therefore empty for
                     // one and the full value set for the other.
                     onFilterChange(withSelection(
                       filter,

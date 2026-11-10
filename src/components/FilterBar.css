@@ -398,7 +398,7 @@
   padding: 3px 6px;
 }
 
-/* The axis's own name before its chips: a row reads as "Kind: …", not as a bare run of buttons. */
+/* The axis's own name before its chips: a row reads as "Campus: …", not as a bare run of buttons. */
 .gv-header-axis-label {
   color: var(--gv-color-text-muted);
   font-size: 11px;
