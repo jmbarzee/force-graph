@@ -2,11 +2,11 @@
 // weigh, how they filter. Everything the view knows about the domain comes
 // through `taxonomy` below.
 
-import { createTaxonomy, isContainment, payloadNumber, payloadString } from '@temporal-architect/graph-view'
+import { createTaxonomy, isContainment, payloadNumber, payloadString } from '@jmbarzee/force-graph'
 import type {
   AxisDescriptor, EdgeType, FilterChip, GraphNode, Highlight, HighlightGraph,
   NodeStyle, TaxonomySpec, ReadableGraph, ScalarAxis,
-} from '@temporal-architect/graph-view'
+} from '@jmbarzee/force-graph'
 import type { Campus } from './data'
 
 /** Node axes. `entity` is both the style axis and the allow-list filter. */

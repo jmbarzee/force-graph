@@ -6,7 +6,7 @@ import type { Viewport } from '../../graph/viewport'
 /**
  * Zooms the camera on each wheel event over `canvas`; returns the cleanup.
  * The listener is native and non-passive: React's root wheel listener is
- * passive, so its preventDefault cannot keep the page from scrolling (#212).
+ * passive, so its preventDefault cannot keep the page from scrolling.
  */
 export function listenWheelZoom(
   canvas: HTMLElement,

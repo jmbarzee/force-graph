@@ -1,7 +1,7 @@
 {
   "extends": "../../tsconfig.json",
   "compilerOptions": {
-    "paths": { "@temporal-architect/graph-view": ["../../src/index.ts"] }
+    "paths": { "@jmbarzee/force-graph": ["../../src/index.ts"] }
   },
   "include": ["*.ts", "*.tsx"],
   "exclude": ["vite.config.ts"]

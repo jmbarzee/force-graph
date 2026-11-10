@@ -2,7 +2,7 @@
 // department, course listing and lab; a cross-listed course becomes one node
 // per listing, sharing a `copyKey`.
 
-import type { Graph, GraphEdge, GraphNode } from '@temporal-architect/graph-view'
+import type { Graph, GraphEdge, GraphNode } from '@jmbarzee/force-graph'
 import type { Catalog, Requirement } from './data'
 import { CAMPUS, ENTITY, REQUIREMENT } from './taxonomy'
 

@@ -7,8 +7,7 @@
 // calling the global directly.
 //
 // The production default is the global generator, unchanged: nothing about the
-// running app becomes deterministic, and no consumer sees a new knob. Only the
-// verification harness supplies a seeded generator.
+// running app becomes deterministic, and no consumer sees a new knob.
 
 /** A source of uniformly-distributed numbers in [0, 1). */
 export type Rng = () => number

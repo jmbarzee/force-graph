@@ -1,6 +1,6 @@
 import React from 'react'
 import { createRoot } from 'react-dom/client'
-import { themeChoiceOf } from '@temporal-architect/graph-view'
+import { themeChoiceOf } from '@jmbarzee/force-graph'
 import { App } from './App'
 
 // `?theme=dark` pins the pane's theme; anything else is "system".

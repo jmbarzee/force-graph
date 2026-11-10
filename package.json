@@ -1,17 +1,16 @@
 {
-  "name": "@temporal-architect/graph-view",
+  "name": "@jmbarzee/force-graph",
   "version": "0.0.0-dev",
   "description": "A force-directed graph view with composable axes: a host declares the axes, values, colours and physics of its nodes and edges, and the view lays out, filters, highlights and tunes the graph without knowing what any of it means.",
   "type": "module",
   "license": "MIT",
-  "homepage": "https://github.com/jmbarzee/temporal-architect/tree/main/tools/graph-view",
+  "homepage": "https://github.com/jmbarzee/force-graph",
   "repository": {
     "type": "git",
-    "url": "https://github.com/jmbarzee/temporal-architect",
-    "directory": "tools/graph-view"
+    "url": "https://github.com/jmbarzee/force-graph"
   },
   "bugs": {
-    "url": "https://github.com/jmbarzee/temporal-architect/issues"
+    "url": "https://github.com/jmbarzee/force-graph/issues"
   },
   "keywords": [
     "graph",
@@ -44,8 +43,6 @@
     "typecheck": "tsc --noEmit -p tsconfig.json",
     "test": "vitest run",
     "build:lib": "vite build --config vite.lib.config.ts && node verify/prune-dts.mjs",
-    "prepack": "cp ../../LICENSE LICENSE",
-    "postpack": "rm -f LICENSE",
     "prepublishOnly": "npm run build:lib"
   },
   "peerDependencies": {

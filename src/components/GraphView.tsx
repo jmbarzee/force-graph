@@ -421,7 +421,7 @@ export const GraphView = React.forwardRef<GraphViewHandle, GraphViewProps>(funct
       const { width, height } = el.getBoundingClientRect()
       if (width > 0 && height === 0) {
         saidZeroRef.current = true
-        console.warn('[graph-view] the pane measured 0 px tall: give its parent a height — the pane fills a flex column, or a block with a height.')
+        console.warn('[force-graph] the pane measured 0 px tall: give its parent a height — the pane fills a flex column, or a block with a height.')
       }
     }
     check()
@@ -585,7 +585,7 @@ export const GraphView = React.forwardRef<GraphViewHandle, GraphViewProps>(funct
   }, [visibleEdges])
 
   // What the controls offer: only what the post-filter visible set holds —
-  // one function, `presentSetsOf`, that the harness calls too.
+  // `presentSetsOf`.
   // The pull half is read over the edges the simulation springs (the graph's
   // own, both ends visible), not over the graduated edges it draws.
   const sprung = React.useMemo(() => sprungEdges(graph.edges, visibleIds), [graph, visibleIds])
