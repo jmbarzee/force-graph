@@ -3,8 +3,9 @@ import { screenToWorld } from '../../graph/viewport'
 import type { Viewport } from '../../graph/viewport'
 import { listenWheelZoom } from './wheelZoom'
 
-// #212: the wheel zoom's preventDefault must take effect, so its listener is
-// registered non-passive. A stand-in canvas records the registration.
+// jmbarzee/temporal-architect#212: the wheel zoom's preventDefault must take
+// effect, so its listener is registered non-passive. A stand-in canvas records
+// the registration.
 function fakeCanvas() {
   const listeners: { type: string; fn: EventListener; options: unknown }[] = []
   const canvas = {

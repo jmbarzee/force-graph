@@ -8,10 +8,10 @@
 import React from 'react'
 import {
   GraphView, GroupLegend, TaxonomyContext, copyGroups, initialFilter, nodesById, payloadNumber, payloadString, schemeVars, selectionFor, useFocusRequest, withSelection,
-} from '@temporal-architect/graph-view'
+} from '@jmbarzee/force-graph'
 import type {
   AxisSelection, FilterState, Graph, GraphNode, NodeGroup, Theme, ThemeChoice,
-} from '@temporal-architect/graph-view'
+} from '@jmbarzee/force-graph'
 import { catalog } from './data'
 import type { Campus, Catalog } from './data'
 import { buildGraph } from './graph'

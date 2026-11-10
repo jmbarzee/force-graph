@@ -1,4 +1,4 @@
-# @temporal-architect/graph-view
+# @jmbarzee/force-graph
 
 A force-directed graph view with composable axes, as a React component.
 
@@ -11,20 +11,10 @@ computed scalar), filters it on any declared axis, highlights it, and lets the
 user tune the forces — without knowing what any node or edge means. The host's
 vocabulary never enters this package.
 
-## Status
-
-Not yet published. In this repository the visualizer (`tools/visualizer/`) is
-the first host and consumes the library from source through its build's alias;
-`examples/course-catalog/` is the second, written against the public entry
-alone. `npm run build:lib` produces the standalone artifact (`dist-lib/`: the
-bundle, one stylesheet, the declarations the entry reaches), and
-`make pack-graph-view-lib` packs it. Publishing under the organisation's scope
-is a release decision.
-
-## Install (once published)
+## Install
 
 ```bash
-npm install @temporal-architect/graph-view
+npm install @jmbarzee/force-graph
 ```
 
 `react` and `react-dom` are peer dependencies (`^18 || ^19`). The package is
@@ -34,12 +24,13 @@ component's rules.
 ## Quick start
 
 The smallest host: a taxonomy of two values and two edge types, a graph of
-three nodes, the view. The block below is the whole of it.
+three nodes, the view. The block below is the whole of it; a full host is
+[`examples/course-catalog/`](examples/course-catalog/).
 
 ```tsx
-import { createTaxonomy, GraphView } from '@temporal-architect/graph-view'
-import type { Graph, GraphNode } from '@temporal-architect/graph-view'
-import '@temporal-architect/graph-view/styles.css'
+import { createTaxonomy, GraphView } from '@jmbarzee/force-graph'
+import type { Graph, GraphNode } from '@jmbarzee/force-graph'
+import '@jmbarzee/force-graph/styles.css'
 
 const taxonomy = createTaxonomy({
   styleAxis: 'kind',
@@ -325,8 +316,8 @@ a focus names:
 
 ```tsx
 import React from 'react'
-import { FilterBar, GraphView, passesSelection, useLinkedViews } from '@temporal-architect/graph-view'
-import type { Graph, Taxonomy } from '@temporal-architect/graph-view'
+import { FilterBar, GraphView, passesSelection, useLinkedViews } from '@jmbarzee/force-graph'
+import type { Graph, Taxonomy } from '@jmbarzee/force-graph'
 
 export function TwoViews({ taxonomy, graph }: { taxonomy: Taxonomy; graph: Graph }) {
   const linked = useLinkedViews({ taxonomy, views: ['list', 'graph'], graph })
@@ -422,9 +413,13 @@ The charge force is O(n²) over the visible nodes: a few hundred draw
 smoothly, a few thousand do not. The push/pull and layout controls bound their
 tokens by a ceiling (an axis with more values than the ceiling is offered but
 cannot be tuned on, and a tuning that outgrows it returns to the style axis).
-What is not built is filed: colour by another axis (#194), an opaque
-`Taxonomy` (#195), undirected edges (#196), per-edge weight (#197), the pane's
-strings in other languages (#198), the React 19 types gate (#200).
+What is not built is filed: colour by another axis
+(jmbarzee/temporal-architect#194), an opaque `Taxonomy`
+(jmbarzee/temporal-architect#195), undirected edges
+(jmbarzee/temporal-architect#196), per-edge weight
+(jmbarzee/temporal-architect#197), the pane's strings in other languages
+(jmbarzee/temporal-architect#198), the React 19 types gate
+(jmbarzee/temporal-architect#200).
 
 `src/index.ts` names the whole surface; the tarball ships `dist-lib/`, this
 file and the licence.

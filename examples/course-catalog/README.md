@@ -1,6 +1,6 @@
 # Course catalog — an example host
 
-A university course catalog drawn with `@temporal-architect/graph-view`:
+A university course catalog drawn with `@jmbarzee/force-graph`:
 faculties contain departments, departments contain courses, courses contain
 labs. Prerequisite, co-requisite and recommended links cross the hierarchy, and
 only the edge's own `requirement` tells them apart. A cross-listed course
@@ -11,7 +11,7 @@ The example imports only the package's public entry.
 
 ## Run
 
-From `tools/graph-view`:
+From the repository root:
 
 ```sh
 npx vite --config examples/course-catalog/vite.config.ts        # http://localhost:5179

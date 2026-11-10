@@ -1,4 +1,4 @@
-// Public entry point for the graph-view library.
+// Public entry point for the force-graph library.
 //
 // A force-directed graph view with composable axes. A host declares its
 // taxonomy — the axes its nodes carry, the values on each, their colours, sizes

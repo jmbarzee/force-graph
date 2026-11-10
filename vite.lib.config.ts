@@ -1,11 +1,7 @@
-// Library build config for `@temporal-architect/graph-view`: an ESM bundle with
+// Library build config for `@jmbarzee/force-graph`: an ESM bundle with
 // externalized React peer dependencies, one sibling stylesheet (the tokens and
 // every component's rules), and per-file `.d.ts` declarations pruned to what the
-// entry reaches (`verify/prune-dts.mjs`; the plugin's `rollupTypes` is a no-op in
-// this version, T31). In this repository the
-// visualizer consumes the library from source through its own build's alias
-// (D62), so this build is the standalone, extractable artifact — R36 — and what
-// `make pack-graph-view-lib` attaches to a Release.
+// entry reaches (`verify/prune-dts.mjs`).
 import { defineConfig } from 'vite'
 import react from '@vitejs/plugin-react'
 import dts from 'vite-plugin-dts'

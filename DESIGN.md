@@ -1,9 +1,10 @@
-# graph-view — design notes
+# force-graph — design notes
 
 What a maintainer needs that the README — the host's contract — does not say:
 the invariants the library holds and why it holds them. They were settled
-during the extraction of this library from the visualizer (the stacked pull
-requests #158 to #218 on `jmbarzee/temporal-architect` and their reviews);
+during the extraction of this library from temporal-architect's visualizer
+(the stacked pull requests jmbarzee/temporal-architect#158 to
+jmbarzee/temporal-architect#218 and their reviews);
 the per-unit record went with the scaffolding when the tree was reduced to
 the product, and these notes are what it distilled to.
 
@@ -83,7 +84,6 @@ the product, and these notes are what it distilled to.
   a contract, and a change to it is a breaking change to every host.
 - **Every shipped declaration carries a doc comment that states the contract,
   not the history.**
-- **Two hosts keep it honest.** The visualizer (`tools/visualizer`) consumes
-  the library from source through its build's alias and bundles it; the
-  course catalog (`examples/course-catalog`) is written against the public
-  entry alone, and is the check that the README suffices.
+- **Two hosts keep it honest.** temporal-architect's visualizer consumes the
+  package; the course catalog (`examples/course-catalog`) is written against
+  the public entry alone, and is the check that the README suffices.
