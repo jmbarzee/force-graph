@@ -1,7 +1,8 @@
 # force-graph — design notes
 
-What a maintainer needs that the README — the host's contract — does not say:
-the invariants the library holds and why.
+What a maintainer needs that the README — the host's contract — and
+[SPEC](SPEC.md) — the view's behaviour — do not say: the invariants the
+library holds and why.
 
 ## The model
 
