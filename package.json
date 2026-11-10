@@ -7,7 +7,7 @@
   "homepage": "https://github.com/jmbarzee/force-graph",
   "repository": {
     "type": "git",
-    "url": "https://github.com/jmbarzee/force-graph"
+    "url": "git+https://github.com/jmbarzee/force-graph.git"
   },
   "bugs": {
     "url": "https://github.com/jmbarzee/force-graph/issues"
