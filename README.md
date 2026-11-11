@@ -435,7 +435,7 @@ What is not built is filed as issues:
   its outputs ([#16](https://github.com/jmbarzee/force-graph/issues/16)), a
   focus that frames the neighbourhood
   ([#21](https://github.com/jmbarzee/force-graph/issues/21)), a neighbourhood
-  frame that counts hidden neighbours
+  frame that leaves hidden neighbours out
   ([#26](https://github.com/jmbarzee/force-graph/issues/26)), the keyboard and
   accessibility model ([#7](https://github.com/jmbarzee/force-graph/issues/7)),
   positions, viewport and selection kept across a live reload
