@@ -410,14 +410,46 @@ draw in lanes.
 ## Limits
 
 The charge force is O(n²) over the visible nodes: a few hundred draw
-smoothly, a few thousand do not. The push/pull and layout controls bound their
-tokens by a ceiling ([SPEC § The control panel](SPEC.md#the-control-panel)).
-What is not built is filed as issues: colour by another axis
-([#9](https://github.com/jmbarzee/force-graph/issues/9)), an opaque `Taxonomy`
-([#10](https://github.com/jmbarzee/force-graph/issues/10)), undirected edges
-([#11](https://github.com/jmbarzee/force-graph/issues/11)), per-edge weight
-([#12](https://github.com/jmbarzee/force-graph/issues/12)), the pane's strings
-in other languages ([#13](https://github.com/jmbarzee/force-graph/issues/13)),
-the React 19 types gate ([#14](https://github.com/jmbarzee/force-graph/issues/14)).
+smoothly, a few thousand do not (Barnes-Hut,
+[#30](https://github.com/jmbarzee/force-graph/issues/30)). The push/pull and
+layout controls bound their tokens by a ceiling
+([SPEC § The control panel](SPEC.md#the-control-panel)).
+What is not built is filed as issues:
+
+- **The graph and taxonomy** — colour by another axis
+  ([#9](https://github.com/jmbarzee/force-graph/issues/9)), an opaque
+  `Taxonomy` ([#10](https://github.com/jmbarzee/force-graph/issues/10)),
+  undirected edges ([#11](https://github.com/jmbarzee/force-graph/issues/11)),
+  per-edge weight ([#12](https://github.com/jmbarzee/force-graph/issues/12)),
+  an edge time series played back
+  ([#33](https://github.com/jmbarzee/force-graph/issues/33)), host-declared
+  pair-axis mappings ([#32](https://github.com/jmbarzee/force-graph/issues/32)),
+  a node drawn as a stack of ghosts
+  ([#19](https://github.com/jmbarzee/force-graph/issues/19)).
+- **Groups** — structural colouring, a metric channel and a cohesion pull
+  ([#27](https://github.com/jmbarzee/force-graph/issues/27)); hiding through
+  the legend, one emphasis path, colours validated on arrival
+  ([#17](https://github.com/jmbarzee/force-graph/issues/17)).
+- **Interaction** — selecting several nodes
+  ([#28](https://github.com/jmbarzee/force-graph/issues/28)), edge hover and
+  its outputs ([#16](https://github.com/jmbarzee/force-graph/issues/16)), a
+  focus that frames the neighbourhood
+  ([#21](https://github.com/jmbarzee/force-graph/issues/21)), a neighbourhood
+  frame that counts hidden neighbours
+  ([#26](https://github.com/jmbarzee/force-graph/issues/26)), the keyboard and
+  accessibility model ([#7](https://github.com/jmbarzee/force-graph/issues/7)),
+  positions, viewport and selection kept across a live reload
+  ([#5](https://github.com/jmbarzee/force-graph/issues/5)), animated reveals
+  ([#8](https://github.com/jmbarzee/force-graph/issues/8)), an empty state
+  when the filter hides every node
+  ([#6](https://github.com/jmbarzee/force-graph/issues/6)).
+- **The control panel** — named presets
+  ([#29](https://github.com/jmbarzee/force-graph/issues/29)), grouping a ladder
+  of values and the Misc tab's read-outs
+  ([#31](https://github.com/jmbarzee/force-graph/issues/31)), a force tab with
+  nothing visible ([#4](https://github.com/jmbarzee/force-graph/issues/4)).
+- **The package** — the pane's strings in other languages
+  ([#13](https://github.com/jmbarzee/force-graph/issues/13)), the React 19
+  types gate ([#14](https://github.com/jmbarzee/force-graph/issues/14)).
 
 `src/index.ts` names the whole surface.
