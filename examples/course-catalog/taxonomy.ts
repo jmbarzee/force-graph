@@ -187,8 +187,6 @@ const FILTERS: readonly AxisDescriptor[] = [
   {
     id: INSTRUCTOR,
     label: 'Instructor',
-    // Read off each course's tags: a team-taught course shows under each of
-    // its instructors, and only the filter reads them.
     emptyMeans: 'all',
     reads: 'tags',
   },

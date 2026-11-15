@@ -304,7 +304,6 @@ export function retunedFor(params: ForceParams, taxonomy: Taxonomy, graph: Graph
   const nodeOf = (id: string) => byId.get(id)
   const refreshed = (m: AxisMapping): AxisMapping | undefined => {
     if (m.axis === style) return styleIdentityMapping(taxonomy)
-    if (tagAxesOf(taxonomy).includes(m.axis)) return undefined
     const values = valuesOn(graph.nodes, m.axis)
     return values.length === 0 ? undefined : identityMapping(namerFor(taxonomy, m.axis), values)
   }
@@ -317,9 +316,13 @@ export function retunedFor(params: ForceParams, taxonomy: Taxonomy, graph: Graph
   const refresh = <T extends { mapping: AxisMapping }>(
     tuning: T, fresh: (mapping: AxisMapping) => T, fits: (mapping: AxisMapping) => boolean,
   ): T => {
+    if (tagAxesOf(taxonomy).includes(tuning.mapping.axis)) {
+      fellBack(tuning.mapping.axis, 'it is a tag axis, which only filters')
+      return fresh(styleIdentityMapping(taxonomy))
+    }
     const next = refreshed(tuning.mapping)
     if (next === undefined || (next.axis !== style && !fits(next))) {
-      fellBack(tuning.mapping.axis, next === undefined ? 'no node carries a value on it' : `it has ${next.buckets.length} buckets, past the ceiling of ${TOKEN_CEILING}`)
+      fellBack(tuning.mapping.axis, next === undefined ? 'no node carries it any more' : `it has ${next.buckets.length} buckets, past the ceiling of ${TOKEN_CEILING}`)
       return fresh(styleIdentityMapping(taxonomy))
     }
     return sameBuckets(next, tuning.mapping) ? tuning : { ...tuning, mapping: next }

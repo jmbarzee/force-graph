@@ -58,7 +58,7 @@ export type ContextLine = ReactNode | readonly ReactNode[]
  *
  * What a host reads: `filterAxes` and `axisFor` to filter its own records the
  * way the view does, through `passesSelection`; `valueOn` for a record's
- * value on an axis; `styleOf`, `styleValues` and `colorVar` for chrome of its
+ * value on a value axis; `styleOf`, `styleValues` and `colorVar` for chrome of its
  * own in the scheme's colours; `edgeTypes` for a legend;
  * `searchText` to match as the view matches. The rest is the engine's
  * interface — resolution for the draw loop — and a host has no call to read
@@ -92,8 +92,9 @@ export interface Taxonomy {
   /** One axis's policies, or undefined if the host does not declare it. */
   axisFor(axis: AxisId): ResolvedAxisDescriptor | undefined
   /**
-   * The value a subject presents on one axis — read off its values, for
-   * every axis alike. An axis that is a projection of another is materialized
+   * The value a subject presents on a value axis — read off its values. A
+   * tag axis's tags are read through `passesSelection`, or `valuesOn` given
+   * its descriptor. An axis that is a projection of another is materialized
    * by the host when it builds the node, so nothing here knows which axes are
    * derived.
    */

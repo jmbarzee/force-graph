@@ -214,7 +214,7 @@ and the nodes, and drops it when the pointer leaves. There is no toggle.
 
 A query matches, case-insensitively, the text `searchText` gives — the name
 by default. Matching visible nodes stay at full opacity and the rest dim to
-20%. A match a filter hides badges the chip hiding it, on the first axis shown that it fails (its first tag's, on a tag axis), and the
+20%. A match a filter hides badges the chip hiding it, on the first axis shown that it fails (on a tag axis, its first tag whose chip is off), and the
 search control carries the total (`+N`). The dropdown lists the visible
 matches; picking one centres on it and selects it.
 

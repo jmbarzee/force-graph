@@ -3,8 +3,7 @@
 // A node is a map of axis → value, and every feature (colour, push/pull,
 // each gravity axis, each filter axis) elects exactly ONE axis to operate on. Features never sum, compose or rank
 // across axes: that is what keeps the model explainable, and it is why nothing
-// here offers a way to combine two axes. A node's several tags on an axis live
-// apart from its values, on an axis that only filters, so no force meets a list.
+// here offers a way to combine two axes.
 //
 // **Values are strings, and that is load-bearing rather than lazy.** Selections
 // end up as `Set` and `Map` keys in the force kernels, and a `Set` deduplicates

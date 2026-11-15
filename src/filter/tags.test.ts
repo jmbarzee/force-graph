@@ -1,7 +1,9 @@
-import { describe, expect, it } from 'vitest'
+import { describe, expect, it, vi } from 'vitest'
 import { countsOn, valuesOn } from '../graph/axis'
+import { layoutFromJSON } from '../graph/layout'
+import { openLayout } from '../graph/layout-internal'
 import type { Graph, GraphNode } from '../graph/model'
-import { axisOptions } from '../graph/simulation'
+import { axisOptions, retunedFor } from '../graph/simulation'
 import { createTaxonomy } from '../graph/taxonomy'
 import { validateGraph } from '../graph/validate'
 import { reconcileFilter } from './reconcile'
@@ -51,14 +53,33 @@ describe('a tag axis', () => {
     expect(focus(filtered({ label: [], assignee: ['cy'] }))).toEqual(filtered({ label: ['bug'], assignee: ['cy', 'ana'] }))
   })
 
-  it('counts a hidden search match on its first tag', () => {
-    const split = hiddenMatchesOf({ nodes: [both], filter: filtered({ label: ['p2'] }), taxonomy, axes: ['label'], visibleIds: new Set(), matches: () => true })
-    expect(split.hiddenByAxis.get('label')).toEqual(new Map([['bug', 1]]))
+  it('counts a hidden search match on its first tag whose chip is off', () => {
+    // One chip holds `a` and `c`, so `c` on turns it on: a node tagged `a`
+    // and `b` is hidden by `b`'s chip.
+    const grouped = createTaxonomy({
+      styleAxis: 'kind',
+      styles: [],
+      filterAxes: [{ id: 'label', emptyMeans: 'all', reads: 'tags', chipsFor: () => [{ id: 'ac', label: 'ac', values: ['a', 'c'] }, { id: 'b', label: 'b', values: ['b'] }] }],
+    })
+    const split = hiddenMatchesOf({
+      nodes: [node('ab', { label: ['a', 'b'] }), node('c', { label: ['c'] })],
+      filter: filtered({ label: ['c'] }), taxonomy: grouped, axes: ['label'], visibleIds: new Set(['c']), matches: () => true,
+    })
+    expect(split.hiddenByAxis.get('label')).toEqual(new Map([['b', 1]]))
   })
 
   it('is never offered to push, pull or a layout axis', () => {
     const tagged: Graph = { nodes: [{ ...both, values: { kind: 'item', label: 'bug', team: 'core' } }], edges: [] }
     expect(axisOptions(taxonomy, tagged).map(o => o.mapping.axis)).toEqual(['kind', 'team'])
+  })
+
+  it('returns a stored layout axis on it to the style axis, saying why', () => {
+    const warn = vi.spyOn(console, 'warn').mockImplementation(() => {})
+    const stored = openLayout(layoutFromJSON({ forces: { bandY: { axis: 'label' } } }, taxonomy)!).forces
+    const retuned = retunedFor(stored, taxonomy, graph)
+    expect('mapping' in retuned.bandY && retuned.bandY.mapping.axis).toBe('kind')
+    expect(warn).toHaveBeenCalledWith(expect.stringContaining('it is a tag axis, which only filters'))
+    warn.mockRestore()
   })
 
   it('cannot be the style axis', () => {

@@ -359,7 +359,8 @@ when `graph` changes, on the axes the user has not touched); `linked.state`,
 for a host that persists them. The bar carries its own theme and scheme
 (`theme`, default `system`; `systemTheme` says what that means), so it needs
 no wrapper; give it the `graph` (or the `values` per axis — `valuesOn(records,
-axis)` reads them off any subjects carrying `values` and `tags`) and, if the host reads
+axis)` reads them off any subjects carrying `values`, or their `tags` given the
+axis's descriptor) and, if the host reads
 its own data, the `counts`. The lock toggles appear only when `locks` is
 controlled with its callback — `useLinkedViews` does — or `chrome.locks` asks.
 The bar tracks the values that just turned on for its chip flash

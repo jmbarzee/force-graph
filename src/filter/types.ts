@@ -9,7 +9,7 @@
 //
 // The search query lives outside a FilterState because the views share it.
 
-import type { AxisId, AxisSubject, AxisValue, ResolvedAxisDescriptor } from '../graph/axis'
+import type { AxisId, AxisSubject, AxisValue, FilterChip, ResolvedAxisDescriptor } from '../graph/axis'
 import { readAxis, valuesOn } from '../graph/axis'
 import type { Graph } from '../graph/model'
 import type { Taxonomy } from '../graph/taxonomy'
@@ -322,12 +322,12 @@ export interface HiddenMatches {
   visible: ReadonlySet<string>
   /** How many matching nodes the filter hides. */
   hiddenCount: number
-  /** The hidden matches per axis and value — on the first of the axes shown that each node fails, under its value there (its first tag, on a tag axis). */
+  /** The hidden matches per axis and value — on the first of the axes shown that each node fails, under its value there (on a tag axis, its first tag whose chip is off). */
   hiddenByAxis: ReadonlyMap<AxisId, ReadonlyMap<string, number>>
 }
 
 /** What `hiddenMatchesOf` reads. */
-export interface HiddenMatchesInput<N extends AxisSubject & { id: string }> {
+export interface HiddenMatchesInput<N extends { id: string }> {
   /** Every node the search ran over, visible or not. */
   nodes: Iterable<N>
   filter: FilterState
@@ -344,22 +344,34 @@ export interface HiddenMatchesInput<N extends AxisSubject & { id: string }> {
  * Split a search's matches by the filter, the way the pane does under its
  * own bar: a match the filter shows lights up, a match it hides is counted
  * on the chip hiding it — the first axis in `axes` the node fails, under the
- * node's value there, or its first tag — so a host's second bar can wear the
- * same badges.
+ * node's value there, or its first tag whose chip is off — so a host's second
+ * bar can wear the same badges.
  */
-export function hiddenMatchesOf<N extends AxisSubject & { id: string }>({ nodes, filter, taxonomy, axes, visibleIds, matches, valueOn }: HiddenMatchesInput<N>): HiddenMatches {
+export function hiddenMatchesOf<N extends { id: string }>({ nodes, filter, taxonomy, axes, visibleIds, matches, valueOn }: HiddenMatchesInput<N>): HiddenMatches {
   const read = readerOf(valueOn)
+  const all = [...nodes]
   const descriptors = axes.flatMap(id => { const d = taxonomy.axisFor(id); return d ? [d] : [] })
+  // An axis's chips as the bar builds them, once per axis a match fails.
+  const chipsOf = new Map<AxisId, readonly FilterChip[]>()
+  const chipsFor = (d: ResolvedAxisDescriptor) => {
+    let chips = chipsOf.get(d.id)
+    if (!chips) { chips = d.chipsFor([...new Set(all.flatMap(n => read(n, d)))]); chipsOf.set(d.id, chips) }
+    return chips
+  }
   const visible = new Set<string>()
   let hiddenCount = 0
   const hiddenByAxis = new Map<AxisId, Map<string, number>>()
-  for (const node of nodes) {
+  for (const node of all) {
     if (!matches(node)) continue
     if (visibleIds.has(node.id)) { visible.add(node.id); continue }
     hiddenCount++
     const failing = descriptors.find(d => !passesDescriptors(filter, [d], axis => read(node, axis)))
-    const value = failing ? read(node, failing)[0] : undefined
-    if (!failing || value === undefined) continue
+    if (!failing) continue
+    const values = read(node, failing)
+    const selection = selectionFor(filter, failing.id)
+    const chipOf = (v: AxisValue) => chipsFor(failing).find(c => c.values.includes(v))?.values ?? [v]
+    const value = values.find(v => !chipOf(v).some(x => selection.has(x))) ?? values[0]
+    if (value === undefined) continue
     const tally = hiddenByAxis.get(failing.id) ?? new Map<string, number>()
     tally.set(value, (tally.get(value) ?? 0) + 1)
     hiddenByAxis.set(failing.id, tally)
