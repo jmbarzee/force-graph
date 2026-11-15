@@ -47,15 +47,9 @@ export function hostTheme(el: Element | null): Theme {
   return window.matchMedia?.('(prefers-color-scheme: dark)').matches ? 'dark' : 'light'
 }
 
-/**
- * The host's theme for the element at `ref`, re-read when any ancestor's
- * `data-theme` changes and when the OS preference changes. With `enabled`
- * false nothing is read or observed, and the answer is light.
- */
-export function useHostTheme(ref: React.RefObject<HTMLElement | null>, enabled = true): Theme {
-  // Light until the layout effect reads the host: the server's answer, so a
-  // hydrating render matches it, and still settled before a client render paints.
-  const [host, setHost] = React.useState<Theme>('light')
+/** The host's theme for the element at `ref`, or undefined until the layout effect has read it. */
+function useHostRead(ref: React.RefObject<HTMLElement | null>, enabled: boolean): Theme | undefined {
+  const [host, setHost] = React.useState<Theme>()
   useIsomorphicLayoutEffect(() => {
     if (!enabled) return
     const read = () => setHost(hostTheme(ref.current))
@@ -70,8 +64,23 @@ export function useHostTheme(ref: React.RefObject<HTMLElement | null>, enabled =
   return host
 }
 
-/** The resolved theme for the pane rooted at `ref`, given the user's choice and, for `system`, what the host says it means — else what its ancestors and the OS say. */
-export function useTheme(ref: React.RefObject<HTMLElement | null>, choice: ThemeChoice, systemTheme?: Theme): Theme {
-  const host = useHostTheme(ref, systemTheme === undefined)
+/**
+ * The host's theme for the element at `ref`, re-read when any ancestor's
+ * `data-theme` changes and when the OS preference changes. Light until read,
+ * the server's answer, so a hydrating render matches it; with `enabled`
+ * false nothing is read or observed, and the answer stays light.
+ */
+export function useHostTheme(ref: React.RefObject<HTMLElement | null>, enabled = true): Theme {
+  return useHostRead(ref, enabled) ?? 'light'
+}
+
+/** The resolved theme for the pane rooted at `ref`, given the user's choice and, for `system`, what the host says it means — else what its ancestors and the OS say, undefined until read. */
+export function useResolvedTheme(ref: React.RefObject<HTMLElement | null>, choice: ThemeChoice, systemTheme?: Theme): Theme | undefined {
+  const host = useHostRead(ref, systemTheme === undefined)
   return choice === 'system' ? systemTheme ?? host : choice
+}
+
+/** The theme the pane rooted at `ref` draws in: the resolved theme, light until read. */
+export function useTheme(ref: React.RefObject<HTMLElement | null>, choice: ThemeChoice, systemTheme?: Theme): Theme {
+  return useResolvedTheme(ref, choice, systemTheme) ?? 'light'
 }
