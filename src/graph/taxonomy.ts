@@ -57,9 +57,8 @@ export type ContextLine = ReactNode | readonly ReactNode[]
  * variant from the spec, never by spreading this object.
  *
  * What a host reads: `filterAxes` and `axisFor` to filter its own records the
- * way the view does, through `passesSelection`; `valueOn` for a record's
- * value on a value axis; `styleOf`, `styleValues` and `colorVar` for chrome of its
- * own in the scheme's colours; `edgeTypes` for a legend;
+ * way the view does, through `passesSelection`; `styleOf`, `styleValues` and
+ * `colorVar` for chrome of its own in the scheme's colours; `edgeTypes` for a legend;
  * `searchText` to match as the view matches. The rest is the engine's
  * interface — resolution for the draw loop — and a host has no call to read
  * it.
@@ -91,14 +90,6 @@ export interface Taxonomy {
   readonly filterAxes: readonly ResolvedAxisDescriptor[]
   /** One axis's policies, or undefined if the host does not declare it. */
   axisFor(axis: AxisId): ResolvedAxisDescriptor | undefined
-  /**
-   * The value a subject presents on a value axis — read off its values. A
-   * tag axis's tags are read through `passesSelection`, or `valuesOn` given
-   * its descriptor. An axis that is a projection of another is materialized
-   * by the host when it builds the node, so nothing here knows which axes are
-   * derived.
-   */
-  valueOn(subject: StyleSubject, axis: AxisId): AxisValue | undefined
   /** Every style value, in declaration order (top of the hierarchy first). */
   readonly styleValues: readonly AxisValue[]
   /** Every edge type, in control-panel order, its defaults filled in. */
@@ -458,7 +449,6 @@ export function createTaxonomy(spec: TaxonomySpec): Taxonomy {
     styleLabel: () => spec.styleLabel ?? styleAxis,
     filterAxes: resolvedAxes,
     axisFor: id => byAxis.get(id),
-    valueOn: (subject, axis) => subject.values[axis],
     abbreviationFor,
     styleValues: values,
     edgeTypes,
