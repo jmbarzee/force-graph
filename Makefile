@@ -11,9 +11,10 @@ check: typecheck typecheck-example test build
 typecheck:
 	npm run typecheck
 
-## typecheck-example — the course catalog against the public entry
+## typecheck-example — the examples against the public entry
 typecheck-example:
 	npx tsc --noEmit -p examples/course-catalog/tsconfig.json
+	npx tsc --noEmit -p examples/many-axes/tsconfig.json
 
 ## test — the unit tests
 test:

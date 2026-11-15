@@ -99,6 +99,13 @@ adds a declared axis not shown; then the search. The host's `findings` fill a
 slot at its bottom, and the bar can flash on a host's refresh. A host's
 `groupsControl` anchors under it, at `--gv-toolbar-height`.
 
+An axis whose chips overflow its row shows the row and a count of the rest;
+the count opens it and **Less** closes it. Every axis starts closed, and which
+are open is not remembered. A change to an axis's selection from outside the
+bar — a focus, a view switch, the host — opens it, so the chips that turned on
+are in view when they flash; so does the keyboard reaching a chip past the row.
+A click in the bar leaves its axis as the user has it.
+
 At the bottom, out of the bar's way:
 
 - **bottom left** — `N nodes, M edges`, the visible and graduated set, moved

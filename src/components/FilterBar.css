@@ -398,6 +398,33 @@
   padding: 3px 6px;
 }
 
+/* A collapsed axis: its first line of chips, the height the bar measured,
+   with room left for a chip's flash ring. */
+.gv-chip-row.collapsed,
+.gv-tag-row.collapsed {
+  overflow: clip;
+  overflow-clip-margin: 4px;
+}
+
+/* The count of a collapsed axis's other chips, which opens it; "Less" closes it. */
+.gv-header-more {
+  flex: 0 0 auto;
+  align-self: flex-start;
+  border: 1px dashed var(--gv-color-border);
+  border-radius: 6px;
+  background: transparent;
+  color: var(--gv-color-text-muted);
+  font-family: var(--gv-font-mono);
+  font-size: 11px;
+  padding: 5px 8px;
+  cursor: pointer;
+}
+
+.gv-header-more:hover {
+  border-style: solid;
+  color: var(--gv-color-text);
+}
+
 /* The axis's own name before its chips: a row reads as "Campus: …", not as a bare run of buttons. */
 .gv-header-axis-label {
   color: var(--gv-color-text-muted);

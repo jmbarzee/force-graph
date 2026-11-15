@@ -35,7 +35,7 @@ import { selectionFor } from '../filter/types'
 import React from 'react'
 import './FilterBar.css'
 import type { ResolvedAxisDescriptor } from '../graph/axis'
-import { filterStatesEqual, listEqual, lockedFor, locksEqual, withLock, withSelection } from '../filter/types'
+import { changedAxes, filterStatesEqual, listEqual, lockedFor, locksEqual, withLock, withSelection } from '../filter/types'
 import type { FilterState, AxisLocks } from '../filter/types'
 import { toggleGroup } from '../filter/toggle'
 import { LockToggle } from './LockToggle'
@@ -119,6 +119,68 @@ interface FilterBarBaseProps {
   findings?: React.ReactNode
   /** Flash the whole bar once whenever this value changes to something truthy — a counter a host bumps when its data reloads. */
   refreshFlash?: boolean | number
+}
+
+/** The first line of a row's items, laid out at these offsets from its top: its height, and how many items wrap past it. */
+export function firstLine(items: readonly { top: number; bottom: number }[]): { height: number; rest: number } {
+  const first = items[0]
+  if (!first) return { height: 0, rest: 0 }
+  const onIt = items.filter(i => i.top < first.bottom)
+  return { height: Math.max(...onIt.map(i => i.bottom)), rest: items.length - onIt.length }
+}
+
+/** The axes a change of filter opens: those whose selection changed, but for the ones the bar's own click changed. */
+export function axesOpenedBy(prev: FilterState, next: FilterState, clicked: readonly AxisId[]): AxisId[] {
+  return changedAxes(prev, next).filter(axis => !clicked.includes(axis))
+}
+
+/** An axis's chips: until it is open, the first line of them and a count of the rest, which opens it. */
+function ChipRow({ className, open, onOpenChange, children }: {
+  className: string
+  open: boolean
+  onOpenChange: (open: boolean) => void
+  children: React.ReactNode
+}) {
+  const ref = React.useRef<HTMLDivElement>(null)
+  const [line, setLine] = React.useState(() => firstLine([]))
+  // Measured before paint on every render, since chips, counts and badges
+  // change widths, and again whenever the pane's width moves the wrap.
+  const measure = React.useCallback(() => {
+    const row = ref.current!
+    const next = firstLine([...row.children].map(item => {
+      const { offsetTop, offsetHeight } = item as HTMLElement
+      return { top: offsetTop - row.offsetTop, bottom: offsetTop - row.offsetTop + offsetHeight }
+    }))
+    setLine(prev => (prev.height === next.height && prev.rest === next.rest ? prev : next))
+  }, [])
+  React.useLayoutEffect(measure)
+  React.useEffect(() => {
+    const observer = new ResizeObserver(measure)
+    observer.observe(ref.current!)
+    return () => observer.disconnect()
+  }, [measure])
+  const collapsed = !open && line.rest > 0
+  return (
+    <>
+      <div
+        ref={ref}
+        className={`${className}${collapsed ? ' collapsed' : ''}`}
+        style={collapsed ? { maxHeight: line.height } : undefined}
+        // A chip reached by keyboard past the first line opens the axis, so focus is never on a chip out of sight.
+        onFocus={e => { if (collapsed && e.target.offsetTop - ref.current!.offsetTop >= line.height) onOpenChange(true) }}
+      >
+        {children}
+      </div>
+      {line.rest > 0 && (
+        <button
+          className="gv-header-more"
+          onClick={() => onOpenChange(!open)}
+          aria-expanded={open}
+          title={open ? 'Show one row' : `Show ${line.rest} more`}
+        >{open ? 'Less' : `+${line.rest}`}</button>
+      )}
+    </>
+  )
 }
 
 /** The classes a section's chips wear, by the axis's declared presentation. */
@@ -207,6 +269,27 @@ export function FilterBar({
   // The add-axis menu, open while the user picks among several.
   const [addOpen, setAddOpen] = React.useState(false)
   const labelOf = (id: string) => taxonomy.axisFor(id)?.label ?? id
+  // Which axes show every chip: none at first, then those a change from
+  // outside the bar touched, and those the user opened.
+  const [open, setOpen] = React.useState<ReadonlySet<string>>(() => new Set())
+  const setAxisOpen = (axis: string, to: boolean) => setOpen(prev => {
+    const next = new Set(prev)
+    if (to) next.add(axis)
+    else next.delete(axis)
+    return next
+  })
+  const clicked = React.useRef<readonly AxisId[]>([])
+  const seenFilter = React.useRef(filter)
+  React.useEffect(() => {
+    const opened = axesOpenedBy(seenFilter.current, filter, clicked.current)
+    seenFilter.current = filter
+    clicked.current = []
+    if (opened.length > 0) setOpen(prev => new Set([...prev, ...opened]))
+  }, [filter])
+  const change = (next: FilterState, axis: AxisId) => {
+    clicked.current = [axis]
+    onFilterChange(next, [axis])
+  }
   const tracked = useRecentlyChanged(filter)
   const recentlyChanged = hostRecentlyChanged ?? tracked
   // Values for every declared axis, not only the shown ones: an axis the user
@@ -273,7 +356,7 @@ export function FilterBar({
         return (
           <React.Fragment key={axis}>
             <div className={`${look.sectionClass}${locked ? ' section-locked' : ''}`}>
-              <div className={look.rowClass}>
+              <ChipRow className={look.rowClass} open={open.has(axis)} onOpenChange={to => setAxisOpen(axis, to)}>
                 <span className="gv-header-axis-label">{label}</span>
                 {empty && (
                   <span className="gv-header-axis-empty" title={descriptor ? `${label} has no values in this view` : `${label} is not an axis the taxonomy declares`}>
@@ -296,7 +379,7 @@ export function FilterBar({
                       key={chip.id}
                       className={cls}
                       style={chip.tint ? ({ ['--gv-chip-tint' as string]: `var(${taxonomy.colorVar(tintOf(chip.id, chip.tint, taxonomy, undeclaredTints.current))})` } as React.CSSProperties) : undefined}
-                      onClick={() => onFilterChange(toggleGroup(filter, axis, chip.values), [axis])}
+                      onClick={() => change(toggleGroup(filter, axis, chip.values), axis)}
                       title={chip.tooltip ?? (isActive ? `Hide ${chip.label.toLowerCase()}` : `Show ${chip.label.toLowerCase()}`)}
                     >
                       {chip.icon && <span className={look.iconClass}>{chip.icon}</span>}
@@ -310,7 +393,7 @@ export function FilterBar({
                     </button>
                   )
                 })}
-              </div>
+              </ChipRow>
               {showLocks && descriptor && (
                 <LockToggle
                   locked={locked}
@@ -334,14 +417,15 @@ export function FilterBar({
                     // matches NOTHING, so clearing it would blank the view
                     // instead of unfiltering it. Match-everything is therefore empty for
                     // one and the full value set for the other.
-                    onFilterChange(withSelection(
+                    change(withSelection(
                       filter,
                       axis,
                       descriptor?.emptyMeans !== 'none'
                         ? new Set<string>()
                         : new Set(chips.flatMap(c => [...c.values])),
-                    ), [axis])
+                    ), axis)
                     setAxes(axes.filter(d => d !== axis))
+                    setAxisOpen(axis, false)
                   }}
                   title={`Remove the ${label} filter`}
                 >×</button>
