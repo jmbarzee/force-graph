@@ -1,8 +1,8 @@
 // Graph data model for the force-directed graph view.
 
-import type { AxisValues, Relation } from './axis'
+import type { AxisTags, AxisValues, Relation } from './axis'
 
-/** A node of the host's graph: an opaque id, a name, its values on the host's axes, and an optional parent, copy key, ring, badges and payload. */
+/** A node of the host's graph: an opaque id, a name, its values on the host's axes, and an optional parent, copy key, ring, badges, tags and payload. */
 export interface GraphNode {
   /**
    * Stable identity, owned by whoever produced the graph.
@@ -19,6 +19,11 @@ export interface GraphNode {
    * one axis each and read it from here; nothing composes across axes.
    */
   values: AxisValues
+  /**
+   * Several values on one axis — its assignees, its labels — on each axis
+   * the taxonomy declares to read tags. Read by the filter only.
+   */
+  tags?: AxisTags
   name: string
   /**
    * Metadata the host owns and the library does not interpret.
@@ -214,6 +219,12 @@ const sameValues = (a: AxisValues | undefined, b: AxisValues | undefined): boole
 }
 const sameList = (a: readonly string[] | undefined, b: readonly string[] | undefined): boolean =>
   a === b || (a !== undefined && b !== undefined && a.length === b.length && a.every((v, i) => v === b[i]))
+const sameTags = (a: AxisTags | undefined, b: AxisTags | undefined): boolean => {
+  if (a === b) return true
+  if (a === undefined || b === undefined) return false
+  const keys = Object.keys(a)
+  return keys.length === Object.keys(b).length && keys.every(k => sameList(a[k], b[k]))
+}
 
 /**
  * Whether two graphs say the same thing: the same nodes in the same order
@@ -228,7 +239,7 @@ export function graphEquals(a: Graph, b: Graph): boolean {
     const x = a.nodes[i], y = b.nodes[i]
     if (x === y) continue
     if (x.id !== y.id || x.name !== y.name || x.parentId !== y.parentId || x.copyKey !== y.copyKey || x.ring !== y.ring || x.payload !== y.payload) return false
-    if (!sameValues(x.values, y.values) || !sameList(x.badges, y.badges)) return false
+    if (!sameValues(x.values, y.values) || !sameList(x.badges, y.badges) || !sameTags(x.tags, y.tags)) return false
   }
   for (let i = 0; i < a.edges.length; i++) {
     const x = a.edges[i], y = b.edges[i]

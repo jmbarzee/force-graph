@@ -297,7 +297,7 @@ export function FilterBar({
   // Values for every declared axis, not only the shown ones: an axis the user
   // removed is offered back by "+" only if its values are known.
   const valuesByAxis = React.useMemo(
-    () => hostValues ?? new Map([...new Set([...taxonomy.filterAxes.map(d => d.id), ...axes])].map(d => [d, graph ? valuesOn(graph.nodes, d) : []])),
+    () => hostValues ?? new Map([...new Set([...taxonomy.filterAxes.map(d => d.id), ...axes])].map(d => [d, graph ? valuesOn(graph.nodes, taxonomy.axisFor(d) ?? d) : []])),
     [hostValues, graph, axes, taxonomy],
   )
   // Opened before paint, so the chips that turned on flash in view. An axis
@@ -313,8 +313,8 @@ export function FilterBar({
     if (opened.length > 0) setOpen(prev => new Set([...prev, ...opened]))
   }, [filter]) // eslint-disable-line react-hooks/exhaustive-deps
   const counts = React.useMemo(
-    () => hostCounts ?? (graph ? countsOn(graph.nodes, axes) : undefined),
-    [hostCounts, graph, axes],
+    () => hostCounts ?? (graph ? countsOn(graph.nodes, axes.map(d => taxonomy.axisFor(d) ?? d)) : undefined),
+    [hostCounts, graph, axes, taxonomy],
   )
 
   // What a section is made of: the values the host read off its data, their

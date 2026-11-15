@@ -48,7 +48,8 @@ the energy (alpha) cools, and ticking pauses below a threshold.
 ## Which nodes are visible
 
 A node is visible when it passes every filter axis shown, each by its own
-`emptyMeans` and `absentMeans`. In the catalog, Show is an allow-list (no chip
+`emptyMeans` and `absentMeans`; it passes a tag axis when any of its tags
+does. In the catalog, Show is an allow-list (no chip
 on shows nothing) and Campus narrows (no chip on shows every campus;
 faculties and departments carry no campus and always show).
 
@@ -213,7 +214,7 @@ and the nodes, and drops it when the pointer leaves. There is no toggle.
 
 A query matches, case-insensitively, the text `searchText` gives — the name
 by default. Matching visible nodes stay at full opacity and the rest dim to
-20%. A match a filter hides badges the chip hiding it, on the first axis shown that it fails, and the
+20%. A match a filter hides badges the chip hiding it, on the first axis shown that it fails (on a tag axis, its first tag whose chip is off), and the
 search control carries the total (`+N`). The dropdown lists the visible
 matches; picking one centres on it and selects it.
 
@@ -293,7 +294,8 @@ A host with a second view links them through `useLinkedViews`
 - **A switch reconciles.** A manual switch adopts the source view's selection
   on every axis the destination shows, except where the destination is locked.
   A focus widens the destination only as far as its target needs, by each
-  axis's `widens` and by whole chips, and overrides a lock for that switch
+  axis's `widens` and by whole chips — on a tag axis, only when none of the
+  target's tags is on, by its first — and overrides a lock for that switch
   alone; the bar flashes the overridden lock and the chips that turned on.
   There is no switch that copies one view's filter onto another past its
   locks.
