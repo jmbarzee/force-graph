@@ -1,5 +1,5 @@
 import { describe, expect, it } from 'vitest'
-import { axesOpenedBy, firstLine } from './FilterBar'
+import { axesOpenedBy, axesRegrown, firstLine } from './FilterBar'
 import type { FilterState } from '../filter/types'
 
 describe('firstLine', () => {
@@ -28,5 +28,13 @@ describe('axesOpenedBy', () => {
 
   it('opens nothing when the selections are unchanged', () => {
     expect(axesOpenedBy(before, new Map(before), [])).toEqual([])
+  })
+
+  it('leaves an axis as it is when a re-seed follows values that arrived', () => {
+    const thirty = Array.from({ length: 30 }, (_, i) => `team ${i}`)
+    const seeded: FilterState = new Map([['team', new Set(thirty)]])
+    const regrown = axesRegrown(new Map([['team', []]]), new Map([['team', thirty]]))
+    expect(regrown).toEqual(['team'])
+    expect(axesOpenedBy(new Map(), seeded, regrown)).toEqual([])
   })
 })

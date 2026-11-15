@@ -27,7 +27,7 @@
   align-items: center;
   justify-content: space-between;
   gap: 8px;
-  padding: 10px 14px;
+  padding: 8px 14px;
   transition: background 0.2s ease, box-shadow 0.2s ease;
 }
 
@@ -406,7 +406,6 @@
   overflow-clip-margin: 4px;
 }
 
-/* The count of a collapsed axis's other chips, which opens it; "Less" closes it. */
 .gv-header-more {
   flex: 0 0 auto;
   align-self: flex-start;

@@ -129,9 +129,14 @@ export function firstLine(items: readonly { top: number; bottom: number }[]): { 
   return { height: Math.max(...onIt.map(i => i.bottom)), rest: items.length - onIt.length }
 }
 
-/** The axes a change of filter opens: those whose selection changed, but for the ones the bar's own click changed. */
-export function axesOpenedBy(prev: FilterState, next: FilterState, clicked: readonly AxisId[]): AxisId[] {
-  return changedAxes(prev, next).filter(axis => !clicked.includes(axis))
+/** The axes a change of filter opens: those whose selection changed, but for the ones it leaves as they are. */
+export function axesOpenedBy(prev: FilterState, next: FilterState, leftAsIs: readonly AxisId[]): AxisId[] {
+  return changedAxes(prev, next).filter(axis => !leftAsIs.includes(axis))
+}
+
+/** The axes whose presented values differ between two readings — those a re-seed follows. */
+export function axesRegrown(prev: ReadonlyMap<string, readonly string[]>, next: ReadonlyMap<string, readonly string[]>): AxisId[] {
+  return [...new Set([...prev.keys(), ...next.keys()])].filter(axis => !listEqual(prev.get(axis) ?? [], next.get(axis) ?? []))
 }
 
 /** An axis's chips: until it is open, the first line of them and a count of the rest, which opens it. */
@@ -279,13 +284,6 @@ export function FilterBar({
     return next
   })
   const clicked = React.useRef<readonly AxisId[]>([])
-  const seenFilter = React.useRef(filter)
-  React.useEffect(() => {
-    const opened = axesOpenedBy(seenFilter.current, filter, clicked.current)
-    seenFilter.current = filter
-    clicked.current = []
-    if (opened.length > 0) setOpen(prev => new Set([...prev, ...opened]))
-  }, [filter])
   const change = (next: FilterState, axis: AxisId) => {
     clicked.current = [axis]
     onFilterChange(next, [axis])
@@ -298,6 +296,18 @@ export function FilterBar({
     () => hostValues ?? new Map([...new Set([...taxonomy.filterAxes.map(d => d.id), ...axes])].map(d => [d, graph ? valuesOn(graph.nodes, d) : []])),
     [hostValues, graph, axes, taxonomy],
   )
+  // Opened before paint, so the chips that turned on flash in view. An axis
+  // whose values changed since the last filter change is being re-seeded,
+  // and stays as it is.
+  const seenFilter = React.useRef(filter)
+  const seenValues = React.useRef(valuesByAxis)
+  React.useLayoutEffect(() => {
+    const opened = axesOpenedBy(seenFilter.current, filter, [...clicked.current, ...axesRegrown(seenValues.current, valuesByAxis)])
+    seenFilter.current = filter
+    seenValues.current = valuesByAxis
+    clicked.current = []
+    if (opened.length > 0) setOpen(prev => new Set([...prev, ...opened]))
+  }, [filter]) // eslint-disable-line react-hooks/exhaustive-deps
   const counts = React.useMemo(
     () => hostCounts ?? (graph ? countsOn(graph.nodes, axes) : undefined),
     [hostCounts, graph, axes],

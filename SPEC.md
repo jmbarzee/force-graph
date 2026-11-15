@@ -104,7 +104,9 @@ the count opens it and **Less** closes it. Every axis starts closed, and which
 are open is not remembered. A change to an axis's selection from outside the
 bar — a focus, a view switch, the host — opens it, so the chips that turned on
 are in view when they flash; so does the keyboard reaching a chip past the row.
-A click in the bar leaves its axis as the user has it.
+A click in the bar leaves its axis as the user has it, and a re-seed — the pane
+following new values on the axis as the host's graph arrives or changes —
+leaves it as it is.
 
 At the bottom, out of the bar's way:
 
