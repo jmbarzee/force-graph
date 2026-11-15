@@ -58,8 +58,8 @@ export type ContextLine = ReactNode | readonly ReactNode[]
  *
  * What a host reads: `filterAxes` and `axisFor` to filter its own records the
  * way the view does, through `passesSelection`; `styleOf`, `styleValues` and
- * `colorVar` for chrome of its own in the scheme's colours; `edgeTypes` for a legend;
- * `searchText` to match as the view matches. The rest is the engine's
+ * `colorVar` for chrome of its own in the scheme's colours; `edgeTypes` for a
+ * legend; `searchText` to match as the view matches. The rest is the engine's
  * interface — resolution for the draw loop — and a host has no call to read
  * it.
  */
