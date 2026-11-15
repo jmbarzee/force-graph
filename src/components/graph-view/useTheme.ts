@@ -74,7 +74,7 @@ export function useHostTheme(ref: React.RefObject<HTMLElement | null>, enabled =
   return useHostRead(ref, enabled) ?? 'light'
 }
 
-/** The resolved theme for the pane rooted at `ref`, given the user's choice and, for `system`, what the host says it means — else what its ancestors and the OS say, undefined until read. */
+/** The pane's resolved theme, undefined until the host is read. */
 export function useResolvedTheme(ref: React.RefObject<HTMLElement | null>, choice: ThemeChoice, systemTheme?: Theme): Theme | undefined {
   const host = useHostRead(ref, systemTheme === undefined)
   return choice === 'system' ? systemTheme ?? host : choice
