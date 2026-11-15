@@ -381,7 +381,10 @@ The pane resolves its theme from its own choice (Auto / Light / Dark) or, for
 `system`, from `systemTheme` when the host gives it, else the nearest
 ancestor's `data-theme` and then the OS — `useHostTheme(ref)` is that same
 read, for a host's own chrome, and `themeChoiceOf(value)` reads a stored
-choice back (`system` for anything else). Every
+choice back (`system` for anything else). A server render knows neither
+ancestors nor OS, so a server-rendered pane paints light until it hydrates; a
+host that wants no flash resolves the theme on the server (a cookie, say) and
+passes `systemTheme`. Every
 token the components read is a `--gv-*` custom property declared in the
 stylesheet per theme (`--gv-color-bg`, `--gv-color-text`, `--gv-accent`,
 `--gv-font-sans`, …), and every class is `gv-*`; a host overrides a token by

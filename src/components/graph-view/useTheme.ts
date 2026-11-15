@@ -38,8 +38,6 @@ export function themeOfMarker(marker: ThemeMarker | null): Theme | undefined {
 
 /** What the host has decided ABOVE `el`: the nearest marking ancestor, else the OS. */
 export function hostTheme(el: Element | null): Theme {
-  // No window (a server render): light, the same answer as a host that declares nothing.
-  if (typeof window === 'undefined') return 'light'
   let marker: Element | null = el?.parentElement?.closest(THEME_MARKER_SELECTOR) ?? null
   while (marker) {
     const theme = themeOfMarker(marker)
@@ -55,9 +53,9 @@ export function hostTheme(el: Element | null): Theme {
  * false nothing is read or observed, and the answer is light.
  */
 export function useHostTheme(ref: React.RefObject<HTMLElement | null>, enabled = true): Theme {
-  const [host, setHost] = React.useState<Theme>(() => (enabled ? hostTheme(ref.current) : 'light'))
-  // A layout effect: the ref is empty on the first render, so the first
-  // answer is read once the element exists and before anything is painted.
+  // Light until the layout effect reads the host: the server's answer, so a
+  // hydrating render matches it, and still settled before a client render paints.
+  const [host, setHost] = React.useState<Theme>('light')
   useIsomorphicLayoutEffect(() => {
     if (!enabled) return
     const read = () => setHost(hostTheme(ref.current))
