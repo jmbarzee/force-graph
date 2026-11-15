@@ -144,7 +144,7 @@ never by spreading the built object.
   and no icon elsewhere, the abbreviation from the label, no tooltip),
   `initialSelection(values)` is the first open's selection (default every
   value on an allow-list, none on a narrowing axis), `presentation` is
-  `chip` or `tag`.
+  `chip` or `tag`, and `reads: 'tags'` makes it a tag axis (see The graph).
 - **Scalars and hooks.** `scalars` adds computed axes (`id`, `label` and
   `tooltip` — defaults the id and the label — and `compute(graph)` answering a
   number per node; `normalize` maps
@@ -180,7 +180,14 @@ engine compares them and never parses one.
   the parent, and
   `validateGraph` names one that contradicts `parentId`. A host adds axes of
   its own to edges and nodes alike through `values`; any axis the nodes
-  carry can be pushed, pulled and laid out on.
+  carry a value on can be pushed, pulled and laid out on.
+- **Tags.** A node's `tags` map an axis to a list — its assignees, its
+  labels — read by a filter axis declared `reads: 'tags'`: a node passes it
+  when any of its tags does, and each tag's chip counts the node once. A tag
+  axis only filters — push, pull, a layout axis and colour never key on it —
+  and `validateGraph` warns of tags on any other axis. `valuesOn` and
+  `countsOn` read a tag axis when handed its descriptor
+  (`taxonomy.axisFor(id)`).
 - **Adornments.** A node may carry `badges` (short texts drawn as chips above
   it) and a `ring` (`dashed`, for a node set apart).
 - **Identity.** Keep one `graph` object until something in it changes: a new
@@ -352,7 +359,7 @@ when `graph` changes, on the axes the user has not touched); `linked.state`,
 for a host that persists them. The bar carries its own theme and scheme
 (`theme`, default `system`; `systemTheme` says what that means), so it needs
 no wrapper; give it the `graph` (or the `values` per axis — `valuesOn(records,
-axis)` reads them off any subjects carrying `values`) and, if the host reads
+axis)` reads them off any subjects carrying `values` and `tags`) and, if the host reads
 its own data, the `counts`. The lock toggles appear only when `locks` is
 controlled with its callback — `useLinkedViews` does — or `chrome.locks` asks.
 The bar tracks the values that just turned on for its chip flash
@@ -363,7 +370,7 @@ it.
 What the pane computes for its own bar is exported for the second view:
 `passesSelection({ filter, taxonomy, axes, node })` decides visibility on the
 axes the view shows (`valueOn(node, axis)` for a record that carries its
-values under other names), `countsOn(nodes, axes)` the badges,
+values or tags under other names), `countsOn(nodes, axes)` the badges,
 `hiddenMatchesOf({ nodes, filter, taxonomy, axes, visibleIds, matches })` the
 search's hidden-match badges. `reconcileFilter({ destination, source, locks,
 transition, taxonomy, axes, graph })` is the switch the hook makes; `axes`

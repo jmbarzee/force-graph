@@ -3,7 +3,8 @@
 // A node is a map of axis → value, and every feature (colour, push/pull,
 // each gravity axis, each filter axis) elects exactly ONE axis to operate on. Features never sum, compose or rank
 // across axes: that is what keeps the model explainable, and it is why nothing
-// here offers a way to combine two axes.
+// here offers a way to combine two axes. A node's several tags on an axis live
+// apart from its values, on an axis that only filters, so no force meets a list.
 //
 // **Values are strings, and that is load-bearing rather than lazy.** Selections
 // end up as `Set` and `Map` keys in the force kernels, and a `Set` deduplicates
@@ -24,6 +25,28 @@ export type AxisValue = string
 
 /** Where a node sits on every axis it has a value for. */
 export type AxisValues = Readonly<Record<AxisId, AxisValue>>
+
+/** The tags a node carries, on each tag axis it has any on. */
+export type AxisTags = Readonly<Record<AxisId, readonly AxisValue[]>>
+
+/** How an axis is read off a node: its one value, or its tags. */
+export type AxisReading = Pick<ResolvedAxisDescriptor, 'id' | 'reads'>
+
+/** What a node, a focus target or a host's record carries: its values and its tags, either possibly absent. */
+export interface AxisSubject {
+  values?: Readonly<Record<AxisId, AxisValue | undefined>>
+  tags?: Readonly<Record<AxisId, readonly AxisValue[] | undefined>>
+}
+
+/** What a subject carries on an axis: its tags on a tag axis, else its one value; none when it carries nothing there. */
+export function readAxis(subject: AxisSubject, axis: AxisReading): readonly AxisValue[] {
+  if (axis.reads === 'tags') return subject.tags?.[axis.id] ?? []
+  const value = subject.values?.[axis.id]
+  return value === undefined ? [] : [value]
+}
+
+/** A plain axis id reads values; a descriptor reads what it declares. */
+const readingOf = (axis: AxisId | AxisReading): AxisReading => (typeof axis === 'string' ? { id: axis, reads: 'values' } : axis)
 
 /**
  * Fold anything into a stable value key.
@@ -160,6 +183,13 @@ export interface AxisDescriptor {
    * `emptyMeans: 'all'` axis.
    */
   presentation?: 'chip' | 'tag'
+  /**
+   * What a node carries on this axis: its one value in `values` (the
+   * default), or a list in `tags` — its assignees, its labels. A node passes
+   * a tag axis when any of its tags does. A tag axis only filters: push,
+   * pull, a layout axis and colour never key on it.
+   */
+  reads?: 'values' | 'tags'
 }
 
 /** A filter axis with every policy filled in — what `Taxonomy.filterAxes` carries. */
@@ -176,6 +206,7 @@ export interface ResolvedAxisDescriptor extends AxisNamer {
   chipsFor(values: readonly AxisValue[]): readonly FilterChip[]
   initialSelection(values: readonly AxisValue[]): readonly AxisValue[]
   presentation: 'chip' | 'tag'
+  reads: 'values' | 'tags'
 }
 
 /** How the style axis names and adorns its values, for a descriptor's defaults. */
@@ -219,6 +250,7 @@ export function resolveDescriptor(d: AxisDescriptor, style: StyleNamer): Resolve
     }))),
     initialSelection: d.initialSelection ?? (values => (allow ? values : [])),
     presentation: d.presentation ?? 'chip',
+    reads: d.reads ?? 'values',
   }
 }
 
@@ -368,45 +400,44 @@ export function isIdentityMapping(mapping: AxisMapping): boolean {
  * The distinct values a set of subjects carries on one axis, in first-encounter
  * order. The domain of an axis is whatever the graph presents on it — the
  * engine declares no value vocabulary of its own — so this is how a control
- * surface or a filter learns what an axis can take.
+ * surface or a filter learns what an axis can take. An axis given by id reads
+ * values; given by its descriptor, a tag axis reads tags.
  */
 export function valuesOn(
-  subjects: Iterable<{ values: AxisValues }>,
-  axis: AxisId,
+  subjects: Iterable<AxisSubject>,
+  axis: AxisId | AxisReading,
 ): AxisValue[] {
+  const reading = readingOf(axis)
   const seen = new Set<AxisValue>()
-  for (const s of subjects) {
-    const v = s.values[axis]
-    if (v !== undefined) seen.add(v)
-  }
+  for (const s of subjects) for (const v of readAxis(s, reading)) seen.add(v)
   return [...seen]
 }
 
 /**
  * How many entities carry each value on each of the given axes — the chip
  * badges' numbers when a host does not supply its own reading. The copies of
- * one entity (`copyKey`) count once; a subject with neither key nor id counts
- * as itself. An axis no subject has a value on gets an empty map, never a
- * missing one.
+ * one entity (`copyKey`) count once, and so does each of an entity's tags; a
+ * subject with neither key nor id counts as itself. An axis is read as
+ * `valuesOn` reads it, and one no subject carries anything on gets an empty
+ * map, never a missing one.
  */
 export function countsOn(
-  subjects: Iterable<{ values: AxisValues; id?: string; copyKey?: string }>,
-  axes: readonly AxisId[],
+  subjects: Iterable<AxisSubject & { id?: string; copyKey?: string }>,
+  axes: readonly (AxisId | AxisReading)[],
 ): ReadonlyMap<AxisId, ReadonlyMap<AxisValue, number>> {
-  const counted = new Map<AxisId, Map<AxisValue, Set<string>>>(axes.map(d => [d, new Map()]))
-  const out = new Map<AxisId, Map<AxisValue, number>>(axes.map(d => [d, new Map()]))
+  const readings = axes.map(readingOf)
+  const counted = new Map<AxisId, Map<AxisValue, Set<string>>>(readings.map(d => [d.id, new Map()]))
+  const out = new Map<AxisId, Map<AxisValue, number>>(readings.map(d => [d.id, new Map()]))
   let anonymous = 0
   for (const s of subjects) {
     const key = s.copyKey ?? s.id ?? `\u0000${anonymous++}`
-    for (const d of axes) {
-      const v = s.values[d]
-      if (v === undefined) continue
-      const keys = counted.get(d)!
+    for (const d of readings) for (const v of readAxis(s, d)) {
+      const keys = counted.get(d.id)!
       let seen = keys.get(v)
       if (!seen) { seen = new Set(); keys.set(v, seen) }
       if (seen.has(key)) continue
       seen.add(key)
-      const m = out.get(d)!
+      const m = out.get(d.id)!
       m.set(v, (m.get(v) ?? 0) + 1)
     }
   }

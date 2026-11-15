@@ -12,6 +12,7 @@ import type { Campus } from './data'
 /** Node axes. `entity` is both the style axis and the allow-list filter. */
 export const ENTITY = 'entity'
 export const CAMPUS = 'campus'
+export const INSTRUCTOR = 'instructor'
 /** This host's edge axis: which kind of requirement a dependency edge is. */
 export const REQUIREMENT = 'requirement'
 
@@ -182,6 +183,14 @@ const FILTERS: readonly AxisDescriptor[] = [
     // campus are the defaults.
     emptyMeans: 'all',
     labelFor: v => CAMPUS_LABEL[v as Campus] ?? v,
+  },
+  {
+    id: INSTRUCTOR,
+    label: 'Instructor',
+    // Read off each course's tags: a team-taught course shows under each of
+    // its instructors, and only the filter reads them.
+    emptyMeans: 'all',
+    reads: 'tags',
   },
 ]
 

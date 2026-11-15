@@ -22,9 +22,9 @@ import { isContainment, relationOf } from '../../graph/model'
 import type { SimNode } from '../../graph/simulation'
 import type { GraphEdge, ReadableGraph } from '../../graph/model'
 import type { Taxonomy } from '../../graph/taxonomy'
-import type { ResolvedAxisDescriptor } from '../../graph/axis'
+import type { AxisSubject, ResolvedAxisDescriptor } from '../../graph/axis'
+import { readAxis } from '../../graph/axis'
 import type { EdgeTypeId } from '../../graph/shapes'
-import type { PhysicsSubject } from '../../graph/forces'
 import type { FilterState } from '../../filter/types'
 import { passesDescriptors } from '../../filter/types'
 
@@ -165,17 +165,17 @@ function computeGraphNodeSummary(
 }
 
 /**
- * `passesDescriptors` for a graph node, projected through the taxonomy, on the
+ * `passesDescriptors` for a graph node, read as each axis declares, on the
  * axes given — the ones the view shows. Every declared axis is the default
  * for a caller that shows them all.
  */
 export function passesFilter(
-  node: PhysicsSubject,
+  node: AxisSubject,
   filter: FilterState,
   taxonomy: Taxonomy,
   axes: readonly ResolvedAxisDescriptor[] = taxonomy.filterAxes,
 ): boolean {
-  return passesDescriptors(filter, axes, axis => taxonomy.valueOn(node, axis))
+  return passesDescriptors(filter, axes, axis => readAxis(node, axis))
 }
 
 /**

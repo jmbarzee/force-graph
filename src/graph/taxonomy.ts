@@ -56,9 +56,10 @@ export type ContextLine = ReactNode | readonly ReactNode[]
  * policy and host hook through. Built once by `createTaxonomy`; derive a
  * variant from the spec, never by spreading this object.
  *
- * What a host reads: `filterAxes`, `axisFor` and `valueOn` to filter its own
- * records the way the view does; `styleOf`, `styleValues` and `colorVar` for
- * chrome of its own in the scheme's colours; `edgeTypes` for a legend;
+ * What a host reads: `filterAxes` and `axisFor` to filter its own records the
+ * way the view does, through `passesSelection`; `valueOn` for a record's
+ * value on an axis; `styleOf`, `styleValues` and `colorVar` for chrome of its
+ * own in the scheme's colours; `edgeTypes` for a legend;
  * `searchText` to match as the view matches. The rest is the engine's
  * interface — resolution for the draw loop — and a host has no call to read
  * it.
@@ -354,6 +355,12 @@ export function createTaxonomy(spec: TaxonomySpec): Taxonomy {
     if (d.emptyMeans !== 'all' && d.emptyMeans !== 'none') {
       problems.push(`filterAxes.${d.id}.emptyMeans is ${JSON.stringify(d.emptyMeans)}, not 'all' or 'none'`)
     }
+    if (d.reads !== undefined && d.reads !== 'values' && d.reads !== 'tags') {
+      problems.push(`filterAxes.${d.id}.reads is ${JSON.stringify(d.reads)}, not 'values' or 'tags'`)
+    }
+    if (d.reads === 'tags' && d.id === spec.styleAxis) {
+      problems.push(`filterAxes.${d.id} reads tags, but it is the style axis, which colours a node by its one value`)
+    }
   }
   const scalars = [...BUILT_IN_SCALARS, ...(spec.scalars ?? [])].map(resolveScalarAxis)
   const scalarIds = new Set<string>()
@@ -468,4 +475,9 @@ export function createTaxonomy(spec: TaxonomySpec): Taxonomy {
     searchText: spec.searchText ?? (node => node.name),
     highlight: spec.highlight ?? ((_active, base) => base),
   }
+}
+
+/** The axes a taxonomy declares to read tags, which only filter. */
+export function tagAxesOf(taxonomy: Pick<Taxonomy, 'filterAxes'>): AxisId[] {
+  return taxonomy.filterAxes.filter(d => d.reads === 'tags').map(d => d.id)
 }
