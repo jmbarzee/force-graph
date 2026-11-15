@@ -142,27 +142,27 @@ export type ReconcileResult = {
  * choice.
  */
 export function initialFilter(taxonomy: Pick<Taxonomy, 'filterAxes'>, graph: Pick<Graph, 'nodes'>): FilterState {
-  const out = new Map<AxisId, AxisSelection>()
-  for (const d of taxonomy.filterAxes) {
-    const values = valuesOn(graph.nodes, d.id)
-    const chosen = new Set(d.initialSelection(values))
-    // The bar toggles a chip's values as a unit, so a selection that splits
-    // one would show the chip as on with half its nodes hidden, and the
-    // first click would turn the whole chip off. Snap to the whole chip —
-    // selecting is the safe direction — and say so once per chip.
-    const present = new Set(values)
-    for (const chip of d.chipsFor(values)) {
-      const mine = chip.values.filter(v => present.has(v))
-      const on = mine.filter(v => chosen.has(v))
-      // Judged as the bar judges it: any value of the chip chosen — a value the
-      // graph lacks included — reads as on.
-      if (!chip.values.some(v => chosen.has(v)) || on.length === mine.length) continue
-      for (const v of mine) chosen.add(v)
-      warnSplitChip(taxonomy, d.id, chip.id, mine.filter(v => !on.includes(v)))
-    }
-    out.set(d.id, chosen)
+  return new Map(taxonomy.filterAxes.map(d => [d.id, seedSelection(taxonomy, d, valuesOn(graph.nodes, d.id))]))
+}
+
+/** One axis's opening selection on the values the graph presents there: `initialFilter`'s, axis by axis. */
+export function seedSelection(taxonomy: Pick<Taxonomy, 'filterAxes'>, d: ResolvedAxisDescriptor, values: readonly string[]): AxisSelection {
+  const chosen = new Set(d.initialSelection(values))
+  // The bar toggles a chip's values as a unit, so a selection that splits
+  // one would show the chip as on with half its nodes hidden, and the
+  // first click would turn the whole chip off. Snap to the whole chip —
+  // selecting is the safe direction — and say so once per chip.
+  const present = new Set(values)
+  for (const chip of d.chipsFor(values)) {
+    const mine = chip.values.filter(v => present.has(v))
+    const on = mine.filter(v => chosen.has(v))
+    // Judged as the bar judges it: any value of the chip chosen — a value the
+    // graph lacks included — reads as on.
+    if (!chip.values.some(v => chosen.has(v)) || on.length === mine.length) continue
+    for (const v of mine) chosen.add(v)
+    warnSplitChip(taxonomy, d.id, chip.id, mine.filter(v => !on.includes(v)))
   }
-  return out
+  return chosen
 }
 
 /**

@@ -1,5 +1,6 @@
 import { describe, expect, it } from 'vitest'
-import { axesOpenedBy, axesRegrown, firstLine } from './FilterBar'
+import { axesOpenedBy, axesReseeded, firstLine } from './FilterBar'
+import { createTaxonomy } from '../graph/taxonomy'
 import type { FilterState } from '../filter/types'
 
 describe('firstLine', () => {
@@ -30,11 +31,18 @@ describe('axesOpenedBy', () => {
     expect(axesOpenedBy(before, new Map(before), [])).toEqual([])
   })
 
+  // An allow-list axis, whose seed is every value it presents.
+  const taxonomy = createTaxonomy({ styleAxis: 'kind', styles: [], filterAxes: [{ id: 'team', emptyMeans: 'none' }] })
+  const none = new Map([['team', []]])
+  const thirty = new Map([['team', Array.from({ length: 30 }, (_, i) => `team ${i}`)]])
+
   it('leaves an axis as it is when a re-seed follows values that arrived', () => {
-    const thirty = Array.from({ length: 30 }, (_, i) => `team ${i}`)
-    const seeded: FilterState = new Map([['team', new Set(thirty)]])
-    const regrown = axesRegrown(new Map([['team', []]]), new Map([['team', thirty]]))
-    expect(regrown).toEqual(['team'])
-    expect(axesOpenedBy(new Map(), seeded, regrown)).toEqual([])
+    const seeded: FilterState = new Map([['team', new Set(thirty.get('team'))]])
+    expect(axesOpenedBy(new Map(), seeded, axesReseeded(taxonomy, none, thirty, seeded))).toEqual([])
+  })
+
+  it('opens an axis whose values arrived when the change is not their seed', () => {
+    const one: FilterState = new Map([['team', new Set(['team 3'])]])
+    expect(axesOpenedBy(new Map(), one, axesReseeded(taxonomy, none, thirty, one))).toEqual(['team'])
   })
 })

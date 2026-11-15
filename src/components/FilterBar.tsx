@@ -35,7 +35,7 @@ import { selectionFor } from '../filter/types'
 import React from 'react'
 import './FilterBar.css'
 import type { ResolvedAxisDescriptor } from '../graph/axis'
-import { changedAxes, filterStatesEqual, listEqual, lockedFor, locksEqual, withLock, withSelection } from '../filter/types'
+import { changedAxes, filterStatesEqual, listEqual, lockedFor, locksEqual, seedSelection, selectionsEqual, withLock, withSelection } from '../filter/types'
 import type { FilterState, AxisLocks } from '../filter/types'
 import { toggleGroup } from '../filter/toggle'
 import { LockToggle } from './LockToggle'
@@ -134,9 +134,13 @@ export function axesOpenedBy(prev: FilterState, next: FilterState, leftAsIs: rea
   return changedAxes(prev, next).filter(axis => !leftAsIs.includes(axis))
 }
 
-/** The axes whose presented values differ between two readings — those a re-seed follows. */
-export function axesRegrown(prev: ReadonlyMap<string, readonly string[]>, next: ReadonlyMap<string, readonly string[]>): AxisId[] {
-  return [...new Set([...prev.keys(), ...next.keys()])].filter(axis => !listEqual(prev.get(axis) ?? [], next.get(axis) ?? []))
+/** The axes a filter re-seeded: their presented values changed between two readings, and the filter selects their seed. */
+export function axesReseeded(taxonomy: Taxonomy, prev: ReadonlyMap<string, readonly string[]>, next: ReadonlyMap<string, readonly string[]>, filter: FilterState): AxisId[] {
+  return [...new Set([...prev.keys(), ...next.keys()])].filter(axis => {
+    const d = taxonomy.axisFor(axis)
+    const values = next.get(axis) ?? []
+    return d !== undefined && !listEqual(prev.get(axis) ?? [], values) && selectionsEqual(selectionFor(filter, axis), seedSelection(taxonomy, d, values))
+  })
 }
 
 /** An axis's chips: until it is open, the first line of them and a count of the rest, which opens it. */
@@ -297,12 +301,12 @@ export function FilterBar({
     [hostValues, graph, axes, taxonomy],
   )
   // Opened before paint, so the chips that turned on flash in view. An axis
-  // whose values changed since the last filter change is being re-seeded,
-  // and stays as it is.
+  // whose values changed since the last filter change and whose selection is
+  // their seed is being re-seeded, and stays as it is.
   const seenFilter = React.useRef(filter)
   const seenValues = React.useRef(valuesByAxis)
   React.useLayoutEffect(() => {
-    const opened = axesOpenedBy(seenFilter.current, filter, [...clicked.current, ...axesRegrown(seenValues.current, valuesByAxis)])
+    const opened = axesOpenedBy(seenFilter.current, filter, [...clicked.current, ...axesReseeded(taxonomy, seenValues.current, valuesByAxis, filter)])
     seenFilter.current = filter
     seenValues.current = valuesByAxis
     clicked.current = []
