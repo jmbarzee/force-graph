@@ -16,7 +16,7 @@ import type { PresentSets } from './graph-view/present'
 import { presentSetsOf } from './graph-view/present'
 import type { EdgeStroke, Theme } from '../graph/scheme'
 import { schemeVars } from '../graph/scheme'
-import { useTheme, THEME_CHOICES } from './graph-view/useTheme'
+import { useResolvedTheme, THEME_CHOICES } from './graph-view/useTheme'
 import type { ThemeChoice } from './graph-view/useTheme'
 import { axisOptions, layoutAxisOptions, pairTuning, sprungEdges } from '../graph/simulation'
 import { copyGroups, copyKeyOf } from '../graph/model'
@@ -501,7 +501,8 @@ export const GraphView = React.forwardRef<GraphViewHandle, GraphViewProps>(funct
   // The theme the pane draws in: the choice, or the host's for system. The
   // scheme rides inline as custom properties in that theme, and every
   // visible edge's stroke is resolved here once, not per frame.
-  const theme = useTheme(containerRef, themeChoice, systemTheme)
+  const resolvedTheme = useResolvedTheme(containerRef, themeChoice, systemTheme)
+  const theme = resolvedTheme ?? 'light'
   const schemeStyle = React.useMemo(() => schemeVars(taxonomy, theme) as React.CSSProperties, [taxonomy, theme])
   const overlay = React.useMemo(() => bandOverlay(graph.nodes, forceParams, resolved, frame,
     (axis, bucket) => axis.mapping.axis === taxonomy.styleAxis() && isIdentityMapping(axis.mapping)
@@ -702,7 +703,7 @@ export const GraphView = React.forwardRef<GraphViewHandle, GraphViewProps>(funct
     onHoverRef.current?.(hoveredNodeId === null ? null : hostIndex.get(hoveredNodeId) ?? null)
   }, [hoveredNodeId]) // eslint-disable-line react-hooks/exhaustive-deps
   React.useEffect(() => { mountedRef.current = true }, [])
-  React.useEffect(() => { onThemeResolvedRef.current?.(theme) }, [theme]) // eslint-disable-line react-hooks/exhaustive-deps
+  React.useEffect(() => { if (resolvedTheme) onThemeResolvedRef.current?.(resolvedTheme) }, [resolvedTheme]) // eslint-disable-line react-hooks/exhaustive-deps
   React.useEffect(() => { onDiagnosticsRef.current?.(diagnostics) }, [diagnostics]) // eslint-disable-line react-hooks/exhaustive-deps
 
   // Double-click node: center and zoom to neighbors, and tell the host.
