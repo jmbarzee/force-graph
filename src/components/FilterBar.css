@@ -27,7 +27,7 @@
   align-items: center;
   justify-content: space-between;
   gap: 8px;
-  padding: 10px 14px;
+  padding: 8px 14px;
   transition: background 0.2s ease, box-shadow 0.2s ease;
 }
 
@@ -396,6 +396,32 @@
   font-size: 11px;
   font-style: italic;
   padding: 3px 6px;
+}
+
+/* A collapsed axis: its first line of chips, the height the bar measured,
+   with room left for a chip's flash ring. */
+.gv-chip-row.collapsed,
+.gv-tag-row.collapsed {
+  overflow: clip;
+  overflow-clip-margin: 4px;
+}
+
+.gv-header-more {
+  flex: 0 0 auto;
+  align-self: flex-start;
+  border: 1px dashed var(--gv-color-border);
+  border-radius: 6px;
+  background: transparent;
+  color: var(--gv-color-text-muted);
+  font-family: var(--gv-font-mono);
+  font-size: 11px;
+  padding: 5px 8px;
+  cursor: pointer;
+}
+
+.gv-header-more:hover {
+  border-style: solid;
+  color: var(--gv-color-text);
 }
 
 /* The axis's own name before its chips: a row reads as "Campus: …", not as a bare run of buttons. */
