@@ -22,7 +22,7 @@ import {
   withSelection,
 } from './types'
 import type { AxisId, AxisValue, ResolvedAxisDescriptor } from '../graph/axis'
-import { readAxis, valuesOn } from '../graph/axis'
+import { valuesOn } from '../graph/axis'
 import type { Graph } from '../graph/model'
 import type { Taxonomy } from '../graph/taxonomy'
 
@@ -96,9 +96,8 @@ function reconcileManual(
  * the descriptor's `widens`: `always` adds the target's value; `whenActive`
  * adds it only while a selection is active — on a narrowing axis an empty
  * selection already shows everything, and adding the first value would
- * narrow to it. On a tag axis none of whose target's tags is on, its first
- * tag is the value added. With the graph given, the whole chip holding the
- * value is added, as far as the graph presents it. Locks are not changed; each locked
+ * narrow to it. With the graph given, the whole chip holding the value is
+ * added, as far as the graph presents it. Locks are not changed; each locked
  * axis that had to widen is reported, so the destination's bar can flash it.
  */
 function reconcileFocus(
@@ -112,14 +111,14 @@ function reconcileFocus(
   const overridden = new Set<AxisId>()
 
   for (const axis of axes) {
-    const values = readAxis(target, axis)
-    if (values.length === 0) continue
+    const value = target.values[axis.id]
+    if (value === undefined) continue
 
     const current = selectionFor(destFilter, axis.id)
-    if (values.some(v => current.has(v))) continue
+    if (current.has(value)) continue
     if (axis.widens === 'whenActive' && current.size === 0) continue
 
-    next = withSelection(next, axis.id, new Set([...current, ...chipValues(axis, values[0], graph)]))
+    next = withSelection(next, axis.id, new Set([...current, ...chipValues(axis, value, graph)]))
     if (lockedFor(destLocks, axis.id)) overridden.add(axis.id)
   }
 
@@ -132,7 +131,7 @@ function reconcileFocus(
 /** The values a focus on `value` turns on: the whole chip holding it, as far as the graph presents its values; the value alone without a graph or a chip. */
 function chipValues(axis: ResolvedAxisDescriptor, value: AxisValue, graph: Pick<Graph, 'nodes'> | undefined): readonly AxisValue[] {
   if (!graph) return [value]
-  const present = valuesOn(graph.nodes, axis)
+  const present = valuesOn(graph.nodes, axis.id)
   const chip = axis.chipsFor(present).find(c => c.values.includes(value))
   if (!chip) return [value]
   const presentSet = new Set(present)

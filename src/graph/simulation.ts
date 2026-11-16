@@ -24,7 +24,6 @@ import { isScalarTuning } from './scalar'
 import type { AxisNamer, AxisId, AxisValue, AxisMapping } from './axis'
 import { identityMapping, valuesOn } from './axis'
 import type { Taxonomy } from './taxonomy'
-import { tagAxesOf } from './taxonomy'
 
 // The force helpers now live in ./forces; re-export them so existing consumers
 // (GraphCanvas, GraphControlPanel, ChargeControls) keep importing them here.
@@ -214,16 +213,16 @@ export function axisOptions(taxonomy: Taxonomy, graph: Graph): AxisOption[] {
 }
 
 /**
- * Every axis the nodes carry other than the style axis and the tag axes: the
- * declared filter axes first, in declaration order, then any other axis a
- * node has a value on, in first-encounter order. An axis is a fact about the
- * nodes, not a declaration: a host that writes `term` on its nodes may push
- * and pull on it without declaring a filter for it.
+ * Every axis the nodes carry other than the style axis: the declared filter
+ * axes first, in declaration order, then any other axis a node has a value
+ * on, in first-encounter order. An axis is a fact about the nodes, not a
+ * declaration: a host that writes `term` on its nodes may push and pull on
+ * it without declaring a filter for it.
  */
 function nodeAxes(taxonomy: Taxonomy, graph: Graph): AxisId[] {
   const style = taxonomy.styleAxis()
   const out: AxisId[] = []
-  const seen = new Set<AxisId>([style, ...tagAxesOf(taxonomy)])
+  const seen = new Set<AxisId>([style])
   for (const d of taxonomy.filterAxes) {
     if (seen.has(d.id)) continue
     seen.add(d.id); out.push(d.id)
@@ -283,7 +282,7 @@ function sameBuckets(a: AxisMapping, b: AxisMapping): boolean {
  * removed; the style axis's goes stale when the taxonomy is swapped. Overrides
  * are keyed by value, so they survive where the value does. A tuning whose
  * buckets did not change comes back by reference, so a caller can tell nothing
- * moved. An axis the graph no longer carries, a tag axis, or one grown past the
+ * moved. An axis the graph no longer carries, or one that has grown past the
  * token ceiling, falls back to the style axis with nothing overridden. A graph
  * with no nodes judges nothing: the parameters come back as they are, so a
  * layout restored before the data arrives waits for it.
@@ -316,10 +315,6 @@ export function retunedFor(params: ForceParams, taxonomy: Taxonomy, graph: Graph
   const refresh = <T extends { mapping: AxisMapping }>(
     tuning: T, fresh: (mapping: AxisMapping) => T, fits: (mapping: AxisMapping) => boolean,
   ): T => {
-    if (tagAxesOf(taxonomy).includes(tuning.mapping.axis)) {
-      fellBack(tuning.mapping.axis, 'it is a tag axis, which only filters')
-      return fresh(styleIdentityMapping(taxonomy))
-    }
     const next = refreshed(tuning.mapping)
     if (next === undefined || (next.axis !== style && !fits(next))) {
       fellBack(tuning.mapping.axis, next === undefined ? 'no node carries it any more' : `it has ${next.buckets.length} buckets, past the ceiling of ${TOKEN_CEILING}`)

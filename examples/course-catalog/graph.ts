@@ -4,7 +4,7 @@
 
 import type { Graph, GraphEdge, GraphNode } from '@jmbarzee/force-graph'
 import type { Catalog, Requirement } from './data'
-import { CAMPUS, ENTITY, INSTRUCTOR, REQUIREMENT } from './taxonomy'
+import { CAMPUS, ENTITY, REQUIREMENT } from './taxonomy'
 
 const subjectOf = (code: string) => code.split(' ')[0]
 /** "MATH 210" → 2; "CHEM 101L" → 1. */
@@ -62,7 +62,6 @@ export function buildGraph(catalog: Catalog): Graph {
         copyKey: `course:${c.id}`,
         parentId: dept,
         values: { [ENTITY]: 'course', [CAMPUS]: c.campus },
-        tags: { [INSTRUCTOR]: c.instructors ?? [] },
         payload: {
           code,
           credits: c.credits,

@@ -40,8 +40,6 @@ export interface Course {
   credits: number
   campus: Campus
   term: Term
-  /** Who teaches it; a team-taught course has several. */
-  instructors?: string[]
   requires?: Requirement[]
   labs?: Lab[]
 }
@@ -86,7 +84,6 @@ export const catalog: Catalog = {
       credits: 4,
       campus: 'north',
       term: 'Autumn',
-      instructors: ['Dr. Ines Moreau'],
     },
     {
       id: 'calc2',
@@ -156,7 +153,6 @@ export const catalog: Catalog = {
       credits: 4,
       campus: 'north',
       term: 'Autumn',
-      instructors: ['Dr. Tomas Varga', 'Dr. Leah Okonjo'],
       requires: [pre('CHEM 201'), pre('BIOL 110'), co('BIOL 210')],
     },
 
@@ -213,7 +209,6 @@ export const catalog: Catalog = {
       credits: 3,
       campus: 'online',
       term: 'Autumn',
-      instructors: ['Dr. Priya Raman', 'Dr. Ines Moreau'],
       requires: [pre('LING 230'), pre('COMP 120'), rec('MATH 220')],
     },
 
@@ -278,7 +273,6 @@ export const catalog: Catalog = {
       credits: 3,
       campus: 'online',
       term: 'Spring',
-      instructors: ['Dr. Priya Raman'],
       requires: [pre('COMP 240'), pre('MATH 210'), pre('MATH 220')],
     },
 
@@ -290,7 +284,6 @@ export const catalog: Catalog = {
       credits: 2,
       campus: 'online',
       term: 'Summer',
-      instructors: ['Dr. Leah Okonjo', 'Dr. Priya Raman'],
       requires: [rec('PHIL 101'), rec('COMP 350')],
     },
   ],

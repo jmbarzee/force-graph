@@ -9,8 +9,8 @@
 //
 // The search query lives outside a FilterState because the views share it.
 
-import type { AxisId, AxisSubject, AxisValue, FilterChip, ResolvedAxisDescriptor } from '../graph/axis'
-import { readAxis, valuesOn } from '../graph/axis'
+import type { AxisId, AxisValues, ResolvedAxisDescriptor } from '../graph/axis'
+import { valuesOn } from '../graph/axis'
 import type { Graph } from '../graph/model'
 import type { Taxonomy } from '../graph/taxonomy'
 import { isPlainRecord } from '../json'
@@ -112,14 +112,13 @@ export function lockedFor(locks: AxisLocks, axis: AxisId): boolean {
 }
 
 /**
- * Where a focus transition wants to land: the target's value per axis, and
- * its tags per tag axis. An axis the target says nothing about is absent,
- * which the reconciler reads as "no expansion needed". A host that also needs
- * the target's name for a view of its own carries it in a type of its own.
+ * Where a focus transition wants to land: the target's value per axis. An
+ * axis the target says nothing about is absent, which the reconciler reads
+ * as "no expansion needed". A host that also needs the target's name for a
+ * view of its own carries it in a type of its own.
  */
 export type FocusTarget = {
   values: Readonly<Record<AxisId, string | undefined>>
-  tags?: Readonly<Record<AxisId, readonly string[] | undefined>>
 }
 
 /** How a view is being switched to: by the user (`manual`: adopt the source's selections) or to show a node (`focus`: widen for its values). */
@@ -143,7 +142,7 @@ export type ReconcileResult = {
  * choice.
  */
 export function initialFilter(taxonomy: Pick<Taxonomy, 'filterAxes'>, graph: Pick<Graph, 'nodes'>): FilterState {
-  return new Map(taxonomy.filterAxes.map(d => [d.id, seedSelection(taxonomy, d, valuesOn(graph.nodes, d))]))
+  return new Map(taxonomy.filterAxes.map(d => [d.id, seedSelection(taxonomy, d, valuesOn(graph.nodes, d.id))]))
 }
 
 /** One axis's opening selection on the values the graph presents there: `initialFilter`'s, axis by axis. */
@@ -264,12 +263,12 @@ export interface PassesSelectionInput<N> {
   axes: readonly AxisId[]
   /** The record judged: a graph node, or any record of the host's. */
   node: N
-  /** The record's value on an axis — its tags, on a tag axis — for a record that carries them under other names. Default: its `values` and `tags`, when it has them. */
-  valueOn?: (node: N, axis: AxisId) => AxisValue | readonly AxisValue[] | undefined
+  /** The record's value on an axis, for a record that carries its values under other names. Default: its `values`, when it has them. */
+  valueOn?: (node: N, axis: AxisId) => string | undefined
 }
 
-/** Whether a record carries `values` and `tags` the way a graph node does. */
-function carriesValues(record: unknown): record is AxisSubject {
+/** Whether a record carries `values` the way a graph node does. */
+function carriesValues(record: unknown): record is { values?: AxisValues } {
   return typeof record === 'object' && record !== null
 }
 
@@ -280,7 +279,7 @@ function carriesValues(record: unknown): record is AxisSubject {
  * agree on what the filter means.
  */
 export function passesSelection<N>({ filter, taxonomy, axes, node, valueOn }: PassesSelectionInput<N>): boolean {
-  const read = readerOf(valueOn)
+  const read = valueOn ?? ((n: N, axis: AxisId) => (carriesValues(n) ? n.values?.[axis] : undefined))
   for (const id of axes) {
     const d = taxonomy.axisFor(id)
     if (d && !passesDescriptors(filter, [d], axis => read(node, axis))) return false
@@ -288,17 +287,11 @@ export function passesSelection<N>({ filter, taxonomy, axes, node, valueOn }: Pa
   return true
 }
 
-/** A host's reader as one over descriptors: its own, or a record's `values` and `tags`. */
-function readerOf<N>(valueOn: ((node: N, axis: AxisId) => AxisValue | readonly AxisValue[] | undefined) | undefined) {
-  return (node: N, axis: ResolvedAxisDescriptor): readonly AxisValue[] =>
-    valueOn ? [valueOn(node, axis.id) ?? []].flat() : carriesValues(node) ? readAxis(node, axis) : []
-}
-
 /** `passesSelection` over descriptors already resolved — the view's hot path, which resolves them once per render. */
 export function passesDescriptors(
   filter: FilterState,
   axes: readonly ResolvedAxisDescriptor[],
-  valuesOf: (axis: ResolvedAxisDescriptor) => readonly AxisValue[],
+  valueOn: (axis: string) => string | undefined,
 ): boolean {
   for (const axis of axes) {
     const selection = selectionFor(filter, axis.id)
@@ -306,12 +299,12 @@ export function passesDescriptors(
       if (axis.emptyMeans === 'none') return false
       continue
     }
-    const values = valuesOf(axis)
-    if (values.length === 0) {
+    const value = valueOn(axis.id)
+    if (value === undefined) {
       if (axis.absentMeans === 'hidden') return false
       continue
     }
-    if (!values.some(v => selection.has(v))) return false
+    if (!selection.has(value)) return false
   }
   return true
 }
@@ -322,12 +315,12 @@ export interface HiddenMatches {
   visible: ReadonlySet<string>
   /** How many matching nodes the filter hides. */
   hiddenCount: number
-  /** The hidden matches per axis and value — on the first of the axes shown that each node fails, under its value there (on a tag axis, its first tag whose chip is off). */
+  /** The hidden matches per axis and value — on the first of the axes shown that each node fails, under its value there. */
   hiddenByAxis: ReadonlyMap<AxisId, ReadonlyMap<string, number>>
 }
 
 /** What `hiddenMatchesOf` reads. */
-export interface HiddenMatchesInput<N extends { id: string }> {
+export interface HiddenMatchesInput<N extends { id: string; values?: AxisValues }> {
   /** Every node the search ran over, visible or not. */
   nodes: Iterable<N>
   filter: FilterState
@@ -336,42 +329,29 @@ export interface HiddenMatchesInput<N extends { id: string }> {
   axes: readonly AxisId[]
   visibleIds: ReadonlySet<string>
   matches: (node: N) => boolean
-  /** A node's value on an axis — its tags, on a tag axis. Default: its `values` and `tags`. */
-  valueOn?: (node: N, axis: AxisId) => AxisValue | readonly AxisValue[] | undefined
+  /** A node's value on an axis. Default: its `values`. */
+  valueOn?: (node: N, axis: AxisId) => string | undefined
 }
 
 /**
  * Split a search's matches by the filter, the way the pane does under its
  * own bar: a match the filter shows lights up, a match it hides is counted
  * on the chip hiding it — the first axis in `axes` the node fails, under the
- * node's value there, or its first tag whose chip is off — so a host's second
- * bar can wear the same badges.
+ * node's value there — so a host's second bar can wear the same badges.
  */
-export function hiddenMatchesOf<N extends { id: string }>({ nodes, filter, taxonomy, axes, visibleIds, matches, valueOn }: HiddenMatchesInput<N>): HiddenMatches {
-  const read = readerOf(valueOn)
-  const all = [...nodes]
+export function hiddenMatchesOf<N extends { id: string; values?: AxisValues }>({ nodes, filter, taxonomy, axes, visibleIds, matches, valueOn }: HiddenMatchesInput<N>): HiddenMatches {
+  const read = valueOn ?? ((node: N, axis: AxisId) => node.values?.[axis])
   const descriptors = axes.flatMap(id => { const d = taxonomy.axisFor(id); return d ? [d] : [] })
-  // An axis's chips as the bar builds them, once per axis a match fails.
-  const chipsOf = new Map<AxisId, readonly FilterChip[]>()
-  const chipsFor = (d: ResolvedAxisDescriptor) => {
-    let chips = chipsOf.get(d.id)
-    if (!chips) { chips = d.chipsFor([...new Set(all.flatMap(n => read(n, d)))]); chipsOf.set(d.id, chips) }
-    return chips
-  }
   const visible = new Set<string>()
   let hiddenCount = 0
   const hiddenByAxis = new Map<AxisId, Map<string, number>>()
-  for (const node of all) {
+  for (const node of nodes) {
     if (!matches(node)) continue
     if (visibleIds.has(node.id)) { visible.add(node.id); continue }
     hiddenCount++
     const failing = descriptors.find(d => !passesDescriptors(filter, [d], axis => read(node, axis)))
-    if (!failing) continue
-    const values = read(node, failing)
-    const selection = selectionFor(filter, failing.id)
-    const chipOf = (v: AxisValue) => chipsFor(failing).find(c => c.values.includes(v))?.values ?? [v]
-    const value = values.find(v => !chipOf(v).some(x => selection.has(x))) ?? values[0]
-    if (value === undefined) continue
+    const value = failing ? read(node, failing.id) : undefined
+    if (!failing || value === undefined) continue
     const tally = hiddenByAxis.get(failing.id) ?? new Map<string, number>()
     tally.set(value, (tally.get(value) ?? 0) + 1)
     hiddenByAxis.set(failing.id, tally)

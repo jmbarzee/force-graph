@@ -11,15 +11,13 @@
 import type { Graph, GraphEdge, GraphNode } from './model'
 import { nodesById, relationOf } from './model'
 import type { Taxonomy } from './taxonomy'
-import { tagAxesOf } from './taxonomy'
 
 /**
  * The defects `validateGraph` names. Errors: a node or edge id used twice,
  * an edge whose endpoint is not in the graph, an unknown relation, a type
  * whose relation is not the edge's, a rule that threw, a parent not in the
  * graph. Warnings: an edge no type claims, a style value the taxonomy does
- * not declare, tags on an axis the taxonomy does not declare to read them,
- * containment edges that contradict `parentId`, derived
+ * not declare, containment edges that contradict `parentId`, derived
  * containment edges no type claims (`containment-untyped`, from
  * `derivedContainmentDiagnostics`).
  */
@@ -33,7 +31,6 @@ export type GraphDiagnosticCode =
   | 'parent-missing'
   | 'containment-parent-mismatch'
   | 'node-value-undeclared'
-  | 'node-tags-undeclared'
   | 'node-id-duplicate'
   | 'containment-untyped'
 
@@ -54,19 +51,18 @@ const RELATIONS = new Set(['containment', 'dependency'])
  * draw as given (a duplicated node id, a dangling endpoint, an unknown
  * relation, a type whose relation is not the edge's, a parent not in the
  * graph) and warnings for what it draws but the host should know (an
- * unclassified edge, an undeclared style value, tags no axis reads,
- * containment edges that contradict `parentId`). Pure; the same graph and
- * taxonomy give the same list, in graph order.
+ * unclassified edge, an undeclared style value, containment edges that
+ * contradict `parentId`). Pure; the same graph and taxonomy give the same
+ * list, in graph order.
  */
 export function validateGraph(graph: Graph, taxonomy: Taxonomy): GraphDiagnostic[] {
   const out: GraphDiagnostic[] = []
   const declaredTypes = new Map(taxonomy.edgeTypes.map(e => [e.id, e]))
   const declaredValues = new Set(taxonomy.styleValues)
-  const tagAxes = new Set(tagAxesOf(taxonomy))
   const byId = nodesById(graph.nodes)
 
   // Nodes: one per id, a parent that exists, a style value the taxonomy
-  // declares, tags only where a tag axis reads them.
+  // declares.
   const seenNodes = new Set<string>()
   for (const node of graph.nodes) {
     if (seenNodes.has(node.id)) {
@@ -80,10 +76,6 @@ export function validateGraph(graph: Graph, taxonomy: Taxonomy): GraphDiagnostic
     const value = taxonomy.styleValueOf(node)
     if (value !== undefined && !declaredValues.has(value)) {
       out.push({ severity: 'warning', code: 'node-value-undeclared', nodeId: node.id, message: `node ${JSON.stringify(node.id)} sits at ${JSON.stringify(value)} on the style axis, which the taxonomy does not declare; it draws in the fallback style` })
-    }
-    for (const axis of Object.keys(node.tags ?? {})) {
-      if (tagAxes.has(axis)) continue
-      out.push({ severity: 'warning', code: 'node-tags-undeclared', nodeId: node.id, message: `node ${JSON.stringify(node.id)} carries tags on ${JSON.stringify(axis)}, which the taxonomy does not declare as a tag axis; nothing reads them` })
     }
   }
 
