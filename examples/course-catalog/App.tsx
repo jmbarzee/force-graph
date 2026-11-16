@@ -15,7 +15,7 @@ import type {
 import { catalog } from './data'
 import type { Campus, Catalog } from './data'
 import { buildGraph } from './graph'
-import { CAMPUS, CAMPUS_LABEL, ENTITY, INSTRUCTOR, taxonomy } from './taxonomy'
+import { CAMPUS, CAMPUS_LABEL, ENTITY, taxonomy } from './taxonomy'
 import type { Entity } from './taxonomy'
 import './app.css'
 
@@ -31,11 +31,9 @@ function countsOf(data: Catalog, campuses: AxisSelection): ReadonlyMap<string, R
     ['department', data.departments.length],
   ])
   const campus = new Map<string, number>()
-  const instructor = new Map<string, number>()
   const bump = (m: Map<string, number>, k: string, by = 1) => m.set(k, (m.get(k) ?? 0) + by)
   for (const c of data.courses) {
     bump(campus, c.campus)
-    for (const name of c.instructors ?? []) bump(instructor, name)
     if (campuses.size > 0 && !campuses.has(c.campus)) continue
     bump(entity, 'course')
     bump(entity, 'lab', c.labs?.length ?? 0)
@@ -43,7 +41,6 @@ function countsOf(data: Catalog, campuses: AxisSelection): ReadonlyMap<string, R
   return new Map([
     [ENTITY, entity],
     [CAMPUS, campus],
-    [INSTRUCTOR, instructor],
   ])
 }
 

@@ -181,7 +181,7 @@ export function useLinkedViews<V extends string>({ taxonomy, views, initial, gra
   }, [stateRef, activeRef, taxonomyRef, graphRef])
 
   const focus = React.useCallback((view: V, node: GraphNode): ReconcileResult => {
-    const result = switchTo(view, { kind: 'focus', target: node })
+    const result = switchTo(view, { kind: 'focus', target: { values: node.values } })
     setFocusRequests(prev => ({ ...prev, [view]: { id: node.id, key: ++focusSeq.current } }))
     return result
   }, [switchTo])

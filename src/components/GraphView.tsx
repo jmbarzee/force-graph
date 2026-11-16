@@ -10,7 +10,7 @@ import { initialFilter, filterStatesEqual, hiddenMatchesOf, listEqual, locksEqua
 import { reconcileFilter } from '../filter/reconcile'
 import type { ForceParams, Simulation } from '../graph/simulation'
 import { bandOverlay, layoutFrame, resolvePhysics } from '../graph/forces'
-import { countsOn, isIdentityMapping, readAxis, valuesOn } from '../graph/axis'
+import { countsOn, isIdentityMapping, valuesOn } from '../graph/axis'
 import type { AxisId, AxisMapping } from '../graph/axis'
 import type { PresentSets } from './graph-view/present'
 import { presentSetsOf } from './graph-view/present'
@@ -372,7 +372,7 @@ export const GraphView = React.forwardRef<GraphViewHandle, GraphViewProps>(funct
   const graphIndex = React.useMemo(() => nodesById(graph.nodes), [graph])
   // The chip badges: the host's reading of its own data, or a count of the
   // graph's entities per axis and value.
-  const nodeCounts = React.useMemo(() => countsOn(graph.nodes, filterAxes), [graph, filterAxes])
+  const nodeCounts = React.useMemo(() => countsOn(graph.nodes, axes), [graph, axes])
   const counts = hostCounts ?? nodeCounts
   // Every node's copies, by the key they share — derived here, once per graph.
   const copies = React.useMemo(() => copyGroups(graph), [graph])
@@ -435,7 +435,7 @@ export const GraphView = React.forwardRef<GraphViewHandle, GraphViewProps>(funct
   // What each filter axis can take, read off the graph: the engine declares no
   // value vocabulary, so the bar learns an axis's domain from the nodes.
   const valuesByAxis = React.useMemo(
-    () => new Map(taxonomy.filterAxes.map(d => [d.id, valuesOn(graph.nodes, d)])),
+    () => new Map(taxonomy.filterAxes.map(d => [d.id, valuesOn(graph.nodes, d.id)])),
     [graph, taxonomy],
   )
 
@@ -790,7 +790,7 @@ export const GraphView = React.forwardRef<GraphViewHandle, GraphViewProps>(funct
     if (!node) return false
     const base = filterRef.current
     // Widened by whole chips: the graph says which values each chip holds.
-    const result = reconcileFilter({ destination: base, source: base, locks, transition: { kind: 'focus', target: node }, taxonomy, axes, graph })
+    const result = reconcileFilter({ destination: base, source: base, locks, transition: { kind: 'focus', target: { values: node.values } }, taxonomy, axes, graph })
     // A read-only filter (controlled, no callback) cannot be widened: the
     // node is judged, centred and reported against the filter the view holds.
     const applied = filterWritable ? result.filter : base
@@ -800,7 +800,7 @@ export const GraphView = React.forwardRef<GraphViewHandle, GraphViewProps>(funct
     }
     // Whether the filter shows the node: a value absent on a hiding axis
     // cannot be revealed by widening, and the host should know.
-    const shown = passesDescriptors(applied, filterAxes, axis => readAxis(node, axis))
+    const shown = passesDescriptors(applied, filterAxes, axis => node.values[axis])
     if (!shown) return false
     pendingCenterRef.current = { nodeId: id }
     if (!running) {

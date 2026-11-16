@@ -15,11 +15,6 @@ library holds and why.
   one entry per node. The style axis is one axis among them, named once
   (`styleAxis()`); a projection of another axis is written by the host when it
   builds the node, never derived by the engine.
-- **Tags stand apart from values.** A node's several values on one axis — its
-  assignees, its labels — are its `tags`, on an axis declared to read them,
-  which only filters. One value per axis is what gives every bucket and band
-  its answer, so no force meets a list; and two copies sharing a `copyKey`
-  would draw one item once per tag.
 - **The library knows no domain.** No word of a host's vocabulary enters it;
   the taxonomy is injected, and every consumer resolves through the container
   it is handed.
