@@ -165,7 +165,7 @@ function computeGraphNodeSummary(
 }
 
 /**
- * `passesDescriptors` for a graph node, projected through the taxonomy, on the
+ * `passesDescriptors` for a graph node, on its own values, on the
  * axes given — the ones the view shows. Every declared axis is the default
  * for a caller that shows them all.
  */
