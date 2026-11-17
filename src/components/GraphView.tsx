@@ -1148,6 +1148,7 @@ export const GraphView = React.forwardRef<GraphViewHandle, GraphViewProps>(funct
           onMouseEnter={cancelHoverClear}
           onMouseLeave={() => handleHoverNode(null)}
         />
+        {nodeCount === 0 && (simRef.current?.nodes.length ?? 0) > 0 && <p className="gv-graph-empty">No nodes match the filter.</p>}
       </div>
 
       {/* Floating overlay: the shared filter bar (with the host's findings), the

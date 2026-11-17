@@ -630,9 +630,7 @@ What is not built is filed as issues:
   neighbourhood frame that leaves hidden neighbours out
   ([#26](https://github.com/jmbarzee/force-graph/issues/26)), the keyboard and
   accessibility model ([#7](https://github.com/jmbarzee/force-graph/issues/7)),
-  animated reveals ([#8](https://github.com/jmbarzee/force-graph/issues/8)), an empty state
-  when the filter hides every node
-  ([#6](https://github.com/jmbarzee/force-graph/issues/6)).
+  animated reveals ([#8](https://github.com/jmbarzee/force-graph/issues/8)).
 - **The package** — the pane's strings in other languages
   ([#13](https://github.com/jmbarzee/force-graph/issues/13)), the React 19
   types gate ([#14](https://github.com/jmbarzee/force-graph/issues/14)).

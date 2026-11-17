@@ -60,9 +60,9 @@ hidden tiers, attaching a visible child to its nearest visible ancestor —
 with departments hidden, courses cluster round their faculty. A hidden
 child's containment edge is dropped.
 
-A filter that hides every node leaves an empty canvas reading
-`0 nodes, 0 edges`; a message is
-[#6](https://github.com/jmbarzee/force-graph/issues/6).
+A filter that hides every node of a graph that has some says so, centred in
+the canvas below the overlay: "No nodes match the filter." An empty graph
+draws no line; it is the host's to explain.
 
 ## Revealing a bucket
 
