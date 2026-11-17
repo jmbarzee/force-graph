@@ -192,11 +192,17 @@ off — stays shown, dimmed. Center gravity has no control.
 
 ### Misc
 
+Each section is its equation, a curve and its sliders; as on a force tab,
+hovering a symbol lights the slider it names.
+
 - **Dynamics** — `friction` (velocity damping per tick), `cooling` (energy
-  lost per tick), `threshold` (the energy below which ticking pauses).
+  lost per tick), `threshold` (the energy below which ticking pauses). The
+  curve plots α against ticks, from 1 down to `threshold`, marking the tick
+  the simulation stops at.
 - **Node scaling** — on-screen size is `r × size × clamp(zoom, shrink floor,
   grow cap)`, defaults 0.6, 0.4 and 1.65; lowering the grow cap makes nodes
-  shrink sooner as the user zooms out.
+  shrink sooner as the user zooms out. The curve plots that scale against
+  zoom: flat below the shrink floor and above the grow cap.
 
 ## Force-field visualisation
 
