@@ -271,3 +271,15 @@ describe('coloring.fill', () => {
     expect(view.reported().filter(d => d.code === 'tint-undeclared')).toHaveLength(1)
   })
 })
+
+it('says so when the filter draws no node, and stops once it draws one', async () => {
+  const view = await mount({ defaultFilter: new Map([['team', { except: new Set(['a', 'b']) }], ['site', { except: new Set() }]]) })
+  expect(view.el.querySelector('.gv-graph-empty')?.textContent).toBe('No nodes match the filter.')
+  await act(async () => view.ref.current!.updateFilter(f => withSelection(f, 'team', new Set(['a']))))
+  expect(view.el.querySelector('.gv-graph-empty')).toBeNull()
+})
+
+it('leaves an empty graph to the host', async () => {
+  const view = await mount({}, graphOf())
+  expect(view.el.querySelector('.gv-graph-empty')).toBeNull()
+})

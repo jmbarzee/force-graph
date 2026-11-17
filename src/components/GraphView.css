@@ -188,6 +188,16 @@
   flex-direction: column;
 }
 
+.gv-graph-empty {
+  position: absolute;
+  inset: var(--gv-toolbar-height, 0px) 0 0;
+  display: grid;
+  place-items: center;
+  margin: 0;
+  color: var(--gv-color-text-muted);
+  pointer-events: none;
+}
+
 /* Graph Canvas Container — immediately follows the toolbar */
 .gv-graph-canvas-container {
   flex: 1;
