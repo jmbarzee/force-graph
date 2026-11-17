@@ -391,18 +391,23 @@ keeps its own keys, Escape aside.
 
 | Key | Action |
 |---|---|
-| Tab / Shift+Tab | Move the focus ring to the next or previous visible node, in graph order, while the pane itself has focus |
+| Tab / Shift+Tab | Move the focus ring to the next or previous visible node, while the pane itself has focus |
 | Enter | Select the focused node alone |
-| Escape | Close the shortcuts panel, else the search, else clear the selection, else (on the pane) give focus back |
+| Escape | Close the shortcuts panel, else the search, else clear the selection, else give the pane's focus back |
 | Arrows | Pan |
 | `+` / `-` | Zoom about the centre |
 | `F` | Fit |
 | `/` | Open the search and focus it, while `chrome.search` offers it |
 | Space | Play / Pause |
-| `?` | Toggle the shortcuts panel, which also lists Shift+hover, while `chrome.shortcuts` offers it |
+| `?` | Toggle the shortcuts panel, which also lists Shift+hover, Ctrl/Meta+click and the lasso, while `chrome.shortcuts` offers it |
 | Shift (held) | Reverse the walk ([§ Hover and selection](#hover-and-selection)) |
 
 Nodes are not DOM elements: the pane keeps a virtual focus over the canvas.
-The ordering, an accessible name per node and the hover box following the
-focus are
-[#7](https://github.com/jmbarzee/force-graph/issues/7).
+The root is focusable unless `keyboard` is `none`, a region named `Graph`
+with its node and edge counts. The focus walks the visible nodes
+depth-first by containment, each under its nearest visible ancestor,
+siblings by name. It is held by id: a filter or a reload that stops drawing
+the node moves it to its nearest drawn ancestor, else clears it. A polite
+status region announces the focused node's name, its style value's label and
+its context line, and the hover box follows the focus while the pane holds
+it, as it follows the pointer.

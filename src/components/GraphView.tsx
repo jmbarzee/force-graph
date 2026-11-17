@@ -61,6 +61,7 @@ import { neighborhoodOf, passesFilter } from './graph-view/visibleGraph'
 import { useSimulationLoop } from './graph-view/useSimulationLoop'
 import { useControllable, useControlledWarning, useLatest, useStable } from './graph-view/useControllable'
 import { namesNode, sameFocusRequest } from './graph-view/focus'
+import { tabOrder } from './graph-view/tabOrder'
 import type { FocusRequest } from './graph-view/focus'
 export type { FocusRequest } from './graph-view/focus'
 import { useIsomorphicLayoutEffect } from './graph-view/useIsomorphicLayoutEffect'
@@ -756,9 +757,8 @@ export const GraphView = React.forwardRef<GraphViewHandle, GraphViewProps>(funct
   // derived transitive-dependency highlight sets and focusedNodeId.
   const {
     hoveredNodeId, setHoveredNodeId,
-    setFocusedIndex,
     shiftHeld,
-    focusedNodeId,
+    focusedNodeId, focusNode,
     highlightedNodes, highlightedEdges,
     activeSection, setActiveSection,
     activePushBucket, setActivePushBucket,
@@ -1006,13 +1006,10 @@ export const GraphView = React.forwardRef<GraphViewHandle, GraphViewProps>(funct
         // user can always reach the host's controls.
         if (target !== containerRef.current) return
         e.preventDefault()
-        const count = visibleNodes.length
-        if (count === 0) return
-        if (e.shiftKey) {
-          setFocusedIndex(prev => prev > 0 ? prev - 1 : count - 1)
-        } else {
-          setFocusedIndex(prev => prev < count - 1 ? prev + 1 : 0)
-        }
+        const order = tabOrder(visibleNodes, getSimNode)
+        if (order.length === 0) return
+        const at = focusedNodeId === null ? -1 : order.indexOf(focusedNodeId)
+        focusNode(order[e.shiftKey ? (at <= 0 ? order.length : at) - 1 : (at + 1) % order.length]!)
         break
       }
       case 'Enter': {
@@ -1026,7 +1023,7 @@ export const GraphView = React.forwardRef<GraphViewHandle, GraphViewProps>(funct
         if (shortcutsOpen) { e.preventDefault(); setShortcutsOpen(false); break }
         if (searchActive) { e.preventDefault(); toggleSearch(); break }
         if (selected.size > 0) { e.preventDefault(); selectOnly(null); break }
-        if (keyboard === 'pane') containerRef.current?.blur()
+        if (target === containerRef.current) containerRef.current?.blur()
         break
       }
       case 'ArrowLeft':
@@ -1081,7 +1078,7 @@ export const GraphView = React.forwardRef<GraphViewHandle, GraphViewProps>(funct
         break
       }
     }
-  }, [keyboard, visibleNodes, focusedNodeId, selected, selectOnly, searchActive, searchQuery, setSearch, shortcutsOpen, show.search, show.shortcuts, handleFitToView, handleToggleRunning]) // eslint-disable-line react-hooks/exhaustive-deps
+  }, [visibleNodes, getSimNode, focusedNodeId, focusNode, selected, selectOnly, searchActive, searchQuery, setSearch, shortcutsOpen, show.search, show.shortcuts, handleFitToView, handleToggleRunning]) // eslint-disable-line react-hooks/exhaustive-deps
   React.useEffect(() => {
     if (keyboard !== 'global') return
     window.addEventListener('keydown', handleKey)
@@ -1101,6 +1098,13 @@ export const GraphView = React.forwardRef<GraphViewHandle, GraphViewProps>(funct
 
   const nodeCount = visibleNodes.length
   const edgeCount = visibleEdges.length
+  const counted = `${nodeCount} node${nodeCount !== 1 ? 's' : ''}, ${edgeCount} edge${edgeCount !== 1 ? 's' : ''}`
+  // The hover box follows the keyboard focus while the pane holds it, as it
+  // follows the pointer while that is over a node.
+  const [paneFocused, setPaneFocused] = React.useState(false)
+  const boxedNodeId = hoveredNodeId ?? (paneFocused ? focusedNodeId : null)
+  const focusedNode = focusedNodeId === null ? undefined : getSimNode(focusedNodeId)
+  const contextOf = (node: GraphNode) => contextLinesOf(taxonomy, node, id => hostIndex.get(id) ?? getSimNode(id))
 
   return (
     <TaxonomyContext.Provider value={taxonomy}>
@@ -1110,8 +1114,12 @@ export const GraphView = React.forwardRef<GraphViewHandle, GraphViewProps>(funct
       className={`gv-graph-view${className ? ` ${className}` : ''}`}
       ref={containerRef}
       data-gv-theme={theme}
-      tabIndex={keyboard === 'pane' ? 0 : undefined}
+      role="region"
+      aria-label={`Graph, ${counted}`}
+      tabIndex={keyboard === 'none' ? undefined : 0}
       onKeyDown={keyboard === 'pane' ? paneKeyDown : undefined}
+      onFocus={e => { if (e.target === e.currentTarget) setPaneFocused(true) }}
+      onBlur={e => { if (e.target === e.currentTarget) setPaneFocused(false) }}
       style={{ ...schemeStyle, ...(overlayHeight ? { ['--gv-toolbar-height' as string]: `${overlayHeight}px` } : {}), ...style }}
     >
       {/* Canvas fills the full viewport beneath the floating overlay */}
@@ -1158,7 +1166,7 @@ export const GraphView = React.forwardRef<GraphViewHandle, GraphViewProps>(funct
           />
         </CanvasErrorBoundary>
         <GraphHoverTooltip
-          hoveredNodeId={hoveredNodeId}
+          hoveredNodeId={boxedNodeId}
           simRef={simRef}
           visibleEdges={visibleEdges}
           undirected={undirected}
@@ -1169,10 +1177,13 @@ export const GraphView = React.forwardRef<GraphViewHandle, GraphViewProps>(funct
           copies={copies}
           nodeSummaries={nodeSummaries}
           nodeAction={actionFor}
-          hostNodeOf={hostNodeOf}
+          contextOf={contextOf}
           onMouseEnter={holdNodeHover}
           onMouseLeave={() => handleHoverNode(null)}
         />
+        <div className="gv-graph-announce" role="status">
+          {focusedNode && [focusedNode.name, styleLabelOf(focusedNode), ...contextOf(focusedNode)].map((part, i) => <span key={i}>{i > 0 && ', '}{part}</span>)}
+        </div>
         {nodeCount === 0 && (simRef.current?.nodes.length ?? 0) > 0 && <p className="gv-graph-empty">No nodes match the filter.</p>}
         {shownEdge && shownOrigin && (
           <EdgeHoverTooltip
@@ -1238,9 +1249,7 @@ export const GraphView = React.forwardRef<GraphViewHandle, GraphViewProps>(funct
       {/* Bottom-left: node/edge counts (shifts right when the shortcuts panel
           is open so they don't overlap). */}
       {show.transport && <div className={`gv-graph-bottom-left${shortcutsOpen ? ' shifted' : ''}`}>
-        <span className="gv-graph-count">
-          {nodeCount} node{nodeCount !== 1 ? 's' : ''}, {edgeCount} edge{edgeCount !== 1 ? 's' : ''}
-        </span>
+        <span className="gv-graph-count">{counted}</span>
       </div>}
 
       {/* Bottom-center: simulation controls + live fps. */}
@@ -1312,6 +1321,8 @@ export const GraphView = React.forwardRef<GraphViewHandle, GraphViewProps>(funct
             {show.search && <Shortcut keys="/" desc="Open search" />}
             <Shortcut keys="Space" desc="Toggle simulation" />
             <Shortcut keys="Shift + hover" desc="Upstream deps" />
+            <Shortcut keys="Ctrl/Meta + click" desc="Add or remove a node" />
+            <Shortcut keys="Ctrl/Meta + drag" desc="Lasso nodes into the selection" />
             <Shortcut keys="?" desc="This panel" />
           </div>
         </div>
@@ -1357,15 +1368,15 @@ interface GraphHoverTooltipProps {
   nodeSummaries: Map<string, string>
   // The host's action for a node, when it offers one.
   nodeAction: (node: GraphNode) => NodeAction | null
-  /** The host's own node by id — what the taxonomy's `contextLine` is handed, never the simulation's copy. */
-  hostNodeOf: (id: string) => GraphNode | undefined
+  /** The node's context lines (`contextLinesOf`). */
+  contextOf: (node: GraphNode) => React.ReactNode[]
   // The tooltip is interactive: these keep it open while the pointer is over
   // it (so the cross-view button is clickable).
   onMouseEnter: () => void
   onMouseLeave: () => void
 }
 
-function GraphHoverTooltip({ hoveredNodeId, simRef, visibleEdges, undirected, visibleIds, viewport, shiftHeld, directionLine, copies, nodeSummaries, nodeAction, hostNodeOf, onMouseEnter, onMouseLeave }: GraphHoverTooltipProps) {
+function GraphHoverTooltip({ hoveredNodeId, simRef, visibleEdges, undirected, visibleIds, viewport, shiftHeld, directionLine, copies, nodeSummaries, nodeAction, contextOf, onMouseEnter, onMouseLeave }: GraphHoverTooltipProps) {
   // Before the early returns: this is a hook, and the component bails out four
   // different ways below.
   const taxonomy = useTaxonomy()
@@ -1377,12 +1388,7 @@ function GraphHoverTooltip({ hoveredNodeId, simRef, visibleEdges, undirected, vi
   const node = sim.getNode(hoveredNodeId)
   if (!node) return null
 
-  // The context under the name is the taxonomy's answer: a host that keys a
-  // value's identity on its own metadata says so there, as one line or
-  // several; the library's default is the parent's name. The hook is handed
-  // the host's own node and parent. The icon is the value's own.
-  const parent = node.parentId === undefined ? undefined : hostNodeOf(node.parentId) ?? sim.getNode(node.parentId)
-  const contextLines = linesOf(engine.contextLine(hostNodeOf(node.id) ?? node, parent))
+  const contextLines = contextOf(node)
   const action = nodeAction(node)
   const icon = engine.nodeStyleOf(node).icon
   const fillKey = fill.of.get(node.id)
@@ -1467,6 +1473,16 @@ function GraphHoverTooltip({ hoveredNodeId, simRef, visibleEdges, undirected, vi
       )}
     </div>
   )
+}
+
+/**
+ * A node's context under its name, in the hover box and the focus's
+ * announcement: the taxonomy's answer, one line or several, handed the host's
+ * own node and parent (`nodeOf`); the library's default is the parent's name.
+ */
+function contextLinesOf(taxonomy: Taxonomy, node: GraphNode, nodeOf: (id: string) => GraphNode | undefined): React.ReactNode[] {
+  const parent = node.parentId === undefined ? undefined : nodeOf(node.parentId)
+  return linesOf(engineOf(taxonomy).contextLine(nodeOf(node.id) ?? node, parent))
 }
 
 /** A hover box's context, one line or several, as lines. */
