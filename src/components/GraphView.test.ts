@@ -292,7 +292,7 @@ describe('coloring.glow', () => {
   /** Mount a view over `groups`, re-rendered with each glow, and what its control was last handed. */
   async function mountGlow(glow?: SetColoring) {
     let last: [readonly ActiveGroup[], GroupsControl] | undefined
-    const root = createRoot(document.createElement('div'))
+    const root = newRoot(document.createElement('div'))
     const render = (next?: SetColoring) => act(async () => {
       root.render(React.createElement(GraphView, { graph: first, taxonomy, groups, coloring: { glow: next }, groupsControl: (...args) => { last = args; return null } }))
     })
@@ -340,7 +340,6 @@ describe('edge hover', () => {
       const onEdgeHover = vi.fn()
       const view = await mount({ onEdgeHover }, graph)
       await act(async () => drawn.hoverEdge({ id: 'e', x: 10, y: 20 }))
-      expect(onEdgeHover).toHaveBeenLastCalledWith(prerequisite)
       expect(onEdgeHover.mock.lastCall![0]).toBe(prerequisite)
       expect(drawn.hoveredEdgeId).toBe('e')
       expect(view.el.querySelector('.gv-tooltip-name')!.textContent).toBe('a → b')
