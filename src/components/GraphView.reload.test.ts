@@ -39,9 +39,11 @@ const tick = (n = Infinity) => act(async () => {
   }
 })
 
-const taxonomy = createTaxonomy({ styleAxis: 'kind', styles: [], filterAxes: [] })
+// A style gives the nodes a charge, which spreads them: with none they
+// collapse within a pixel, and their frame barely moves when they do.
+const taxonomy = createTaxonomy({ styleAxis: 'kind', styles: [{ id: 'node' }], filterAxes: [] })
 const graphOf = (...ids: string[]): Graph => ({
-  nodes: ids.map(id => ({ id, name: id, values: {} })),
+  nodes: ids.map(id => ({ id, name: id, values: { kind: 'node' } })),
   edges: ids.slice(1).map(id => ({ id: `${ids[0]}-${id}`, sourceId: ids[0]!, targetId: id })),
 })
 const first = graphOf('a', 'b', 'c')
@@ -88,9 +90,10 @@ it('keeps the positions, the viewport and its selection over a reload', async ()
 })
 
 it('carries a held frame over a reload, on the new graph\'s nodes among its ids', async () => {
-  // `d` starts clear of the others: seeded at random, it could land within
-  // half a pixel of their frame, and framing it would move nothing.
-  const view = await mount(first, new Map([['d', { x: 300, y: 200 }]]))
+  // `d` starts far from the others, not at random: framing it moves the view,
+  // and its pull on `a` over the reload's tick moves their frame, which a
+  // dropped hold would leave behind.
+  const view = await mount(first, new Map([['d', { x: 3000, y: 2000 }]]))
   // Past the warm-up, while the opening frame still holds.
   while (frames.size && viewport === DEFAULT_VIEWPORT) await tick(1)
   await view.render(grown)
