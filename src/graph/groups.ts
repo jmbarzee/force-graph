@@ -38,8 +38,8 @@ export interface NodeGroup {
   weight?: number
 }
 
-/** A group the glow draws, its colour settled for both themes. */
-export type GlowSource = NodeGroup & { color: ThemedHue }
+/** A group the glow draws, its colour settled for both themes and its name for the legend. */
+export type GlowSource = NodeGroup & { color: ThemedHue; label: string }
 
 /** One key of a set-shaped channel, in the order its palette slots follow. */
 export interface LegendKey {
@@ -159,8 +159,8 @@ export function cohesionOf(groups: readonly NodeGroup[], edges: readonly GraphEd
   return out
 }
 
-/** A group as drawn. */
-export interface ActiveGroup {
+/** A group as the canvas draws it. */
+export interface GlowGroup {
   /** The host's group id. */
   id: string
   /** The glow's colour: the host's, else the palette's. */
@@ -169,10 +169,6 @@ export interface ActiveGroup {
   strength: number
   /** The group's visible nodes. */
   nodeIds: ReadonlySet<string>
-}
-
-/** An active group with the `weight` its glow swells by; the canvas reads it, a host's control sees an `ActiveGroup`. */
-export interface GlowGroup extends ActiveGroup {
   /** The host's `weight`. */
   weight?: number
 }
@@ -199,10 +195,10 @@ export function activeGroupsOf(groups: readonly GlowSource[], visibleIds: Readon
 // surfaces out of a field of many faint ones. Returns the same array when no
 // focus node lands in any group, so the common case allocates nothing.
 /** The active groups with any that holds one of the given nodes glowing at `NODE_FOCUS_STRENGTH`; the same array when none does. */
-export function boostGroupsForNodes<G extends ActiveGroup>(
-  groups: G[],
+export function boostGroupsForNodes(
+  groups: GlowGroup[],
   focusIds: Array<string | null>,
-): G[] {
+): GlowGroup[] {
   const ids = focusIds.filter((id): id is string => !!id)
   if (ids.length === 0) return groups
   let changed = false

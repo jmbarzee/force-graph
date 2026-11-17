@@ -110,8 +110,9 @@ pointer, so zoomed content bleeds visibly under it. The bar is one row of chips
 per axis shown, each with its lock and a `×` on hover that removes it; a `+`
 adds a declared axis not shown; then the search. The host's `findings` fill a
 slot at its bottom, and the bar can flash on a host's refresh. A host's
-`groupsControl` anchors under it, at `--gv-toolbar-height`; a `GroupLegend`
-ends above the pane's foot, its items scrolling under the host's controls.
+`legend` anchors under it, at `--gv-toolbar-height`; a `ColorLegend`
+ends above the pane's foot, its sections — fill, glow, ring — scrolling under
+the host's controls.
 
 An axis whose chips overflow its row shows the row and a count of the rest;
 the count opens it and **Less** closes it. Every axis starts closed, and which
@@ -330,8 +331,8 @@ the palette has a slot free, and hiding one group recolours no other. A
 group's `weight` (0..1) swells its halo and corridor, up to double; hue and
 brightness stay. A focused group — the one `emphasize` names, or the one
 holding a hovered or selected node — brightens and swells. In the catalog
-each degree programme is a group, and its legend's checkboxes write the group
-filter.
+each degree programme is a group, and its legend's glow checkboxes write the
+group filter; glowing by campus, they write the campus axis.
 
 ## Appearance
 

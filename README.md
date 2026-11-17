@@ -301,7 +301,8 @@ the console. Everything else is optional.
   ```
 - **Labels.** `labels` names values per axis, beside the graph, for names
   that arrive with the data: a chip, a control's bucket (and, off the style
-  axis, its abbreviation), and a search result's style read a value's label
+  axis, its abbreviation), a colouring's key in the legend and the hover box,
+  and a search result's style read a value's label
   from `labels`, then from the descriptor's `labelFor`, then the value. The
   value stays the filter's key, the chip's identity and what `filterToJSON`
   writes, so two values sharing a name stay two chips. Keep one object until
@@ -362,8 +363,7 @@ the console. Everything else is optional.
   are diagnostics, and draw neutral. `coloring={{ glow }}` glows each key's
   nodes as one group by a `SetColoring`: a `Coloring`, or `{ by: 'groups' }`,
   the default, the view's `groups`. A key's `weight` swells its glow as a
-  group's does; `groups` still drive the `GROUPS` filter and cohesion, and
-  `toggle` writes `GROUPS` only while the glow follows them.
+  group's does; `groups` still drive the `GROUPS` filter and cohesion.
   `coloring={{ ring }}` rings each keyed node in its key's colour by a
   `Coloring`; a node's `ring: 'dashed'` dashes that ring, in its fill when
   it has no key. A node's rings stack outward in one order, an absent one
@@ -387,13 +387,20 @@ the console. Everything else is optional.
   node in no group always passing, and `passesGroups(filter, groupIds)`
   judges one), `groupCohesion`
   (a multiplier, default 1, on the stiffness of every edge whose ends share a
-  visible group, so members drift together), `groupsControl` for a legend
-  inside the pane (anchor it under `--gv-toolbar-height`), handed the groups
-  as drawn and a `GroupsControl` — `shown(id)`, `toggle(id)` while the filter
-  is writable, which writes `GROUPS` as the bar writes an axis, and
-  `emphasize(id | null)`; `GroupLegend` is one — `items`, the `active`
-  groups and the `control`, and `children`, the host's own controls, held
-  above its items, which scroll once the legend reaches the pane's foot),
+  visible group, so members drift together), `legend` for a legend inside
+  the pane (anchor it under `--gv-toolbar-height`), handed the
+  `ColorChannels` — each channel's keys as drawn, `fill` always, `glow` and
+  `ring` while they colour, each a `ChannelKey`, `{ id, label, color,
+  visible }`, its colour in the pane's theme and `visible` while a visible
+  node wears it — and a `GroupsControl` over the glow's keys: `shown(id)`,
+  `toggle(id)` while the filter is writable, which writes the entry the keys
+  are values of as the bar writes an axis (`GROUPS` for the groups, the axis
+  for a filter axis the view shows, none for any other), and `emphasize(id | null)`;
+  `ColorLegend` is one — the `channels`, the `control`, `titles` by channel
+  ("Fill", "Glow", "Ring" by default), and `children`, the host's own
+  controls, held above a section per channel, which scroll once the legend
+  reaches the pane's foot; glow rows toggle and emphasise, fill and ring rows
+  only read),
   `markedEdges` (edge ids drawn with a dashed band behind their stroke, a
   graduated edge when the edge it stands for is), a `nodeAction`
   for the hover box (`{ label, onSelect }`, or a function of the node

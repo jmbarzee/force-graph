@@ -1,10 +1,11 @@
 import { valuesOn } from './axis'
-import type { AxisId, AxisValue } from './axis'
+import type { AxisId, AxisLabels, AxisValue } from './axis'
 import { checkedKey, groupSlotsOf, groupsByNode, nodeGroupsOf } from './groups'
 import type { GlowSource, Groups, LegendKey } from './groups'
 import type { Graph, GraphNode } from './model'
 import { cssSuffix, hueOf, pairOf } from './scheme'
-import type { ThemedColor, ThemedHue } from './scheme'
+import type { Theme, ThemedColor, ThemedHue } from './scheme'
+import { namerFor, styleLabelFor } from './simulation'
 import type { Taxonomy } from './taxonomy'
 import type { GraphDiagnostic } from './validate'
 
@@ -33,9 +34,10 @@ const NONE: readonly string[] = Object.freeze([])
  * them takes its values across the graph in its chips' order, or the style
  * axis's declared order and fills. A key with no colour takes the palette
  * slot of its place among the keys, so a filter recolours nothing; a group,
- * its `groupSlotsOf` slot. The groups' own warnings are `nodeGroupsOf`'s to report.
+ * its `groupSlotsOf` slot. An axis's keys are named as its chips are, through
+ * `labels`. The groups' own warnings are `nodeGroupsOf`'s to report.
  */
-export function resolveColoring(coloring: SetColoring, graph: Graph, taxonomy: Taxonomy, groups: Groups): ResolvedColoring {
+export function resolveColoring(coloring: SetColoring, graph: Graph, taxonomy: Taxonomy, groups: Groups, labels?: AxisLabels): ResolvedColoring {
   const diagnostics: GraphDiagnostic[] = []
   const keys = new Map<string, { label: string; hue: ThemedHue; weight?: number }>()
   const of = new Map<string, readonly string[]>()
@@ -65,17 +67,18 @@ export function resolveColoring(coloring: SetColoring, graph: Graph, taxonomy: T
     if (coloring.keys) declare(coloring.keys)
     else if (axis === taxonomy.styleAxis()) {
       const present = new Set(valuesOn(graph.nodes, axis))
-      const labelFor = taxonomy.axisFor(axis)?.labelFor
+      const labelFor = styleLabelFor(taxonomy, labels)
       for (const v of taxonomy.styleValues) {
         if (!present.has(v)) continue
-        const { label, color } = taxonomy.styleOf(v)
-        keys.set(v, { label: labelFor?.(v) ?? label, hue: { light: color.light.fill, dark: color.dark.fill } })
+        const { color } = taxonomy.styleOf(v)
+        keys.set(v, { label: labelFor(v), hue: { light: color.light.fill, dark: color.dark.fill } })
       }
     } else {
       const values = valuesOn(graph.nodes, axis)
       const descriptor = taxonomy.axisFor(axis)
+      const { labelFor } = namerFor(taxonomy, axis, labels)
       const ordered: readonly AxisValue[] = descriptor ? descriptor.chipsFor(values).flatMap(c => c.values) : values
-      declare(ordered.map(v => ({ id: v, label: descriptor?.labelFor(v) ?? v })))
+      declare(ordered.map(v => ({ id: v, label: labelFor(v) })))
     }
   }
 
@@ -122,16 +125,13 @@ export interface Fill {
 /**
  * The fill a colouring gives a graph. Absent, or the style axis without
  * keys, it is every declared style's own colour; otherwise each key's hue as
- * a body's fill and border.
+ * a body's fill and border. Keys are named through `labels`.
  */
-export function fillOf(coloring: Coloring | undefined, graph: Graph, taxonomy: Taxonomy): Fill {
+export function fillOf(coloring: Coloring | undefined, graph: Graph, taxonomy: Taxonomy, labels?: AxisLabels): Fill {
   const styleAxis = taxonomy.styleAxis()
   if (!coloring || (coloring.by === 'axis' && coloring.axis === styleAxis && !coloring.keys)) {
-    const labelFor = taxonomy.axisFor(styleAxis)?.labelFor
-    const keys = new Map(taxonomy.styleValues.map(v => {
-      const { label, color } = taxonomy.styleOf(v)
-      return [v, { label: labelFor?.(v) ?? label, color, cssVar: taxonomy.colorVar(v) }]
-    }))
+    const labelFor = styleLabelFor(taxonomy, labels)
+    const keys = new Map(taxonomy.styleValues.map(v => [v, { label: labelFor(v), color: taxonomy.styleOf(v).color, cssVar: taxonomy.colorVar(v) }]))
     const of = new Map<string, string>()
     for (const node of graph.nodes) {
       const v = node.values[styleAxis]
@@ -139,7 +139,7 @@ export function fillOf(coloring: Coloring | undefined, graph: Graph, taxonomy: T
     }
     return { axis: styleAxis, keys, of, diagnostics: [] }
   }
-  const resolved = resolveColoring(coloring, graph, taxonomy, [])
+  const resolved = resolveColoring(coloring, graph, taxonomy, [], labels)
   const cssVar = cssVarsFor([...resolved.keys.keys()])
   const keys = new Map([...resolved.keys].map(([id, { label, hue }]) => [id, { label, color: pairOf(hue), cssVar: cssVar.get(id)! }]))
   const of = new Map<string, string>()
@@ -177,12 +177,54 @@ export function hueFor(coloring: ResolvedColoring, id: string): ThemedHue | unde
 
 /**
  * What the glow follows: one source per key of a set colouring, its members
- * the nodes holding the key, coloured by the key's hue and swelling by its
- * weight. Absent, the colouring is the groups.
+ * the nodes holding the key, coloured by the key's hue, named by its label
+ * and swelling by its weight. Absent, the colouring is the groups.
  */
-export function glowOf(coloring: SetColoring = { by: 'groups' }, graph: Graph, taxonomy: Taxonomy, groups: Groups): { sources: readonly GlowSource[]; diagnostics: readonly GraphDiagnostic[] } {
-  const { keys, of, diagnostics } = resolveColoring(coloring, graph, taxonomy, groups)
+export function glowOf(coloring: SetColoring = { by: 'groups' }, graph: Graph, taxonomy: Taxonomy, groups: Groups, labels?: AxisLabels): { sources: readonly GlowSource[]; diagnostics: readonly GraphDiagnostic[] } {
+  const { keys, of, diagnostics } = resolveColoring(coloring, graph, taxonomy, groups, labels)
   const members = new Map([...keys.keys()].map(k => [k, new Set<string>()]))
   for (const [id, held] of of) for (const k of held) members.get(k)!.add(id)
-  return { sources: [...keys].map(([id, { hue, weight }]) => ({ id, nodeIds: members.get(id)!, color: hue, weight })), diagnostics }
+  return { sources: [...keys].map(([id, { label, hue, weight }]) => ({ id, label, nodeIds: members.get(id)!, color: hue, weight })), diagnostics }
+}
+
+/** One key of a colour channel as drawn. */
+export interface ChannelKey {
+  /** The key's id: a value, a group, or what a host function answers. */
+  id: string
+  /** The key's name, as the chips and the hover box give it. */
+  label: string
+  /** The key's colour in the pane's theme. */
+  color: string
+  /** Whether a visible node wears the key. */
+  visible: boolean
+}
+
+/** Each colour channel's keys as drawn, in slot order; a channel that colours by nothing is absent. */
+export interface ColorChannels {
+  /** The body's fill. */
+  fill?: readonly ChannelKey[]
+  /** The glow. */
+  glow?: readonly ChannelKey[]
+  /** The ring. */
+  ring?: readonly ChannelKey[]
+}
+
+/**
+ * Each channel's keys as drawn in `theme`, visible while a node of
+ * `visibleIds` wears them. The fill is always present; the glow and the ring
+ * when given.
+ */
+export function colorChannels(fill: Fill, glow: readonly GlowSource[] | undefined, ring: ResolvedColoring | null, visibleIds: ReadonlySet<string>, theme: Theme): ColorChannels {
+  const worn = (keysOf: (id: string) => readonly string[] | undefined) => {
+    const out = new Set<string>()
+    for (const id of visibleIds) for (const key of keysOf(id) ?? NONE) out.add(key)
+    return out
+  }
+  const fillWorn = worn(id => { const key = fill.of.get(id); return key === undefined ? undefined : [key] })
+  const ringWorn = ring && worn(id => ring.of.get(id))
+  return {
+    fill: [...fill.keys].map(([id, { label, color }]) => ({ id, label, color: color[theme].fill, visible: fillWorn.has(id) })),
+    glow: glow?.map(({ id, label, color, nodeIds }) => ({ id, label, color: color[theme], visible: [...nodeIds].some(n => visibleIds.has(n)) })),
+    ring: ring ? [...ring.keys].map(([id, { label, hue }]) => ({ id, label, color: hue[theme], visible: ringWorn!.has(id) })) : undefined,
+  }
 }

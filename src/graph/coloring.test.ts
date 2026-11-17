@@ -1,5 +1,5 @@
 import { describe, expect, it, vi } from 'vitest'
-import { coloringsEqual, fillOf, glowOf, hueFor, pairFor, resolveColoring } from './coloring'
+import { colorChannels, coloringsEqual, fillOf, glowOf, hueFor, pairFor, resolveColoring } from './coloring'
 import type { Coloring, SetColoring } from './coloring'
 import { groupSlotsOf } from './groups'
 import type { NodeGroup } from './groups'
@@ -39,6 +39,14 @@ describe('resolveColoring by axis', () => {
       ['service', { label: 'Service', hue: { light: '#111111', dark: '#eeeeee' } }],
       ['queue', { label: 'Queue', hue: { light: '#222222', dark: '#dddddd' } }],
     ])
+  })
+
+  it('names the keys through labels, on a declared axis, the style axis and an undeclared one', () => {
+    const labels = { team: { red: 'Crimson' }, kind: { queue: 'Line' }, site: { x: 'Ex' } }
+    const named = (axis: string) => [...resolveColoring({ by: 'axis', axis }, { nodes: [...nodes, node('e', { site: 'x' })], edges: [] }, taxonomy, [], labels).keys].map(([id, k]) => [id, k.label])
+    expect(named('team')).toEqual([['blue', 'BLUE'], ['green', 'GREEN'], ['red', 'Crimson']])
+    expect(named('kind')).toEqual([['service', 'Service'], ['queue', 'Line']])
+    expect(named('site')).toEqual([['x', 'Ex']])
   })
 
   it('takes declared keys over the defaults, and a value outside them resolves to none silently', () => {
@@ -143,6 +151,7 @@ describe('fillOf', () => {
     expect(fill.keys.get('queue')).toEqual({ label: 'Queue', color: taxonomy.styleOf('queue').color, cssVar: taxonomy.colorVar('queue') })
     expect(nodes.map(n => fill.of.get(n.id))).toEqual(['queue', 'service', 'service', undefined])
     expect(fillOf({ by: 'axis', axis: 'kind' }, { nodes, edges: [] }, taxonomy)).toEqual(fill)
+    expect(fillOf(undefined, { nodes, edges: [] }, taxonomy, { kind: { queue: 'Line' } }).keys.get('queue')!.label).toBe('Line')
   })
 
   it('pairs each key’s hue as fill and border on another axis', () => {
@@ -151,6 +160,32 @@ describe('fillOf', () => {
     expect(fill.keys.get('blue')).toEqual({ label: 'BLUE', color: pairOf(PALETTE[0]), cssVar: '--gv-node-blue' })
     expect(fill.of.get('a')).toBe('red')
     expect(fill.of.has('d')).toBe(false)
+  })
+})
+
+describe('colorChannels', () => {
+  const graph = { nodes, edges: [] }
+  const fill = fillOf({ by: 'axis', axis: 'team' }, graph, taxonomy)
+  const { sources } = glowOf({ by: 'axis', axis: 'kind' }, graph, taxonomy, [])
+  const ring = resolve({ by: 'node', keys: [{ id: 'red', label: 'Red', color: { light: '#010101', dark: '#fefefe' } }], of: n => n.values.team })
+
+  it('gives each key its label and its colour in the theme, visible while a visible node wears it', () => {
+    const channels = colorChannels(fill, sources, ring, new Set(['b', 'c']), 'dark')
+    expect(channels.fill).toEqual([
+      { id: 'blue', label: 'BLUE', color: PALETTE[0].dark, visible: true },
+      { id: 'green', label: 'GREEN', color: PALETTE[1].dark, visible: true },
+      { id: 'red', label: 'RED', color: PALETTE[2].dark, visible: false },
+    ])
+    expect(channels.glow).toEqual([
+      { id: 'service', label: 'Service', color: '#eeeeee', visible: true },
+      { id: 'queue', label: 'Queue', color: '#dddddd', visible: false },
+    ])
+    expect(channels.ring).toEqual([{ id: 'red', label: 'Red', color: '#fefefe', visible: false }])
+  })
+
+  it('leaves out a glow and a ring not given', () => {
+    const channels = colorChannels(fill, undefined, null, new Set(), 'light')
+    expect([channels.fill!.length, channels.glow, channels.ring]).toEqual([3, undefined, undefined])
   })
 })
 

@@ -9,7 +9,7 @@
 
 import React from 'react'
 import {
-  GraphView, GroupLegend, TUNING_PRESETS, TaxonomyContext, copyGroups, copyKeyOf, initialFilter, nodesById, payloadNumber, payloadString, useFocusRequest, useScheme, withSelection,
+  ColorLegend, GraphView, TUNING_PRESETS, TaxonomyContext, copyGroups, copyKeyOf, initialFilter, nodesById, payloadNumber, payloadString, useFocusRequest, useScheme, withSelection,
 } from '@jmbarzee/force-graph'
 import type {
   Coloring, FilterState, GraphNode, SetColoring, ThemeChoice, TuningPreset,
@@ -97,9 +97,11 @@ export function App({ initialTheme = 'system', initialFocus }: { initialTheme?: 
             findings={FINDINGS.length > 0 && <Findings messages={FINDINGS} />}
             groups={groups}
             coloring={{ glow: GLOW[glowBy], ring: RING }}
-            groupsControl={(active, control) => glowBy === 'programmes'
-              ? <GroupLegend title="Degree programmes" items={groups.keys} active={active} control={control}>{glowSwitch}</GroupLegend>
-              : <div className="gv-group-legend">{glowSwitch}</div>}
+            legend={(channels, control) => (
+              <ColorLegend channels={channels} control={control} titles={{ fill: 'Kind', glow: glowBy === 'programmes' ? 'Degree programmes' : 'Campus', ring: 'Term' }}>
+                {glowSwitch}
+              </ColorLegend>
+            )}
             presets={PRESETS}
             nodeAction={{ label: 'Open details', onSelect: setDetails }}
             onNodeActivate={setDetails}

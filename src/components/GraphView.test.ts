@@ -4,8 +4,8 @@ import { createRoot } from 'react-dom/client'
 import type { Root } from 'react-dom/client'
 import { afterEach, beforeEach, describe, expect, it, vi } from 'vitest'
 import { GraphView } from './GraphView'
-import type { Coloring, ResolvedColoring, SetColoring } from '../graph/coloring'
-import type { GraphViewHandle, GroupsControl } from './GraphView'
+import type { ColorChannels, Coloring, ResolvedColoring } from '../graph/coloring'
+import type { GraphViewHandle, GraphViewProps, GroupsControl } from './GraphView'
 import { createTaxonomy } from '../graph/taxonomy'
 import { createTuning } from '../graph/tuning'
 import type { Tuning } from '../graph/tuning'
@@ -13,8 +13,8 @@ import type { Graph, GraphNode } from '../graph/model'
 import type { GraphDiagnostic } from '../graph/validate'
 import type { FilterState } from '../filter/types'
 import { GROUPS, initialFilter, selectionFor, withSelection } from '../filter/types'
-import { GroupLegend } from './GroupLegend'
-import type { ActiveGroup, NodeGroup } from '../graph/groups'
+import { ColorLegend } from './ColorLegend'
+import type { GlowGroup, NodeGroup } from '../graph/groups'
 import { PALETTE } from '../graph/scheme'
 import type { EdgeStroke } from '../graph/scheme'
 
@@ -23,15 +23,16 @@ const drawn = vi.hoisted(() => ({
   strokes: new Map<{ id: string }, EdgeStroke>(), simulations: [] as object[],
   hover: (_id: string | null) => {}, hoverEdge: (_hover: { id: string; x: number; y: number } | null) => {}, hoveredEdgeId: null as string | null,
   select: (_id: string | null, _additive: boolean) => {}, lasso: (_ids: string[]) => {}, selected: new Set<string>() as ReadonlySet<string>,
-  ring: null as ResolvedColoring | null,
+  ring: null as ResolvedColoring | null, glows: [] as readonly GlowGroup[],
 }))
 vi.mock('./GraphCanvas', () => ({
   GraphCanvas: (props: {
     edgeStrokes: typeof drawn.strokes; onHoverNode: typeof drawn.hover; onHoverEdge: typeof drawn.hoverEdge; hoveredEdgeId: string | null
     onSelectNode: typeof drawn.select; onLassoSelect: typeof drawn.lasso; selectedNodeIds: ReadonlySet<string>; ring: ResolvedColoring | null
+    groupGlows: readonly GlowGroup[]
   }) => {
     drawn.strokes = props.edgeStrokes; drawn.hover = props.onHoverNode; drawn.hoverEdge = props.onHoverEdge; drawn.hoveredEdgeId = props.hoveredEdgeId
-    drawn.select = props.onSelectNode; drawn.lasso = props.onLassoSelect; drawn.selected = props.selectedNodeIds; drawn.ring = props.ring
+    drawn.select = props.onSelectNode; drawn.lasso = props.onLassoSelect; drawn.selected = props.selectedNodeIds; drawn.ring = props.ring; drawn.glows = props.groupGlows
     return null
   },
 }))
@@ -111,26 +112,25 @@ it('names a parent cycle and draws past it with every node hidden', async () => 
 // `red` holds n0 alone and shares n1 with `blue`.
 const groups: NodeGroup[] = [{ id: 'red', nodeIds: new Set(['n0', 'n1']) }, { id: 'blue', nodeIds: new Set(['n1']) }]
 
-/** Mount a view with a legend over `groups`, and what it drew and reported. */
+/** Mount a view with a legend over `groups`, and what it reported. */
 async function mountGroups(props: Partial<React.ComponentProps<typeof GraphView>>) {
-  let drawn: readonly ActiveGroup[] = []
   const writes: [FilterState, readonly string[]][] = []
   const view = await mount({
     groups,
-    groupsControl: (active, control) => { drawn = active; return React.createElement(GroupLegend, { items: groups.map(g => ({ id: g.id, label: g.id })), active, control }) },
+    legend: (channels, control) => React.createElement(ColorLegend, { channels, control }),
     onFilterChange: (next, touched) => writes.push([next, touched]),
     ...props,
   })
-  return { ...view, drawn: () => drawn, lastWrite: () => writes[writes.length - 1]! }
+  return { ...view, lastWrite: () => writes[writes.length - 1]! }
 }
 
 it("hides a group's glow and only-members from its legend row, and a focus turns it back on", async () => {
   const view = await mountGroups({})
-  await act(async () => view.el.querySelector<HTMLInputElement>('.gv-group-legend input')!.click())
+  await act(async () => view.el.querySelector<HTMLInputElement>('.gv-color-legend input')!.click())
   const [hidden, touched] = view.lastWrite()
   expect(selectionFor(hidden, GROUPS)).toEqual({ except: new Set(['red']) })
   expect(touched).toEqual([GROUPS])
-  expect(view.drawn().map(g => [g.id, [...g.nodeIds]])).toEqual([['blue', ['n1']]])
+  expect(drawn.glows.map(g => [g.id, [...g.nodeIds]])).toEqual([['blue', ['n1']]])
   let shown = false
   await act(async () => { shown = view.ref.current!.focusNode('n0') })
   expect(shown).toBe(true)
@@ -142,14 +142,14 @@ it('asks the host to widen a controlled group filter for a focus, and writes not
   const view = await mountGroups({ filter })
   await act(async () => { view.ref.current!.focusNode('n0') })
   expect(selectionFor(view.lastWrite()[0], GROUPS)).toEqual({ except: new Set() })
-  expect(view.drawn().map(g => g.id)).toEqual(['blue'])
+  expect(drawn.glows.map(g => g.id)).toEqual(['blue'])
 })
 
 it('reports a group colour it cannot read once, and draws the group from the palette', async () => {
   let reported: readonly GraphDiagnostic[] = []
-  const view = await mountGroups({ groups: [{ ...groups[0]!, color: 'nope' }], onDiagnostics: d => { reported = d } })
+  await mountGroups({ groups: [{ ...groups[0]!, color: 'nope' }], onDiagnostics: d => { reported = d } })
   expect(reported.filter(d => d.code === 'key-color-invalid')).toHaveLength(1)
-  expect(view.drawn()[0]!.color).toBe(PALETTE[0].light)
+  expect(drawn.glows[0]!.color).toBe(PALETTE[0].light)
 })
 
 it("runs a layout scalar's compute once per edit, for the panel, the overlay and the simulation alike", async () => {
@@ -311,32 +311,67 @@ describe('coloring.ring', () => {
   })
 })
 
-describe('coloring.glow', () => {
-  /** Mount a view over `groups`, re-rendered with each glow, and what its control was last handed. */
-  async function mountGlow(glow?: SetColoring) {
-    let last: [readonly ActiveGroup[], GroupsControl] | undefined
-    const root = newRoot(document.createElement('div'))
-    const render = (next?: SetColoring) => act(async () => {
-      root.render(React.createElement(GraphView, { graph: first, taxonomy, groups, coloring: { glow: next }, groupsControl: (...args) => { last = args; return null } }))
-    })
-    await render(glow)
-    return { render, last: () => last! }
-  }
+/** Mount a view over `groups`, re-rendered with each colouring, and what its legend and filter were last handed. */
+async function mountLegend(coloring?: GraphViewProps['coloring'], props: Partial<GraphViewProps> = {}) {
+  let last: [ColorChannels, GroupsControl] | undefined
+  const writes: [FilterState, readonly string[]][] = []
+  const root = newRoot(document.createElement('div'))
+  const render = (next?: GraphViewProps['coloring']) => act(async () => {
+    root.render(React.createElement(GraphView, {
+      graph: first, taxonomy, groups, coloring: next, legend: (...args) => { last = args; return null },
+      onFilterChange: (f, touched) => writes.push([f, touched]), ...props,
+    }))
+  })
+  await render(coloring)
+  return { render, last: () => last!, lastWrite: () => writes[writes.length - 1]! }
+}
 
+describe('coloring.glow', () => {
   it('follows the groups when absent, and repaints a new glow without rebuilding the simulation', async () => {
-    const view = await mountGlow()
-    expect(view.last()[0].map(g => g.id)).toEqual(['red', 'blue'])
+    const view = await mountLegend()
+    expect(view.last()[0].glow!.map(k => k.id)).toEqual(['red', 'blue'])
     expect(view.last()[1].toggle).toBeDefined()
     const built = drawn.simulations.length
-    await view.render({ by: 'axis', axis: 'team' })
-    expect(view.last()[0].map(g => [g.id, [...g.nodeIds]])).toEqual([['a', ['n0']], ['b', ['n1']]])
+    await view.render({ glow: { by: 'axis', axis: 'team' } })
+    expect(drawn.glows.map(g => [g.id, [...g.nodeIds]])).toEqual([['a', ['n0']], ['b', ['n1']]])
     expect(drawn.simulations.length).toBe(built)
   })
 
-  it('shows every key and toggles none while the glow follows another colouring', async () => {
-    const [, control] = (await mountGlow({ by: 'axis', axis: 'team' })).last()
+  it("toggles a filter axis's value from its glow row, and the key it hid is no longer visible", async () => {
+    const view = await mountLegend({ glow: { by: 'axis', axis: 'team' } })
+    await act(async () => view.last()[1].toggle!('a'))
+    const [hidden, touched] = view.lastWrite()
+    expect(selectionFor(hidden, 'team')).toEqual({ except: new Set(['a']) })
+    expect(touched).toEqual(['team'])
+    expect(view.last()[1].shown('a')).toBe(false)
+    expect(view.last()[0].glow!.map(k => [k.id, k.visible])).toEqual([['a', false], ['b', true]])
+  })
+
+  it('hides only the toggled value of an emptyMeans all axis that selects nothing', async () => {
+    const narrowing = createTaxonomy({ styleAxis: 'kind', styles: [], filterAxes: [{ id: 'team', emptyMeans: 'all' }] })
+    const view = await mountLegend({ glow: { by: 'axis', axis: 'team' } }, { taxonomy: narrowing, defaultFilter: new Map([['team', new Set<string>()]]) })
+    expect(view.last()[1].shown('a')).toBe(true)
+    await act(async () => view.last()[1].toggle!('a'))
+    expect([view.last()[1].shown('a'), view.last()[1].shown('b')]).toEqual([false, true])
+  })
+
+  it('shows every key and toggles none while the glow follows a node colouring', async () => {
+    const [, control] = (await mountLegend({ glow: { by: 'node', keys: [{ id: 'a', label: 'A' }], of: n => n.values.team } })).last()
     expect(control.shown('a')).toBe(true)
     expect(control.toggle).toBeUndefined()
+  })
+})
+
+describe('legend', () => {
+  it('hands the fill always, the glow and the ring when they colour, each key in the theme and named by labels', async () => {
+    const byTeam = { by: 'axis', axis: 'team' } as const
+    const view = await mountLegend({}, { groups: undefined })
+    expect([view.last()[0].glow, view.last()[0].ring]).toEqual([undefined, undefined])
+    const named = await mountLegend({ fill: byTeam, glow: byTeam, ring: byTeam }, { labels: { team: { a: 'Alpha' } } })
+    const [channels] = named.last()
+    for (const keys of [channels.fill!, channels.glow!, channels.ring!]) {
+      expect(keys).toEqual([{ id: 'a', label: 'Alpha', color: PALETTE[0].light, visible: true }, { id: 'b', label: 'b', color: PALETTE[1].light, visible: true }])
+    }
   })
 })
 

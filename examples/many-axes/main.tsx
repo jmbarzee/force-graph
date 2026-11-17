@@ -1,6 +1,6 @@
 import React from 'react'
 import { createRoot } from 'react-dom/client'
-import { FilterBar, GraphView, GroupLegend, createTaxonomy, initialFilter } from '@jmbarzee/force-graph'
+import { ColorLegend, FilterBar, GraphView, createTaxonomy, initialFilter } from '@jmbarzee/force-graph'
 import type { DerivedGroups, Graph } from '@jmbarzee/force-graph'
 
 const AXES = ['Region', 'Team', 'Product', 'Language', 'Week']
@@ -66,12 +66,12 @@ function App() {
         taxonomy={taxonomy}
         coloring={BY_TEAM}
         groups={groups}
-        groupsControl={(active, control) => (
-          <GroupLegend title="Groups" items={groups.keys} active={active} control={control}>
+        legend={(channels, control) => (
+          <ColorLegend channels={channels} control={control} titles={{ fill: 'Team', glow: axis }}>
             <select value={axis} onChange={e => setAxis(e.target.value)}>
               {AXES.map(a => <option key={a}>{a}</option>)}
             </select>
-          </GroupLegend>
+          </ColorLegend>
         )}
       />
     </>
