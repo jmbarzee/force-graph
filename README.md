@@ -158,7 +158,8 @@ never by spreading the built object.
   trusts them) to the built-in
   reach, degree and depth. `contextLine(node, parent)` is the hover box's
   line or lines under the name, text or elements (default the parent's
-  name); `searchText(node)` is
+  name), and `edgeContextLine(edge, source, target)` an edge's (default
+  none); `searchText(node)` is
   what the search matches on (default the name); `highlight(active, base,
   graph, direction)` may widen or replace the transitive walk; `collapse(kept,
   candidate)` picks which of two graduated edges on one visible pair survives.
@@ -402,7 +403,8 @@ the console. Everything else is optional.
   hand back what `onSettled` kept, or call `setPositions` to settle from
   rough positions).
 - **Outputs.** `onSelectionChange(node | null)`, `onNodeActivate(node)` on a
-  double-click, `onHover(node | null)`, `onThemeResolved(theme)`,
+  double-click, `onHover(node | null)`, `onEdgeHover(edge | null)` for the
+  edge under the pointer while no node is, `onThemeResolved(theme)`,
   `onDiagnostics(diagnostics)` whenever the graph's defects are recomputed
   (the first graph's included), `onTuningChange(tuning)`,
   `onPlayheadChange(playhead)`,
@@ -425,12 +427,14 @@ the console. Everything else is optional.
   the user's.
 - **What to know.** The view's own filter re-seeds on a graph change for
   every axis the user has not touched — a controlled filter never does — and
-  `onFilterChange` hears it. `onHover(null)` arrives 150 ms after the pointer
-  leaves, so a tooltip can be reached. Removing an axis in the bar resets its
-  selection to "match everything" and fires `onFilterChange` before
-  `onAxesChange`; an axis the taxonomy does not declare renders as a header
-  with its remove control and filters nothing. Derived containment edges are
-  `in:<id>` (numbered on a collision) and reach `highlight` and `collapse`.
+  `onFilterChange` hears it. `onHover(null)` and `onEdgeHover(null)` arrive
+  150 ms after the pointer leaves, so a tooltip can be reached; a graduated
+  edge is handed as the host's edge it stands for. Removing an axis in the
+  bar resets its selection to "match everything" and fires `onFilterChange`
+  before `onAxesChange`; an axis the taxonomy does not declare renders as a
+  header with its remove control and filters nothing. Derived containment
+  edges are `in:<id>` (numbered on a collision), not the host's objects, and
+  reach `highlight`, `collapse` and `onEdgeHover`.
   An error diagnostic drops the edge, or the later node of a duplicated id,
   or clears the `parentId`, it names. The pane's theme observer watches every
   `data-theme` in the document unless `systemTheme` is given.

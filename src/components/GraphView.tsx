@@ -36,12 +36,14 @@ import { TUNING_PRESETS } from '../graph/presets'
 import type { TuningPreset } from '../graph/presets'
 import { usePresets } from './graph-view/usePresets'
 import { TaxonomyContext, useTaxonomy } from './graph-view/useTaxonomy'
-import type { Taxonomy } from '../graph/taxonomy'
+import type { ContextLine, Taxonomy } from '../graph/taxonomy'
+import type { EdgeTypeId } from '../graph/shapes'
 import { engineOf } from '../graph/taxonomy'
 import { worldToScreen } from '../graph/viewport'
 import type { Viewport } from '../graph/viewport'
 import { zoomAt } from '../graph/viewport'
 import { GraphCanvas } from './GraphCanvas'
+import type { EdgeHover } from './GraphCanvas'
 import { CanvasErrorBoundary } from './CanvasErrorBoundary'
 import { GraphControlPanel } from './GraphControlPanel'
 import { hiddenByOf } from './controls/NothingVisible'
@@ -62,6 +64,7 @@ import { namesNode, sameFocusRequest } from './graph-view/focus'
 import type { FocusRequest } from './graph-view/focus'
 export type { FocusRequest } from './graph-view/focus'
 import { useIsomorphicLayoutEffect } from './graph-view/useIsomorphicLayoutEffect'
+import { useHoverGrace } from './graph-view/useHoverGrace'
 import { validateGraph, dropInvalid, tintDiagnostics } from '../graph/validate'
 import type { GraphDiagnostic } from '../graph/validate'
 
@@ -315,6 +318,8 @@ export interface GraphViewProps {
   onNodeActivate?: (node: GraphNode) => void
   /** The node under the pointer, or null. */
   onHover?: (node: GraphNode | null) => void
+  /** The edge under the pointer while no node is, or null: the host's edge, the one a graduated edge stands for, or a derived containment edge. */
+  onEdgeHover?: (edge: GraphEdge | null) => void
   /** The theme the pane resolved to draw in — the choice, or the host's for `system`. */
   onThemeResolved?: (theme: Theme) => void
   /** Every node's position, by id, each time the simulation comes to rest on its own — not when the user pauses it: a layout to keep and hand back as `defaultPositions`. */
@@ -358,7 +363,7 @@ export const GraphView = React.forwardRef<GraphViewHandle, GraphViewProps>(funct
   theme: themeProp, onThemeChange, defaultTheme, systemTheme, tokens,
   tuning: tuningProp, onTuningChange, defaultTuning, presets = TUNING_PRESETS,
   playhead: playheadProp, onPlayheadChange, defaultPlayhead,
-  onSelectionChange, onNodeActivate, onHover, onThemeResolved, onDiagnostics, onSettled,
+  onSelectionChange, onNodeActivate, onHover, onEdgeHover, onThemeResolved, onDiagnostics, onSettled,
 }: GraphViewProps, ref) {
   // The taxonomy: the prop, or the context. Neither is a wiring bug a
   // default would hide, so it is said here, once, before any hook.
@@ -467,6 +472,8 @@ export const GraphView = React.forwardRef<GraphViewHandle, GraphViewProps>(funct
     return added.length ? [...graphDiagnostics, ...added] : graphDiagnostics
   }, [graphDiagnostics, groupDiagnostics, fill, glow, taxonomy, valuesByAxis])
   const graphIndex = React.useMemo(() => nodesById(graph.nodes), [graph])
+  // Every edge by id: the host's own, and the containment edges derived from `parentId`.
+  const edgeIndex = React.useMemo(() => new Map(graph.edges.map(e => [e.id, e])), [graph])
   const counts = React.useMemo(
     () => (typeof hostCounts === 'object' ? hostCounts : countsOn(graph.nodes, axes, hostCounts && { filter, taxonomy })),
     [hostCounts, graph, axes, hostCounts === 'faceted' && filter, taxonomy],
@@ -797,6 +804,15 @@ export const GraphView = React.forwardRef<GraphViewHandle, GraphViewProps>(funct
     requestFrame, tickFrame, releaseFrame, taxonomy,
   })
 
+  const { hover: handleHoverNode, hold: holdNodeHover } = useHoverGrace(setHoveredNodeId)
+  // The edge under the pointer, anchored where the pointer met it; shown only
+  // while no node is hovered and only while the edge is drawn.
+  const [hoveredEdge, setHoveredEdge] = React.useState<EdgeHover | null>(null)
+  const keepEdgeAnchor = React.useCallback((next: EdgeHover | null) => setHoveredEdge(prev => (next && prev?.id === next.id ? prev : next)), [])
+  const { hover: handleHoverEdge, hold: holdEdgeHover } = useHoverGrace(keepEdgeAnchor)
+  const shownEdge = hoveredNodeId === null && hoveredEdge && origins.has(hoveredEdge.id) ? hoveredEdge : null
+  const shownOrigin = shownEdge && (edgeIndex.get(origins.get(shownEdge.id)!) ?? null)
+
   // What the host hears: the hover, a double-click, the resolved theme and
   // the graph's diagnostics — always the host's own node objects, never the
   // view's copies. Read through refs, so a host passing a fresh function
@@ -805,6 +821,7 @@ export const GraphView = React.forwardRef<GraphViewHandle, GraphViewProps>(funct
   // a host wants its first graph's defects too. The selection reports from
   // `requestSelect`, above.
   const onHoverRef = useLatest(onHover)
+  const onEdgeHoverRef = useLatest(onEdgeHover)
   const onNodeActivateRef = useLatest(onNodeActivate)
   const onThemeResolvedRef = useLatest(onThemeResolved)
   const onDiagnosticsRef = useLatest(onDiagnostics)
@@ -813,6 +830,9 @@ export const GraphView = React.forwardRef<GraphViewHandle, GraphViewProps>(funct
     if (!mountedRef.current) return
     onHoverRef.current?.(hoveredNodeId === null ? null : hostIndex.get(hoveredNodeId) ?? null)
   }, [hoveredNodeId]) // eslint-disable-line react-hooks/exhaustive-deps
+  React.useEffect(() => {
+    if (mountedRef.current) onEdgeHoverRef.current?.(shownOrigin)
+  }, [shownOrigin]) // eslint-disable-line react-hooks/exhaustive-deps
   React.useEffect(() => { mountedRef.current = true }, [])
   React.useEffect(() => { if (resolvedTheme) onThemeResolvedRef.current?.(resolvedTheme) }, [resolvedTheme]) // eslint-disable-line react-hooks/exhaustive-deps
   React.useEffect(() => { onDiagnosticsRef.current?.(diagnostics) }, [diagnostics]) // eslint-disable-line react-hooks/exhaustive-deps
@@ -840,29 +860,6 @@ export const GraphView = React.forwardRef<GraphViewHandle, GraphViewProps>(funct
       setTimeout(() => searchInputRef.current?.focus(), 50)
     }
   }
-
-  // Hover with a grace period so the pointer can travel from a node onto its
-  // hover tooltip (interactive — it carries the host's cross-view button)
-  // without the tooltip vanishing. A null from the canvas schedules a clear;
-  // the tooltip's onMouseEnter cancels it, onMouseLeave re-arms it.
-  const hoverClearTimer = React.useRef<number | null>(null)
-  const cancelHoverClear = React.useCallback(() => {
-    if (hoverClearTimer.current !== null) {
-      clearTimeout(hoverClearTimer.current)
-      hoverClearTimer.current = null
-    }
-  }, [])
-  const handleHoverNode = React.useCallback((id: string | null) => {
-    cancelHoverClear()
-    if (id !== null) {
-      setHoveredNodeId(id)
-    } else {
-      hoverClearTimer.current = window.setTimeout(() => {
-        setHoveredNodeId(null)
-        hoverClearTimer.current = null
-      }, 150)
-    }
-  }, [cancelHoverClear, setHoveredNodeId])
 
   // Select node from search result
   const handleSelectSearchResult = (nodeId: string) => {
@@ -1120,6 +1117,8 @@ export const GraphView = React.forwardRef<GraphViewHandle, GraphViewProps>(funct
             highlightedNodes={highlightedNodes}
             highlightedEdges={highlightedEdges}
             hoveredNodeId={hoveredNodeId}
+            hoveredEdgeId={shownEdge?.id ?? null}
+            onHoverEdge={handleHoverEdge}
             selectedNodeId={selectedNodeId}
             focusedNodeId={focusedNodeId}
             flashNode={flashNode}
@@ -1154,10 +1153,21 @@ export const GraphView = React.forwardRef<GraphViewHandle, GraphViewProps>(funct
           nodeSummaries={nodeSummaries}
           nodeAction={actionFor}
           hostNodeOf={hostNodeOf}
-          onMouseEnter={cancelHoverClear}
+          onMouseEnter={holdNodeHover}
           onMouseLeave={() => handleHoverNode(null)}
         />
         {nodeCount === 0 && (simRef.current?.nodes.length ?? 0) > 0 && <p className="gv-graph-empty">No nodes match the filter.</p>}
+        {shownEdge && shownOrigin && (
+          <EdgeHoverTooltip
+            hover={shownEdge}
+            edge={shownOrigin}
+            type={edgeTypes.get(shownEdge.id)}
+            undirected={undirected.has(shownEdge.id)}
+            hostNodeOf={hostNodeOf}
+            onMouseEnter={holdEdgeHover}
+            onMouseLeave={() => handleHoverEdge(null)}
+          />
+        )}
       </div>
 
       {/* Floating overlay: the shared filter bar (with the host's findings), the
@@ -1355,9 +1365,7 @@ function GraphHoverTooltip({ hoveredNodeId, simRef, visibleEdges, undirected, vi
   // several; the library's default is the parent's name. The hook is handed
   // the host's own node and parent. The icon is the value's own.
   const parent = node.parentId === undefined ? undefined : hostNodeOf(node.parentId) ?? sim.getNode(node.parentId)
-  const context = engine.contextLine(hostNodeOf(node.id) ?? node, parent)
-  const contextLines: React.ReactNode[] = context === undefined || context === null ? []
-    : Array.isArray(context) ? [...(context as readonly React.ReactNode[])] : [context as React.ReactNode]
+  const contextLines = linesOf(engine.contextLine(hostNodeOf(node.id) ?? node, parent))
   const action = nodeAction(node)
   const icon = engine.nodeStyleOf(node).icon
   const fillKey = fill.of.get(node.id)
@@ -1440,6 +1448,42 @@ function GraphHoverTooltip({ hoveredNodeId, simRef, visibleEdges, undirected, vi
           {action.label}
         </button>
       )}
+    </div>
+  )
+}
+
+/** A hover box's context, one line or several, as lines. */
+function linesOf(context: ContextLine): React.ReactNode[] {
+  return context === undefined || context === null ? []
+    : Array.isArray(context) ? [...(context as readonly React.ReactNode[])] : [context as React.ReactNode]
+}
+
+interface EdgeHoverTooltipProps {
+  hover: EdgeHover
+  /** The edge the hovered one stands for: the host's own, or a derived containment edge. */
+  edge: GraphEdge
+  type: EdgeTypeId | undefined
+  undirected: boolean
+  hostNodeOf: (id: string) => GraphNode | undefined
+  onMouseEnter: () => void
+  onMouseLeave: () => void
+}
+
+/** The hovered edge's box: its ends, its type's tooltip and the taxonomy's lines for it, where the pointer met it. */
+function EdgeHoverTooltip({ hover, edge, type, undirected, hostNodeOf, onMouseEnter, onMouseLeave }: EdgeHoverTooltipProps) {
+  const taxonomy = useTaxonomy()
+  const source = hostNodeOf(edge.sourceId)
+  const target = hostNodeOf(edge.targetId)
+  if (!source || !target) return null
+  const tooltip = type === undefined ? undefined : taxonomy.edgeTypes.find(t => t.id === type)?.tooltip
+  const contextLines = linesOf(engineOf(taxonomy).edgeContextLine(edge, source, target))
+  return (
+    <div className="gv-graph-hover-tooltip" style={{ left: hover.x, top: hover.y }} onMouseEnter={onMouseEnter} onMouseLeave={onMouseLeave}>
+      <div className="gv-tooltip-identity">
+        <span className="gv-tooltip-name">{source.name} {undirected ? '↔' : '→'} {target.name}</span>
+      </div>
+      {tooltip && <div className="gv-tooltip-summary">{tooltip}</div>}
+      {contextLines.map((line, i) => <div key={i} className="gv-tooltip-parent">{line}</div>)}
     </div>
   )
 }

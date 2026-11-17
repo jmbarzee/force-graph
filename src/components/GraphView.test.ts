@@ -1,7 +1,8 @@
 // @vitest-environment jsdom
 import React, { act } from 'react'
 import { createRoot } from 'react-dom/client'
-import { beforeEach, describe, expect, it, vi } from 'vitest'
+import type { Root } from 'react-dom/client'
+import { afterEach, beforeEach, describe, expect, it, vi } from 'vitest'
 import { GraphView } from './GraphView'
 import type { Coloring, SetColoring } from '../graph/coloring'
 import type { GraphViewHandle, GroupsControl } from './GraphView'
@@ -18,9 +19,15 @@ import { PALETTE } from '../graph/scheme'
 import type { EdgeStroke } from '../graph/scheme'
 
 // What the canvas was last handed, and every simulation the view built.
-const drawn = vi.hoisted(() => ({ strokes: new Map<{ id: string }, EdgeStroke>(), simulations: [] as object[], hover: (_id: string | null) => {} }))
+const drawn = vi.hoisted(() => ({
+  strokes: new Map<{ id: string }, EdgeStroke>(), simulations: [] as object[],
+  hover: (_id: string | null) => {}, hoverEdge: (_hover: { id: string; x: number; y: number } | null) => {}, hoveredEdgeId: null as string | null,
+}))
 vi.mock('./GraphCanvas', () => ({
-  GraphCanvas: (props: { edgeStrokes: typeof drawn.strokes; onHoverNode: typeof drawn.hover }) => { drawn.strokes = props.edgeStrokes; drawn.hover = props.onHoverNode; return null },
+  GraphCanvas: (props: { edgeStrokes: typeof drawn.strokes; onHoverNode: typeof drawn.hover; onHoverEdge: typeof drawn.hoverEdge; hoveredEdgeId: string | null }) => {
+    drawn.strokes = props.edgeStrokes; drawn.hover = props.onHoverNode; drawn.hoverEdge = props.onHoverEdge; drawn.hoveredEdgeId = props.hoveredEdgeId
+    return null
+  },
 }))
 vi.mock('../graph/simulation', async importOriginal => {
   const actual = await importOriginal<typeof import('../graph/simulation')>()
@@ -29,6 +36,15 @@ vi.mock('../graph/simulation', async importOriginal => {
   }
   return { ...actual, Simulation }
 })
+
+// Every root a test mounts, unmounted after it: a view left alive re-renders and rewrites `drawn`.
+const roots: Root[] = []
+function newRoot(el: HTMLElement): Root {
+  const root = createRoot(el)
+  roots.push(root)
+  return root
+}
+afterEach(() => act(() => { for (const root of roots.splice(0)) root.unmount() }))
 
 beforeEach(() => {
   ;(globalThis as { IS_REACT_ACT_ENVIRONMENT?: boolean }).IS_REACT_ACT_ENVIRONMENT = true
@@ -50,7 +66,7 @@ async function mount(props: Partial<React.ComponentProps<typeof GraphView>>, sta
   const ref = React.createRef<GraphViewHandle>()
   const reported: FilterState[] = []
   const el = document.createElement('div')
-  const root = createRoot(el)
+  const root = newRoot(el)
   const render = (graph: Graph) => act(async () => {
     root.render(React.createElement(GraphView, { ref, graph, taxonomy, onFilterChange: next => reported.push(next), ...props }))
   })
@@ -137,7 +153,7 @@ it("runs a layout scalar's compute once per edit, for the panel, the overlay and
     scalars: [{ id: 'rank', compute: graph => { computed++; return new Map([...graph.nodes].map((n, i) => [n.id, i])) } }],
   })
   const tuningAt = (gravityY: number) => createTuning({ forces: { bandY: { scalar: 'rank' }, gravityY } }, counted)
-  const root = createRoot(document.createElement('div'))
+  const root = newRoot(document.createElement('div'))
   const render = (tuning: Tuning) => act(async () => {
     root.render(React.createElement(GraphView, { graph: first, taxonomy: counted, tuning, onTuningChange: () => {} }))
   })
@@ -157,7 +173,7 @@ const strokeOf = (id: string) => [...drawn.strokes].find(([edge]) => edge.id ===
 
 it('strokes an edge at the playhead by its series over the peak, and leaves the simulation be', async () => {
   const onPlayheadChange = vi.fn()
-  const root = createRoot(document.createElement('div'))
+  const root = newRoot(document.createElement('div'))
   const render = (playhead: number | null) => act(async () => {
     root.render(React.createElement(GraphView, { graph: played, taxonomy, playhead, onPlayheadChange }))
   })
@@ -228,7 +244,7 @@ describe('coloring.fill', () => {
   async function mountFilled(coloring?: { fill?: Coloring }) {
     let reported: readonly GraphDiagnostic[] = []
     const el = document.createElement('div')
-    const root = createRoot(el)
+    const root = newRoot(el)
     const render = (next?: { fill?: Coloring }) => act(async () => {
       root.render(React.createElement(GraphView, { graph, taxonomy: filled, coloring: next, onDiagnostics: d => { reported = d } }))
     })
@@ -254,7 +270,7 @@ describe('coloring.fill', () => {
   it('neither re-resolves nor re-reports a colouring equal to the last', async () => {
     const of = vi.fn((node: GraphNode) => node.values.team)
     const onDiagnostics = vi.fn()
-    const root = createRoot(document.createElement('div'))
+    const root = newRoot(document.createElement('div'))
     const render = () => act(async () => {
       root.render(React.createElement(GraphView, { graph, taxonomy: filled, coloring: { fill: { by: 'node', keys: [{ id: 'red', label: 'Red' }], of } }, onDiagnostics }))
     })
@@ -276,7 +292,7 @@ describe('coloring.glow', () => {
   /** Mount a view over `groups`, re-rendered with each glow, and what its control was last handed. */
   async function mountGlow(glow?: SetColoring) {
     let last: [readonly ActiveGroup[], GroupsControl] | undefined
-    const root = createRoot(document.createElement('div'))
+    const root = newRoot(document.createElement('div'))
     const render = (next?: SetColoring) => act(async () => {
       root.render(React.createElement(GraphView, { graph: first, taxonomy, groups, coloring: { glow: next }, groupsControl: (...args) => { last = args; return null } }))
     })
@@ -311,4 +327,48 @@ it('says so when the filter draws no node, and stops once it draws one', async (
 it('leaves an empty graph to the host', async () => {
   const view = await mount({}, graphOf())
   expect(view.el.querySelector('.gv-graph-empty')).toBeNull()
+})
+
+describe('edge hover', () => {
+  const [a, b] = first.nodes
+  const prerequisite = { id: 'e', sourceId: 'n0', targetId: 'n1' }
+  const graph: Graph = { nodes: [a!, { ...b!, parentId: 'n0' }], edges: [prerequisite] }
+
+  it('hands the host its own edge and boxes it, a node winning over it, and null 150 ms after the pointer leaves', async () => {
+    vi.useFakeTimers()
+    try {
+      const onEdgeHover = vi.fn()
+      const view = await mount({ onEdgeHover }, graph)
+      await act(async () => drawn.hoverEdge({ id: 'e', x: 10, y: 20 }))
+      expect(onEdgeHover.mock.lastCall![0]).toBe(prerequisite)
+      expect(drawn.hoveredEdgeId).toBe('e')
+      expect(view.el.querySelector('.gv-tooltip-name')!.textContent).toBe('a → b')
+
+      // The pointer onto a node, then back onto the edge within the node's grace.
+      await act(async () => { drawn.hover('n0'); drawn.hoverEdge(null) })
+      expect(onEdgeHover).toHaveBeenLastCalledWith(null)
+      expect(drawn.hoveredEdgeId).toBeNull()
+      await act(async () => { drawn.hover(null); drawn.hoverEdge({ id: 'e', x: 10, y: 20 }) })
+      expect(drawn.hoveredEdgeId).toBeNull()
+      await act(async () => { vi.advanceTimersByTime(150) })
+      expect(onEdgeHover).toHaveBeenLastCalledWith(prerequisite)
+
+      // The null is timed from the pointer leaving, however long it keeps moving.
+      await act(async () => drawn.hoverEdge(null))
+      await act(async () => { vi.advanceTimersByTime(100); drawn.hoverEdge(null); vi.advanceTimersByTime(49) })
+      expect(onEdgeHover).toHaveBeenLastCalledWith(prerequisite)
+      await act(async () => { vi.advanceTimersByTime(1) })
+      expect(onEdgeHover).toHaveBeenLastCalledWith(null)
+      expect(view.el.querySelector('.gv-graph-hover-tooltip')).toBeNull()
+    } finally {
+      vi.useRealTimers()
+    }
+  })
+
+  it('hands a derived containment edge as derived', async () => {
+    const onEdgeHover = vi.fn()
+    await mount({ onEdgeHover }, graph)
+    await act(async () => drawn.hoverEdge({ id: 'in:n1', x: 0, y: 0 }))
+    expect(onEdgeHover).toHaveBeenLastCalledWith({ id: 'in:n1', sourceId: 'n1', targetId: 'n0', relation: 'containment' })
+  })
 })
