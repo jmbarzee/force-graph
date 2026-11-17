@@ -189,7 +189,7 @@ it('shows no scrubber for a graph without a window, or when chrome turns it off'
   expect((await mount({}, { ...played, window: undefined })).el.querySelector('.gv-scrubber')).toBeNull()
 })
 
-it('reads a new graph as unchanged only when its window and series are', async () => {
+it('reads a new graph as unchanged only when its window, weights and series are', async () => {
   const warn = vi.spyOn(console, 'warn').mockImplementation(() => {})
   const said = () => warn.mock.calls.some(([m]) => String(m).includes('nothing in it did'))
   const view = await mount({}, played)
@@ -197,7 +197,9 @@ it('reads a new graph as unchanged only when its window and series are', async (
   expect(said()).toBe(false)
   await view.render({ ...played, window: { ...played.window!, buckets: 3 } })
   expect(said()).toBe(false)
-  await view.render({ ...played, window: { ...played.window!, buckets: 3 }, edges: played.edges.map(e => ({ ...e })) })
+  await view.render({ ...played, window: { ...played.window!, buckets: 3 }, edges: played.edges.map(e => ({ ...e, weight: 0.25 })) })
+  expect(said()).toBe(false)
+  await view.render({ ...played, window: { ...played.window!, buckets: 3 }, edges: played.edges.map(e => ({ ...e, weight: 0.25 })) })
   expect(said()).toBe(true)
   warn.mockRestore()
 })

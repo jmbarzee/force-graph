@@ -258,11 +258,12 @@ the console. Everything else is optional.
   to be told; and each has a `default*` prop for where the view's own starts
   (`defaultFilter`, `defaultLocks`, `defaultAxes`, `defaultSearch`,
   `defaultTheme`, `defaultSelectedId`, `defaultTuning`, `defaultPlayhead`),
-  read once. A controlled value is the host's: the view never rewrites it, and warns once if the prop flips
-  between defined and undefined. `initialFilter(taxonomy, graph)` is the
-  filter the view starts from — an `initialSelection` that splits a chip is
-  snapped to the whole chip, with a warning. `reseedFilter(filter, taxonomy,
-  graph, touched)` is what the view does to its own filter when the graph
+  read once. A controlled value is the host's: the view never rewrites it,
+  and warns once if the prop flips between defined and undefined.
+  `initialFilter(taxonomy, graph)` is the filter the view starts from — an
+  `initialSelection` that splits a chip is snapped to the whole chip, with a
+  warning. `reseedFilter(filter, taxonomy, graph, touched)` is what the view
+  does to its own filter when the graph
   changes — every axis the user has not touched takes the new graph's
   opening selection — for a host that controls the filter to call from its
   own data effect; `onFilterChange(next, touched)` names the axes the user
@@ -345,8 +346,9 @@ the console. Everything else is optional.
   cluster, which takes the theme button with it), `diagnostics`,
   `shortcuts`, `directionLine` (the hover box's), `activateZoom` (the
   double-click zoom) and `scrubber` (shown only for a valid `window`) —
-  `searchTitle` and `searchPlaceholder` for the host's own words, `systemTheme` (what `'system'` means, for a host that knows its
-  own theme), `className`, `style`, and `defaultPositions` (kept positions,
+  `searchTitle` and `searchPlaceholder` for the host's own words,
+  `systemTheme` (what `'system'` means, for a host that knows its own
+  theme), `className`, `style`, and `defaultPositions` (kept positions,
   read whenever the simulation is built; a node the live layout already
   holds keeps its place).
 - **Outputs.** `onSelectionChange(node | null)`, `onNodeActivate(node)` on a

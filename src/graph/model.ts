@@ -275,8 +275,8 @@ const sameList = <T>(a: readonly T[] | undefined, b: readonly T[] | undefined): 
 
 /**
  * Whether two graphs say the same thing: the same nodes in the same order
- * with the same fields, the same edges and the same window — values, series
- * and the window compared, payloads by identity. A new graph object equal to
+ * with the same fields, the same edges and the same window — values,
+ * weights, series and the window compared, payloads by identity. A new graph object equal to
  * the last is the sign of a host rebuilding what it could have kept; the
  * view says so once.
  */
@@ -294,7 +294,7 @@ export function graphEquals(a: Graph, b: Graph): boolean {
     const x = a.edges[i], y = b.edges[i]
     if (x === y) continue
     if (x.id !== y.id || x.sourceId !== y.sourceId || x.targetId !== y.targetId || x.relation !== y.relation || x.payload !== y.payload) return false
-    if (!sameValues(x.values, y.values) || !sameList(x.series, y.series)) return false
+    if (x.weight !== y.weight || !sameValues(x.values, y.values) || !sameList(x.series, y.series)) return false
   }
   return true
 }

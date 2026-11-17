@@ -599,7 +599,7 @@ export const GraphView = React.forwardRef<GraphViewHandle, GraphViewProps>(funct
   }, [visibleEdges, edgeTypes, taxonomy])
   // At a playhead, an edge with a series strokes its count there over the
   // peak of the whole graph, not of what the filter shows; else its weight.
-  const timeWindow = React.useMemo(() => windowOf(graph), [graph])
+  const timeWindow = windowOf(graph)
   const peak = React.useMemo(() => peakOf(graph.edges, timeWindow), [graph, timeWindow])
   const playhead = timeWindow && rawPlayhead !== null ? Math.min(timeWindow.buckets - 1, Math.max(0, rawPlayhead)) : null
   const edgeStrokes = React.useMemo(() => {
