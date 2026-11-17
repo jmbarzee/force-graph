@@ -1035,7 +1035,7 @@ export function GraphCanvas({
 
         // The rings, outward: the data ring, the copy halo (on every visible
         // copy while any is hovered or selected, undimmed so it pops), the
-        // selection ring, the focus ring.
+        // selection ring, the focus ring, and a flash's pulse expanding past them.
         const hue = d.ring && hueFor(d.ring, node.id)
         ctx.save()
         let edge = r
@@ -1044,22 +1044,12 @@ export function GraphCanvas({
         }
         if (d.activeDupDefKeys.has(copyKeyOf(node))) edge = drawRing(ctx, sx, sy, edge, RING_WIDTH, fill, NO_DASH, 0.55)
         if (d.selectedNodeIds.has(node.id)) edge = drawRing(ctx, sx, sy, edge, SELECTION_WIDTH, p.selectionRingColor, NO_DASH, nodeAlpha)
-        if (node.id === d.focusedNodeId) drawRing(ctx, sx, sy, edge, RING_WIDTH, p.focusRingColor, FOCUS_DASH, nodeAlpha)
-        ctx.restore()
-
+        if (node.id === d.focusedNodeId) edge = drawRing(ctx, sx, sy, edge, RING_WIDTH, p.focusRingColor, FOCUS_DASH, nodeAlpha)
         if (node.id === d.flashNode?.id) {
           const t = (performance.now() - d.flashNode.at) / FLASH_MS
-          if (t < 1) {
-            ctx.save()
-            ctx.strokeStyle = p.selectionRingColor
-            ctx.lineWidth = 3
-            ctx.globalAlpha = 1 - t
-            ctx.beginPath()
-            ctx.arc(sx, sy, r + 5 + 10 * t, 0, Math.PI * 2)
-            ctx.stroke()
-            ctx.restore()
-          }
+          if (t < 1) drawRing(ctx, sx, sy, edge + 10 * t, 3, p.selectionRingColor, NO_DASH, 1 - t)
         }
+        ctx.restore()
 
         ctx.globalAlpha = 1
 

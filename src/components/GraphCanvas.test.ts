@@ -123,7 +123,8 @@ describe('GraphCanvas', () => {
     vi.restoreAllMocks()
   })
 
-  it('paints stacked nodes\' ghosts behind every edge, and rings only the body', () => {
+  /** Paints one frame of a canvas over `props`, its viewport at (200, 200), and answers what it painted. */
+  function paintFrame(props: Partial<React.ComponentProps<typeof GraphCanvas>>) {
     const { ctx, paints } = recordingCtx()
     vi.spyOn(HTMLCanvasElement.prototype, 'getContext').mockReturnValue(ctx)
     vi.stubGlobal('ResizeObserver', class {
@@ -134,20 +135,30 @@ describe('GraphCanvas', () => {
     let frame: FrameRequestCallback | undefined
     vi.stubGlobal('requestAnimationFrame', (cb: FrameRequestCallback) => { frame = cb; return 1 })
     vi.stubGlobal('cancelAnimationFrame', () => {})
-    // A stacked course at screen (200, 200), and its stacked lab at (300, 200), selected and focused.
-    const at = (id: string, x: number, parentId?: string): SimNode => ({ id, name: id, values: {}, parentId, stack: true, x, y: 0, vx: 0, vy: 0, pinned: false })
-    const props = {
-      nodes: [at('course', 0), at('lab', 100, 'course')], edges: [{ id: 'e', sourceId: 'lab', targetId: 'course' }],
-      viewport: { x: 200, y: 200, scale: 1 }, nodeScale: DEFAULT_NODE_SCALE, theme: 'light',
-      selectedNodeIds: new Set(['lab']), focusedNodeId: 'lab', highlightedNodes: null, highlightedEdges: null, hoveredNodeId: null,
+    const all = {
+      edges: [], viewport: { x: 200, y: 200, scale: 1 }, nodeScale: DEFAULT_NODE_SCALE, theme: 'light',
+      selectedNodeIds: new Set(), focusedNodeId: null, highlightedNodes: null, highlightedEdges: null, hoveredNodeId: null,
       hoveredEdgeId: null, flashNode: null, searchMatchIds: null, running: false, edgeStrokes: new Map(), edgeOffsets: new Map(),
-      undirectedEdges: new Set(), activeSection: null, groupGlows: [], markedEdges: new Set(),
+      undirectedEdges: new Set(), activeSection: null, groupGlows: [], markedEdges: new Set(), ...props,
     } as unknown as React.ComponentProps<typeof GraphCanvas>
     const el = document.body.appendChild(document.createElement('div'))
     const root = createRoot(el)
     act(() => root.render(React.createElement(TaxonomyContext.Provider, { value: createTaxonomy({ styleAxis: 'kind', styles: [] }) },
-      React.createElement(GraphCanvas, props))))
+      React.createElement(GraphCanvas, all))))
     act(() => frame!(0))
+    act(() => root.unmount())
+    return paints
+  }
+
+  const simNode = (id: string, x: number, extra: Partial<SimNode> = {}): SimNode =>
+    ({ id, name: id, values: {}, x, y: 0, vx: 0, vy: 0, pinned: false, ...extra })
+
+  it('paints stacked nodes\' ghosts behind every edge, and rings only the body', () => {
+    // A stacked course at screen (200, 200), and its stacked lab at (300, 200), selected and focused.
+    const paints = paintFrame({
+      nodes: [simNode('course', 0, { stack: true }), simNode('lab', 100, { stack: true, parentId: 'course' })],
+      edges: [{ id: 'e', sourceId: 'lab', targetId: 'course' }], selectedNodeIds: new Set(['lab']), focusedNodeId: 'lab',
+    })
 
     const onBody = (p: Paint) => p.y === 200 && (p.x === 200 || p.x === 300)
     const ghosts = paints.filter(p => p.radius !== undefined && !onBody(p))
@@ -158,7 +169,18 @@ describe('GraphCanvas', () => {
     expect(paints.indexOf(ghosts[ghosts.length - 1])).toBeLessThan(firstEdge)
     const rings = paints.filter(p => p.width === SELECTION_WIDTH || p.dash === FOCUS_DASH)
     expect(rings.map(p => [p.x, p.y])).toEqual([[300, 200], [300, 200]])
+  })
 
-    act(() => root.unmount())
+  it('starts a flash outside the node\'s rings', () => {
+    vi.spyOn(performance, 'now').mockReturnValue(1000)
+    // Two copies of one entity, the first dashed, hovered and flashing.
+    const paints = paintFrame({
+      nodes: [simNode('a', 0, { copyKey: 'k', ring: 'dashed' }), simNode('b', 100, { copyKey: 'k' })],
+      hoveredNodeId: 'a', flashNode: { id: 'a', at: 1000 },
+    })
+
+    const halo = paints.find(p => p.op === 'stroke' && p.alpha === 0.55 && p.x === 200)!
+    const flash = paints.find(p => p.op === 'stroke' && p.width === 3)!
+    expect(flash.radius! - flash.width / 2).toBeGreaterThan(halo.radius! + halo.width / 2)
   })
 })
