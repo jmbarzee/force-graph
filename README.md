@@ -203,7 +203,9 @@ engine compares them and never parses one.
   its own to edges and nodes alike through `values`; any axis the nodes
   carry can be pushed, pulled and laid out on.
 - **Adornments.** A node may carry `badges` (short texts drawn as chips above
-  it) and a `ring` (`'dashed'`, for a node set apart).
+  it) and a `ring` (`'dashed'`, for a node set apart). An edge may carry a
+  `weight`, 0..1, which widens its stroke up to double; the spring does not
+  read it.
 - **Identity.** Keep one `graph` object until something in it changes: a new
   object equal to the last rebuilds the layout for nothing, and the view says
   so once. The same for the taxonomy — build it once, outside render; the
@@ -212,7 +214,9 @@ engine compares them and never parses one.
   graph keeps the positions of the nodes it still has.
 - **Validation.** `validateGraph(graph, taxonomy)` names every defect — a
   dangling endpoint, an unknown relation, a type the rule returns that the
-  table lacks, a duplicate node or edge id, a parent not in the graph. The
+  table lacks, a duplicate node or edge id, a parent not in the graph, a
+  weight outside 0..1 or not finite (`'edge-weight-invalid'`, a warning: the
+  view clamps it, and draws one not finite as no weight). The
   view runs it, lists the diagnostics under the bar, hands them to
   `onDiagnostics` and draws what remains — adding three warnings of its own:
   `'containment-untyped'`, when a containment edge it derived from `parentId`
@@ -546,7 +550,6 @@ What is not built is filed as issues:
   ([#9](https://github.com/jmbarzee/force-graph/issues/9)), an opaque
   `Taxonomy` ([#10](https://github.com/jmbarzee/force-graph/issues/10)),
   undirected edges ([#11](https://github.com/jmbarzee/force-graph/issues/11)),
-  per-edge weight ([#12](https://github.com/jmbarzee/force-graph/issues/12)),
   an edge time series played back
   ([#33](https://github.com/jmbarzee/force-graph/issues/33)), host-declared
   pair-axis mappings ([#32](https://github.com/jmbarzee/force-graph/issues/32)),

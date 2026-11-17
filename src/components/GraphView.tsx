@@ -25,7 +25,7 @@ import type { ThemeChoice } from './graph-view/useTheme'
 import { axisOptions, layoutAxisOptions, pairTuning, sprungEdges } from '../graph/simulation'
 import { copyGroups, copyKeyOf } from '../graph/model'
 import type { NodeScaleParams } from '../graph/node-scale'
-import { CONTAINMENT_STROKE, NEUTRAL_STROKE } from '../graph/shapes'
+import { CONTAINMENT_STROKE, NEUTRAL_STROKE, weighted } from '../graph/shapes'
 import { defaultTuningFor, tuningsEqual, makeTuning, openTuning } from '../graph/tuning-internal'
 import type { Tuning } from '../graph/tuning'
 import { TaxonomyContext, useTaxonomy } from './graph-view/useTaxonomy'
@@ -582,7 +582,8 @@ export const GraphView = React.forwardRef<GraphViewHandle, GraphViewProps>(funct
     const strokes = new Map<GraphEdge, EdgeStroke>()
     for (const edge of visibleEdges) {
       const type = edgeTypes.get(edge.id)
-      strokes.set(edge, type !== undefined ? taxonomy.edgeStrokeFor(type) : isContainment(edge) ? CONTAINMENT_STROKE : NEUTRAL_STROKE)
+      const base = type !== undefined ? taxonomy.edgeStrokeFor(type) : isContainment(edge) ? CONTAINMENT_STROKE : NEUTRAL_STROKE
+      strokes.set(edge, weighted(base, edge))
     }
     return strokes
   }, [visibleEdges, edgeTypes, taxonomy])

@@ -42,6 +42,18 @@ describe('computeVisibleGraph origins', () => {
     expect(grad!.id).not.toBe('call')
     expect(vg.origins.get(grad!.id)).toBe('call')
   })
+
+  it("carries the weight of the original the taxonomy's collapse keeps", () => {
+    const edges = [...graph.edges, { id: 'heavy', sourceId: 'c1', targetId: 'c2', relation: 'dependency' as const, weight: 0.9 }]
+    const heaviest = createTaxonomy({
+      styleAxis: 'kind', styles: [style('parent'), style('child')],
+      collapse: (kept, candidate) => ((candidate.weight ?? 0) > (kept.weight ?? 0) ? candidate : kept),
+    })
+    for (const [t, weight] of [[taxonomy, undefined], [heaviest, 0.9]] as const) {
+      const vg = computeVisibleGraph({ ...sim, edges }, withSelection(initialFilter(t, graph), 'kind', new Set(['parent'])), t)
+      expect(vg.visibleEdges.find(e => e.sourceId === 'p1' && e.targetId === 'p2')!.weight).toBe(weight)
+    }
+  })
 })
 
 describe('computeVisibleGraph undirected', () => {

@@ -308,8 +308,9 @@ programme is a group, and its legend's checkboxes write the group filter.
   layout does not flicker; the active node always wins.
 - **Detail by zoom.** Below a zoom of 0.1 the decorative rings drop. A node
   stays hoverable and clickable at every zoom.
-- **Edges.** Stroked by their resolved type (`EdgeType.style`) — a graduated
-  edge keeps the type of the edge it stands for. Dependency edges carry an
+- **Edges.** Stroked by their resolved type (`EdgeType.style`), widened by
+  `weight`, up to double — a graduated edge keeps the type and weight of the
+  edge it stands for. Dependency edges carry an
   8 px arrowhead toward the dependency, at every zoom; containment is
   undirected. Parallel edges between one pair draw in lanes. A `markedEdges`
   edge gets a dashed band in the label ink behind its own stroke, so it keeps
