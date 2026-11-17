@@ -248,7 +248,21 @@ describe('coloring.fill', () => {
     await act(async () => drawn.hover('n0'))
     const row = view.el.querySelector('.gv-tooltip-fill')!
     expect(row.textContent).toBe('red')
-    expect(row.querySelector<HTMLElement>('.gv-tooltip-swatch')!.style.background).toBe(`var(${filled.colorVar('red')})`)
+    expect(row.querySelector<HTMLElement>('.gv-tooltip-swatch')!.style.background).toBe('var(--gv-node-red)')
+  })
+
+  it('neither re-resolves nor re-reports a colouring equal to the last', async () => {
+    const of = vi.fn((node: GraphNode) => node.values.team)
+    const onDiagnostics = vi.fn()
+    const root = createRoot(document.createElement('div'))
+    const render = () => act(async () => {
+      root.render(React.createElement(GraphView, { graph, taxonomy: filled, coloring: { fill: { by: 'node', keys: [{ id: 'red', label: 'Red' }], of } }, onDiagnostics }))
+    })
+    await render()
+    const [asked, reported] = [of.mock.calls.length, onDiagnostics.mock.calls.length]
+    expect(reported).toBeGreaterThan(0)
+    await render()
+    expect([of.mock.calls.length, onDiagnostics.mock.calls.length]).toEqual([asked, reported])
   })
 
   it('reports a chip tint naming no key once', async () => {

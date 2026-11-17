@@ -156,7 +156,7 @@ export function AxisControls({ axis, params, resolved, axes, present, onParamCha
           onBands={bands => onParamChange(tuningPatch(axis, bands.reduce((t, [bucket, next]) => withOverride(t, bucket, next), mappedTuning(tuning))))}
           hovered={hovered}
           onHover={onHover}
-          color={bucket => bucketColor(taxonomy, fill, mappedTuning(tuning).mapping, bucket)}
+          color={bucket => bucketColor(fill, mappedTuning(tuning).mapping, bucket)}
         />
       )}
 

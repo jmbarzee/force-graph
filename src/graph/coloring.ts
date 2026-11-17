@@ -3,7 +3,7 @@ import type { AxisId, AxisValue } from './axis'
 import { checkedKey, groupsByNode, nodeGroupsOf } from './groups'
 import type { Groups, LegendKey } from './groups'
 import type { Graph, GraphNode } from './model'
-import { hueOf, pairOf } from './scheme'
+import { cssSuffix, hueOf, pairOf } from './scheme'
 import type { ThemedColor, ThemedHue } from './scheme'
 import type { Taxonomy } from './taxonomy'
 import type { GraphDiagnostic } from './validate'
@@ -89,12 +89,25 @@ export function resolveColoring(coloring: SetColoring, graph: Graph, taxonomy: T
   return { keys, of, diagnostics }
 }
 
-/** A node's fill: each key's label and colour, and each node's key. */
+/** Whether two colourings say the same: `by`, `axis`, `keys` by id, label and colour, and `of` by identity. */
+export function coloringsEqual(a: Coloring | undefined, b: Coloring | undefined): boolean {
+  if (a === b) return true
+  if (!a || !b || a.by !== b.by || !keysEqual(a.keys, b.keys)) return false
+  return a.by === 'axis' ? a.axis === (b as typeof a).axis : a.of === (b as typeof a).of
+}
+
+const keysEqual = (a: readonly LegendKey[] | undefined, b: readonly LegendKey[] | undefined): boolean =>
+  a === b || (!!a && !!b && a.length === b.length && a.every((k, i) => k.id === b[i].id && k.label === b[i].label && colorsEqual(k.color, b[i].color)))
+
+const colorsEqual = (a: LegendKey['color'], b: LegendKey['color']): boolean =>
+  a === b || (typeof a === 'object' && typeof b === 'object' && a.light === b.light && a.dark === b.dark)
+
+/** A node's fill: each key's label, colour and custom property, and each node's key. */
 export interface Fill {
   /** The axis the fill follows; undefined when a host function answers each node's key. */
   axis: AxisId | undefined
-  /** Every key, in slot order, with its legend label and colour. */
-  keys: ReadonlyMap<string, { label: string; color: ThemedColor }>
+  /** Every key, in slot order, with its legend label, colour, and the custom property its fill is published under (`-border` for its border). */
+  keys: ReadonlyMap<string, { label: string; color: ThemedColor; cssVar: string }>
   /** Each keyed node's key, by node id. */
   of: ReadonlyMap<string, string>
   /** What resolving the colouring reported. */
@@ -112,7 +125,7 @@ export function fillOf(coloring: Coloring | undefined, graph: Graph, taxonomy: T
     const labelFor = taxonomy.axisFor(styleAxis)?.labelFor
     const keys = new Map(taxonomy.styleValues.map(v => {
       const { label, color } = taxonomy.styleOf(v)
-      return [v, { label: labelFor?.(v) ?? label, color }]
+      return [v, { label: labelFor?.(v) ?? label, color, cssVar: taxonomy.colorVar(v) }]
     }))
     const of = new Map<string, string>()
     for (const node of graph.nodes) {
@@ -122,10 +135,27 @@ export function fillOf(coloring: Coloring | undefined, graph: Graph, taxonomy: T
     return { axis: styleAxis, keys, of, diagnostics: [] }
   }
   const resolved = resolveColoring(coloring, graph, taxonomy, [])
-  const keys = new Map([...resolved.keys].map(([id, { label, hue }]) => [id, { label, color: pairOf(hue) }]))
+  const cssVar = cssVarsFor([...resolved.keys.keys()])
+  const keys = new Map([...resolved.keys].map(([id, { label, hue }]) => [id, { label, color: pairOf(hue), cssVar: cssVar.get(id)! }]))
   const of = new Map<string, string>()
   for (const [id, [key]] of resolved.of) if (key !== undefined) of.set(id, key)
   return { axis: coloring.by === 'axis' ? coloring.axis : undefined, keys, of, diagnostics: resolved.diagnostics }
+}
+
+/**
+ * Each key's custom property: `--gv-node-` and the key in kebab case,
+ * numbered from 2 where an earlier key took the name (`c`, `c-2`), and
+ * `k<slot>` where it kebab-cases to nothing.
+ */
+function cssVarsFor(keys: readonly string[]): Map<string, string> {
+  const taken = new Set<string>()
+  return new Map(keys.map((key, slot) => {
+    const stem = cssSuffix(key) || `k${slot + 1}`
+    let name = stem
+    for (let n = 2; taken.has(name); n++) name = `${stem}-${n}`
+    taken.add(name)
+    return [key, `--gv-node-${name}`]
+  }))
 }
 
 /** A node's fill and border: its key's, else `fallback`. Allocates nothing, for the draw loop. */

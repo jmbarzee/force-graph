@@ -228,8 +228,9 @@ one.
 - **Identity.** Keep one `graph` object until something in it changes: a new
   object equal to the last rebuilds the layout for nothing, and the view says
   so once. The same for the taxonomy — build it once, outside render; the
-  view warns when its identity churns. The filter, locks and axes are
-  compared by content, so a host may rebuild those each render. A changed
+  view warns when its identity churns. The filter, locks, axes and the
+  colourings are compared by content, so a host may rebuild those each
+  render. A changed
   graph keeps the positions of the nodes it still has.
 - **Validation.** `validateGraph(graph, taxonomy)` names every defect — a
   dangling endpoint, an unknown relation, a type the rule returns that the
@@ -587,8 +588,10 @@ published on the pane under the name `taxonomy.colorVar(value)` answers —
 `--gv-node-` and the value id in kebab case (a value id such as
 `teachingLab` → `--gv-node-teaching-lab`), or a numbered name when the id kebab-cases to
 nothing or to another value's — and `-border` for the border. Inside the
-pane the fill's keys publish under the same names, a key's colour winning
-over a style value it shares a name with. A host's own
+pane the fill's keys publish as `--gv-node-` and the key in kebab case,
+numbered where two keys kebab-case alike (`c`, `c-2`) or one kebab-cases to
+nothing, a
+key's colour winning over a style value it shares a name with. A host's own
 chrome beside the pane reads the styles' tints through `useScheme`, or
 `schemeStylesheet(taxonomy, darkSelector?)` mounted once (its dark block under
 `[data-theme="dark"]`, or the host's own selector). Default rest

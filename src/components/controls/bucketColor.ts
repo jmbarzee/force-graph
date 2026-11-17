@@ -23,6 +23,7 @@ export function bucketsFill(fill: Fill, mapping: AxisMapping): boolean {
   return mapping.axis === fill.axis && isIdentityMapping(mapping)
 }
 
-export function bucketColor(taxonomy: Taxonomy, fill: Fill, mapping: AxisMapping, bucketId: string): string {
-  return bucketsFill(fill, mapping) && fill.keys.has(bucketId) ? `var(${taxonomy.colorVar(bucketId)})` : NEUTRAL_BUCKET_COLOR
+export function bucketColor(fill: Fill, mapping: AxisMapping, bucketId: string): string {
+  const key = bucketsFill(fill, mapping) ? fill.keys.get(bucketId) : undefined
+  return key ? `var(${key.cssVar})` : NEUTRAL_BUCKET_COLOR
 }

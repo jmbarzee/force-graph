@@ -15,7 +15,7 @@ import type { ForceParams, SimNode, Simulation } from '../graph/simulation'
 import { bandOverlay, resolvePhysics } from '../graph/forces'
 import { countsOn, mappingKey, valuesOn } from '../graph/axis'
 import type { AxisId, AxisLabels, AxisMapping } from '../graph/axis'
-import { fillOf } from '../graph/coloring'
+import { coloringsEqual, fillOf } from '../graph/coloring'
 import type { Coloring } from '../graph/coloring'
 import { FillContext, useFill } from './graph-view/useFill'
 import { bucketsFill } from './controls/bucketColor'
@@ -458,7 +458,8 @@ export const GraphView = React.forwardRef<GraphViewHandle, GraphViewProps>(funct
     [graph, taxonomy],
   )
   // The fill, resolved apart from the simulation: a new colouring repaints.
-  const fill = React.useMemo(() => fillOf(coloring?.fill, graph, taxonomy), [coloring?.fill, graph, taxonomy])
+  const fillColoring = useStable(coloring?.fill, coloringsEqual)
+  const fill = React.useMemo(() => fillOf(fillColoring, graph, taxonomy), [fillColoring, graph, taxonomy])
   const diagnostics = React.useMemo(() => {
     const added = [...groupDiagnostics, ...fill.diagnostics, ...tintDiagnostics(taxonomy, valuesByAxis, fill)]
     return added.length ? [...graphDiagnostics, ...added] : graphDiagnostics
@@ -1402,7 +1403,7 @@ function GraphHoverTooltip({ hoveredNodeId, simRef, visibleEdges, undirected, vi
       </div>
       {fillKey !== undefined && (
         <div className="gv-tooltip-fill">
-          <span className="gv-tooltip-swatch" style={{ background: `var(${taxonomy.colorVar(fillKey)})` }} />
+          <span className="gv-tooltip-swatch" style={{ background: `var(${fill.keys.get(fillKey)!.cssVar})` }} />
           {fill.keys.get(fillKey)!.label}
         </div>
       )}

@@ -12,7 +12,6 @@ import { withSpringOverride } from '../graph/simulation'
 import type { ResolvedPhysics } from '../graph/forces'
 import type { EdgeCategoryDescription } from '../graph/forces'
 import type { AxisMapping, AxisValue } from '../graph/axis'
-import type { Taxonomy } from '../graph/taxonomy'
 import type { Fill } from '../graph/coloring'
 
 import { useTaxonomy } from './graph-view/useTaxonomy'
@@ -33,8 +32,8 @@ export const EDGE_REST_STEP = 10
 const clamp = (v: number, lo: number, hi: number) => Math.max(lo, Math.min(hi, v))
 
 /** One half of a split-colour token: its value's colour, or the neutral "any" for an end the type leaves out. */
-const swatchColor = (taxonomy: Taxonomy, fill: Fill, mapping: AxisMapping, value: AxisValue | null): string =>
-  value === null ? NEUTRAL_BUCKET_COLOR : bucketColor(taxonomy, fill, mapping, value)
+const swatchColor = (fill: Fill, mapping: AxisMapping, value: AxisValue | null): string =>
+  value === null ? NEUTRAL_BUCKET_COLOR : bucketColor(fill, mapping, value)
 
 /** One token per category present in the graph, in first-seen order; ids the table cannot describe are skipped. */
 function describedCategories(spring: ResolvedPhysics['spring'], present: ReadonlySet<string>): EdgeCategoryDescription[] {
@@ -74,8 +73,8 @@ export function SpringMap({ params, resolved, present, onParamChange, hoveredEdg
       id: c.id,
       x: ph.distance,
       y: ph.strength,
-      colorA: swatchColor(taxonomy, fill, spring.mapping, c.swatch[0]),
-      colorB: swatchColor(taxonomy, fill, spring.mapping, c.swatch[1]),
+      colorA: swatchColor(fill, spring.mapping, c.swatch[0]),
+      colorB: swatchColor(fill, spring.mapping, c.swatch[1]),
       outline: c.relation === 'containment' ? 'dashed' : 'solid',
       label: c.label,
       tooltip: c.tooltip,
@@ -165,16 +164,12 @@ export function SpringCurves({ params, resolved, present, onParamChange, hovered
 
     const built = sampled.map(({ edge, restEff, pts }) => ({
       id: edge.id,
-      color: swatchColor(taxonomy, fill, spring.mapping, edge.swatch[0]),
+      color: swatchColor(fill, spring.mapping, edge.swatch[0]),
       markerX: xFor(restEff),
       points: pts.map(p => `${xFor(p.d).toFixed(1)},${yFor(p.v).toFixed(1)}`).join(' '),
     }))
     return { curves: built, dMax }
-    // `taxonomy` and `fill` belong here: the body reads them for the split-colour
-    // tokens. Its sibling ChargeCurves already listed them, and the asymmetry was
-    // the bug — a taxonomy swap left these curves drawn in the previous
-    // taxonomy's colours, on its edge set, with no error.
-  }, [spring, shown, pull, dist, exp, taxonomy, fill])
+  }, [spring, shown, pull, dist, exp, fill])
 
   return (
     <ForceCurves

@@ -102,7 +102,7 @@ describe('fillOf', () => {
     const fill = fillOf(undefined, { nodes, edges: [] }, taxonomy)
     expect(fill.axis).toBe('kind')
     expect([...fill.keys.keys()]).toEqual(['service', 'queue', 'store'])
-    expect(fill.keys.get('queue')).toEqual({ label: 'Queue', color: taxonomy.styleOf('queue').color })
+    expect(fill.keys.get('queue')).toEqual({ label: 'Queue', color: taxonomy.styleOf('queue').color, cssVar: taxonomy.colorVar('queue') })
     expect(nodes.map(n => fill.of.get(n.id))).toEqual(['queue', 'service', 'service', undefined])
     expect(fillOf({ by: 'axis', axis: 'kind' }, { nodes, edges: [] }, taxonomy)).toEqual(fill)
   })
@@ -110,7 +110,7 @@ describe('fillOf', () => {
   it('pairs each key’s hue as fill and border on another axis', () => {
     const fill = fillOf({ by: 'axis', axis: 'team' }, { nodes, edges: [] }, taxonomy)
     expect(fill.axis).toBe('team')
-    expect(fill.keys.get('blue')).toEqual({ label: 'BLUE', color: pairOf(PALETTE[0]) })
+    expect(fill.keys.get('blue')).toEqual({ label: 'BLUE', color: pairOf(PALETTE[0]), cssVar: '--gv-node-blue' })
     expect(fill.of.get('a')).toBe('red')
     expect(fill.of.has('d')).toBe(false)
   })

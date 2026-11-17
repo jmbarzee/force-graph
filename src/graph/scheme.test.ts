@@ -22,11 +22,18 @@ describe('keyVars', () => {
   const fill = fillOf({ by: 'axis', axis: 'team' }, graph, taxonomy)
 
   it('publishes each key’s fill and border under colorVar, in either theme', () => {
-    expect(keyVars(taxonomy, fill, 'dark')).toEqual({
+    expect(keyVars(fill, 'dark')).toEqual({
       '--gv-node-red': PALETTE[0].dark, '--gv-node-red-border': pairOf(PALETTE[0]).dark.border,
       '--gv-node-blue-team': PALETTE[1].dark, '--gv-node-blue-team-border': pairOf(PALETTE[1]).dark.border,
     })
-    expect(keyVars(taxonomy, fill, 'light')).toMatchObject({ '--gv-node-red': PALETTE[0].light })
+    expect(keyVars(fill, 'light')).toMatchObject({ '--gv-node-red': PALETTE[0].light })
+  })
+
+  it('numbers keys that kebab-case alike, and one that kebab-cases to nothing', () => {
+    const langs = { nodes: ['C', 'C++', 'C#', 'Ψ'].map(lang => ({ id: lang, name: lang, values: { kind: 'red', team: lang } })), edges: [] }
+    const named = fillOf({ by: 'axis', axis: 'team' }, langs, taxonomy)
+    expect([...named.keys.values()].map(k => k.cssVar)).toEqual(['--gv-node-c', '--gv-node-c-2', '--gv-node-c-3', '--gv-node-k4'])
+    expect(keyVars(named, 'light')).toMatchObject({ '--gv-node-c': PALETTE[0].light, '--gv-node-c-2': PALETTE[1].light, '--gv-node-c-3': PALETTE[2].light, '--gv-node-k4': PALETTE[3].light })
   })
 
   it('wins over a style value of the same name in a scope', () => {

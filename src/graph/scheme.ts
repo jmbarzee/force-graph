@@ -78,12 +78,12 @@ export function schemeVars(taxonomy: Taxonomy, theme: Theme): React.CSSPropertie
   return vars
 }
 
-/** The fill's keys as `schemeVars` names them, for one theme: a pane's `--gv-node-*` follows its fill. */
-export function keyVars(taxonomy: Taxonomy, fill: Fill, theme: Theme): React.CSSProperties {
+/** The fill's keys under the names it gives them, for one theme: a pane's `--gv-node-*` follows its fill. */
+export function keyVars(fill: Fill, theme: Theme): React.CSSProperties {
   const vars: Record<string, string> = {}
-  for (const [key, { color }] of fill.keys) {
-    vars[taxonomy.colorVar(key)] = color[theme].fill
-    vars[`${taxonomy.colorVar(key)}-border`] = color[theme].border
+  for (const { color, cssVar } of fill.keys.values()) {
+    vars[cssVar] = color[theme].fill
+    vars[`${cssVar}-border`] = color[theme].border
   }
   return vars
 }

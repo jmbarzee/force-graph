@@ -444,7 +444,7 @@ export function FilterBar<R extends SearchRecord = SearchRecord>({
                     <button
                       key={chip.id}
                       className={cls}
-                      style={tint === undefined ? undefined : ({ ['--gv-chip-tint' as string]: `var(${taxonomy.colorVar(tint)})` } as React.CSSProperties)}
+                      style={tint === undefined ? undefined : ({ ['--gv-chip-tint' as string]: `var(${fill.keys.get(tint)!.cssVar})` } as React.CSSProperties)}
                       onClick={() => change(toggleGroup(filter, axis, chip.values), axis)}
                       title={chip.tooltip ?? (isActive ? `Hide ${chip.label.toLowerCase()}` : `Show ${chip.label.toLowerCase()}`)}
                     >

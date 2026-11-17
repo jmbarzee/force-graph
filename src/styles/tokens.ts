@@ -39,5 +39,5 @@ export function createTheme(themes: { readonly [T in Theme]?: { readonly [R in T
 
 /** A themed root's inline style for one theme: the scheme's colours, the fill's over them, then the host's tokens. */
 export function scopeStyle(taxonomy: Taxonomy, theme: Theme, tokens?: ThemeTokens, fill?: Fill): React.CSSProperties {
-  return { ...schemeVars(taxonomy, theme), ...(fill && keyVars(taxonomy, fill, theme)), ...tokens?.[theme] }
+  return { ...schemeVars(taxonomy, theme), ...(fill && keyVars(fill, theme)), ...tokens?.[theme] }
 }

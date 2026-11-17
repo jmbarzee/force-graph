@@ -51,6 +51,7 @@ interface ChargeControlProps {
 // token at their centroid, and dragging it shifts every rung alike.
 export function ChargeMap({ params, resolved, present, onParamChange, hoveredBucket, onHoverBucket }: ChargeControlProps) {
   const taxonomy = useTaxonomy()
+  const fill = useFill(taxonomy)
   const { push } = resolved
   const [collapsed, toggle] = useCollapsed()
   // Only the buckets the visible set holds; the tuning keeps the rest.
@@ -58,8 +59,7 @@ export function ChargeMap({ params, resolved, present, onParamChange, hoveredBuc
   const ladders = laddersOn(taxonomy, push.mapping, shown.map(b => b.id))
   const rows = rowsOf(shown.map(b => b.id), ladders, collapsed)
   const at = (id: string) => ({ x: pushForKey(push, id).coreRadius, y: Math.abs(pushForKey(push, id).charge) })
-  const fill = useFill(taxonomy)
-  const color = (id: string) => bucketColor(taxonomy, fill, push.mapping, id)
+  const color = (id: string) => bucketColor(fill, push.mapping, id)
   const bucketToken = (id: string): MapToken => {
     const b = shown.find(s => s.id === id)!
     return {
@@ -175,12 +175,12 @@ export function ChargeCurves({ params, resolved, present, onParamChange, hovered
 
     const built = sampled.map(({ type, rEff, pts }) => ({
       id: type,
-      color: bucketColor(taxonomy, fill, push.mapping, type),
+      color: bucketColor(fill, push.mapping, type),
       markerX: xFor(rEff),
       points: pts.map(p => `${xFor(p.d).toFixed(1)},${yFor(p.v).toFixed(1)}`).join(' '),
     }))
     return { curves: built, dMax }
-  }, [params, pushMul, push, crMul, exp, taxonomy, fill, present])
+  }, [params, pushMul, push, crMul, exp, fill, present])
 
   return (
     <ForceCurves
