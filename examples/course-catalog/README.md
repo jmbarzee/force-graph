@@ -18,7 +18,9 @@ npx vite --config examples/course-catalog/vite.config.ts        # http://localho
 node_modules/.bin/tsc --noEmit -p examples/course-catalog/tsconfig.json
 ```
 
-Add `?theme=dark` (or `light`) to the URL to pin the pane's theme.
+Add `?theme=dark` (or `light`) to the URL to pin the pane's theme, and
+`?focus=lab:CHEM%20101L` to open framed on a lab, which the opening filter
+hides.
 
 ## What each file exercises
 

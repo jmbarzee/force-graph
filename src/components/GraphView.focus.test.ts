@@ -2,7 +2,9 @@
 import React, { act } from 'react'
 import { createRoot } from 'react-dom/client'
 import { beforeEach, expect, it, vi } from 'vitest'
-import { GraphView, type GraphViewHandle } from './GraphView'
+import { GraphView, type GraphViewHandle, type GraphViewProps } from './GraphView'
+import type { FocusRequest } from './graph-view/focus'
+import type { FilterState } from '../filter/types'
 import { createTaxonomy } from '../graph/taxonomy'
 import type { Graph } from '../graph/model'
 import type { SimNode } from '../graph/simulation'
@@ -83,4 +85,111 @@ it('selects the target of a focus the user lets go before it frames', async () =
   await tick()
   expect(view.selections).toEqual(['a'])
   expect(canvas.flashNode).toBeNull()
+})
+
+// Under a controlled filter: `n0` is hidden until the host widens `team`, and
+// `n2`, with no `site`, no filter can show.
+const teams = createTaxonomy({ styleAxis: 'kind', styles: [], filterAxes: [{ id: 'team', emptyMeans: 'none' }, { id: 'site', emptyMeans: 'none' }] })
+const staff: Graph = {
+  nodes: ([['n0', { team: 'a', site: 'x' }], ['n1', { team: 'b', site: 'x' }], ['n2', { team: 'a' }]] as const).map(([id, values]) => ({ id, name: id, values })),
+  edges: [],
+}
+const hidesN0: FilterState = new Map([['team', { except: new Set(['a']) }], ['site', { except: new Set() }]])
+
+async function host() {
+  const ref = React.createRef<GraphViewHandle>()
+  const asks: Parameters<NonNullable<GraphViewProps['onFilterChange']>>[] = []
+  const events: string[] = []
+  const root = createRoot(document.createElement('div'))
+  const render = (filter: FilterState, focus: FocusRequest | null = null) => act(async () => {
+    root.render(React.createElement(GraphView, {
+      ref, graph: staff, taxonomy: teams, filter, focus,
+      onFilterChange: (...ask) => asks.push(ask),
+      onFocusResult: (request, shown) => events.push(`${request.key}:${shown}`),
+      onSelectionChange: n => events.push(`select:${n?.id}`),
+    }))
+  })
+  await render(hidesN0)
+  await tick()
+  return { ref, asks, events, render }
+}
+
+it('asks the host to widen, and lands only once the host passes the widened filter back', async () => {
+  const view = await host()
+  const viewport = canvas.viewport
+  const request = { id: 'n0', key: 1 }
+  await view.render(hidesN0, request)
+  await tick()
+  expect(view.asks).toEqual([[expect.any(Map), [], request]])
+  expect(view.events).toEqual([])
+  expect(canvas.viewport).toBe(viewport)
+
+  await view.render(view.asks[0]![0], request)
+  expect(view.events).toEqual(['1:true', 'select:n0'])
+})
+
+it('reports false, and selects nothing, when the host passes back a filter that still hides the node', async () => {
+  const view = await host()
+  const request = { id: 'n0', key: 1 }
+  await view.render(hidesN0, request)
+  await view.render(new Map([['team', { except: new Set(['a', 'b']) }]]), request)
+  expect(view.events).toEqual(['1:false'])
+})
+
+it('reports false, and asks nothing, for a node no filter can show', async () => {
+  const view = await host()
+  await view.render(hidesN0, { id: 'n2', key: 1 })
+  expect(view.events).toEqual(['1:false'])
+  expect(view.asks).toEqual([])
+})
+
+it('never reports a waiting focus that a newer one replaced', async () => {
+  const view = await host()
+  await view.render(hidesN0, { id: 'n0', key: 1 })
+  await view.render(hidesN0, { id: 'n1', key: 2 })
+  await view.render(view.asks[0]![0], { id: 'n1', key: 2 })
+  expect(view.events).toEqual(['2:true', 'select:n1'])
+})
+
+it('withdraws a waiting focus that null replaces in the commit that brings the widened filter', async () => {
+  const view = await host()
+  await view.render(hidesN0, { id: 'n0', key: 1 })
+  await view.render(view.asks[0]![0], null)
+  expect(view.events).toEqual([])
+})
+
+it('withdraws a waiting focus that a newer one replaces in the commit that brings the widened filter', async () => {
+  const view = await host()
+  await view.render(hidesN0, { id: 'n0', key: 1 })
+  await view.render(view.asks[0]![0], { id: 'n1', key: 2 })
+  expect(view.events).toEqual(['2:true', 'select:n1'])
+})
+
+it('builds a second handle focus on the host filter, not the widening still waiting', async () => {
+  const view = await host()
+  await act(async () => {
+    view.ref.current!.focusNode('n0')
+    view.ref.current!.focusNode('n0')
+  })
+  expect(view.asks).toHaveLength(2)
+  expect(view.events).toEqual([])
+})
+
+it("marks the handle's widening with the node's id", async () => {
+  const view = await host()
+  await act(async () => { expect(view.ref.current!.focusNode('n0')).toBe(true) })
+  expect(view.asks).toEqual([[expect.any(Map), [], { id: 'n0' }]])
+  expect(view.events).toEqual([])
+})
+
+it('lands a widening on the filter the view keeps itself', async () => {
+  const ref = React.createRef<GraphViewHandle>()
+  const selections: (string | null)[] = []
+  await act(async () => {
+    createRoot(document.createElement('div')).render(React.createElement(GraphView, {
+      ref, graph: staff, taxonomy: teams, defaultFilter: hidesN0, onSelectionChange: n => selections.push(n?.id ?? null),
+    }))
+  })
+  await act(async () => { ref.current!.focusNode('n0') })
+  expect(selections).toEqual(['n0'])
 })

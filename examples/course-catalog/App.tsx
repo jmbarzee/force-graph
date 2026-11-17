@@ -48,7 +48,7 @@ export const PRESETS: readonly TuningPreset[] = [
   { label: 'By level', tuning: { forces: { bandY: { scalar: 'level' } } } },
 ]
 
-export function App({ initialTheme = 'system' }: { initialTheme?: ThemeChoice }) {
+export function App({ initialTheme = 'system', initialFocus }: { initialTheme?: ThemeChoice; initialFocus?: string | null }) {
   // Controlled: the details panel's "Show only <campus>" writes the filter.
   const [filter, setFilter] = React.useState<FilterState>(() => initialFilter(taxonomy, graph))
   const [themeChoice, setThemeChoice] = React.useState<ThemeChoice>(initialTheme)
@@ -58,6 +58,7 @@ export function App({ initialTheme = 'system' }: { initialTheme?: ThemeChoice })
   // A request, not a state: the view applies it when it changes, and each ask
   // is a fresh one, so asking again for the same node asks again.
   const [focus, requestFocus] = useFocusRequest()
+  React.useEffect(() => { if (initialFocus) requestFocus(initialFocus) }, [initialFocus, requestFocus])
   // Where the nodes last came to rest: a reload opens there.
   const [kept] = React.useState(() => loadPositions(localStorage))
 

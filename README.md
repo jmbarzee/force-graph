@@ -272,8 +272,9 @@ the console. Everything else is optional.
   does to its own filter when the graph
   changes — every axis the user has not touched takes the new graph's
   opening selection — for a host that controls the filter to call from its
-  own data effect; `onFilterChange(next, touched)` names the axes the user
-  changed in each write, so the host can keep that set. A host that writes
+  own data effect; `onFilterChange(next, touched, focus?)` names the axes the
+  user changed in each write, so the host can keep that set, and a focus's
+  widening names the request it answers. A host that writes
   only one axis need not control the filter: the handle's `updateFilter`
   writes it, and the view keeps re-seeding the rest.
 - **Save and restore.** An axis's selection is a set, "only these", or
@@ -311,9 +312,10 @@ the console. Everything else is optional.
   reports. `focus={{ id, key }}` reveals, frames and selects a node — the
   declarative form of the handle's `focusNode`, for a pane that mounts lazily
   or whose data arrives late. It is compared by value, so a new `id` or `key`
-  is a new request; it waits until its node is in the graph; and
-  `onFocusResult(request, shown)` says whether the filter could show the
-  node. Null, or a newer request, withdraws a waiting one unreported.
+  is a new request; it waits until its node is in the graph, and, when the
+  filter must widen, until the filter the host passes back shows the node;
+  and `onFocusResult(request, shown)` says whether it did. Null, or a newer
+  request, withdraws a waiting one unreported.
   `useFocusRequest()` gives a host the request and a `requestFocus(id)` that
   makes each ask new.
 - **Tuning.** `tuning` is the forces and the node scale as the user set
@@ -389,9 +391,10 @@ the console. Everything else is optional.
   a node in one call — it widens the filter on the axes shown and the groups
   it belongs to when the group filter hides it, flashes a lock
   it overrides, frames the node with its neighbors until the layout settles,
-  then flashes the node — and answers
-  whether the node ended visible (a value absent on a hiding axis cannot be
-  revealed); `select(id | null)` sets or clears the selection; `fit()` frames
+  then flashes the node — and answers at once
+  whether a filter can show the node (a value absent on a hiding axis cannot
+  be revealed); a widening frames and selects once the filter shows it;
+  `select(id | null)` sets or clears the selection; `fit()` frames
   the visible set; `getPositions()` and `setPositions()` carry a layout out
   and back in, as `onSettled` and `defaultPositions` do across a reload;
   `updateFilter(fn)` rewrites the filter, the axes `fn` changes counting as

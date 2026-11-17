@@ -4,10 +4,11 @@ import { themeChoiceOf } from '@jmbarzee/force-graph'
 import { App } from './App'
 
 // `?theme=dark` pins the pane's theme; anything else is "system".
-const initialTheme = themeChoiceOf(new URLSearchParams(location.search).get('theme'))
+const params = new URLSearchParams(location.search)
+const initialTheme = themeChoiceOf(params.get('theme'))
 
 createRoot(document.getElementById('root')!).render(
   <React.StrictMode>
-    <App initialTheme={initialTheme} />
+    <App initialTheme={initialTheme} initialFocus={params.get('focus')} />
   </React.StrictMode>,
 )
