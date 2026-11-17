@@ -1,7 +1,6 @@
 import { describe, expect, it } from 'vitest'
 import { computeVisibleGraph, neighborhoodOf } from './visibleGraph'
 import { createTaxonomy } from '../../graph/taxonomy'
-import { fitToView } from '../../graph/viewport'
 import { initialFilter, withSelection } from '../../filter/types'
 import type { NodeStyle } from '../../graph/shapes'
 import type { Graph, GraphEdge, GraphNode } from '../../graph/model'
@@ -44,12 +43,8 @@ describe('computeVisibleGraph origins', () => {
 })
 
 describe('neighborhoodOf', () => {
-  it('frames the drawn neighbors, not a hidden one far from the node', () => {
-    const at: Record<string, [number, number]> = { p1: [0, 0], p2: [100, 0], c1: [5000, 5000], c2: [100, 10] }
-    const placed = graph.nodes.map(n => ({ ...n, x: at[n.id][0], y: at[n.id][1] })) as SimNode[]
-    const source = { nodes: placed, edges: graph.edges, getNode: (id: string) => placed.find(n => n.id === id) }
-    const vg = computeVisibleGraph(source, withSelection(initialFilter(taxonomy, graph), 'kind', new Set(['parent'])), taxonomy)
-    const drawn = placed.filter(n => n.id === 'p1' || n.id === 'p2')
-    expect(fitToView(neighborhoodOf('p1', vg.visibleNodes, vg.visibleEdges), 800, 600)).toEqual(fitToView(drawn, 800, 600))
+  it('leaves out a hidden neighbor', () => {
+    const vg = computeVisibleGraph(sim, withSelection(initialFilter(taxonomy, graph), 'kind', new Set(['parent'])), taxonomy)
+    expect(neighborhoodOf('p1', vg.visibleNodes, vg.visibleEdges).map(n => n.id)).toEqual(['p1', 'p2'])
   })
 })

@@ -709,10 +709,6 @@ export const GraphView = React.forwardRef<GraphViewHandle, GraphViewProps>(funct
 
   // Double-click node: center and zoom to neighbors, and tell the host.
   const handleDoubleClickNode = React.useCallback((id: string) => {
-    const sim = simRef.current
-    if (!sim) return
-    const node = sim.getNode(id)
-    if (!node) return
     const hostNode = hostIndex.get(id)
     if (hostNode) onNodeActivateRef.current?.(hostNode)
     if (show.activateZoom) fit(neighborhoodOf(id, visibleNodes, visibleEdges), 80)
