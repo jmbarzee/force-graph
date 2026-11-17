@@ -3,7 +3,7 @@
 
 import React from 'react'
 import './GraphView.css'
-import { nodesById, isContainment, withContainmentEdges } from '../graph/model'
+import { intensityAt, nodesById, isContainment, peakOf, seriesOf, unitWeight, windowOf, withContainmentEdges } from '../graph/model'
 import type { Graph, GraphEdge, GraphNode } from '../graph/model'
 import type { FilterState, AxisLocks } from '../filter/types'
 import { GROUPS, changedAxes, initialFilter, filterStatesEqual, hiddenMatchesOf, listEqual, locksEqual, reseedFilter, selectionFor, selects } from '../filter/types'
@@ -25,7 +25,7 @@ import type { ThemeChoice } from './graph-view/useTheme'
 import { axisOptions, layoutAxisOptions, pairTuning, sprungEdges } from '../graph/simulation'
 import { copyGroups, copyKeyOf } from '../graph/model'
 import type { NodeScaleParams } from '../graph/node-scale'
-import { CONTAINMENT_STROKE, NEUTRAL_STROKE, weighted } from '../graph/shapes'
+import { CONTAINMENT_STROKE, NEUTRAL_STROKE, played, weighted } from '../graph/shapes'
 import { defaultTuningFor, tuningsEqual, makeTuning, openTuning } from '../graph/tuning-internal'
 import type { Tuning } from '../graph/tuning'
 import { TaxonomyContext, useTaxonomy } from './graph-view/useTaxonomy'
@@ -38,6 +38,7 @@ import { GraphCanvas } from './GraphCanvas'
 import { CanvasErrorBoundary } from './CanvasErrorBoundary'
 import { GraphControlPanel } from './GraphControlPanel'
 import { hiddenByOf } from './controls/NothingVisible'
+import { Scrubber } from './Scrubber'
 import { activeGroupsOf, boostGroupsForNodes, cohesionOf, groupSlotsOf, groupsByNode, nodeGroupsOf, type ActiveGroup, type Groups, type NodeGroup } from '../graph/groups'
 import { FilterBar, hiddenMatchBadge } from './FilterBar'
 import type { SearchState } from './FilterBar'
@@ -103,6 +104,8 @@ export interface GraphViewChrome {
   directionLine?: boolean
   /** Centre and zoom to a node's neighbours on double-click. */
   activateZoom?: boolean
+  /** The scrubber that plays the graph's `window` back, shown only when the graph declares a valid one. */
+  scrubber?: boolean
 }
 
 /**
@@ -259,6 +262,17 @@ export interface GraphViewProps {
   onTuningChange?: (next: Tuning) => void
   /** Where the view's own tuning starts when the host does not control it — `createTuning`'s or `tuningFromJSON`'s answer, say. Read once. */
   defaultTuning?: Tuning
+  /**
+   * Where in the graph's `window` the edges are drawn: a fractional bucket
+   * index, clamped to `[0, buckets − 1]`, at which each edge with a `series`
+   * strokes its count there. Null, the whole window: every edge draws its
+   * static `weight`. Default: `defaultPlayhead`, else null.
+   */
+  playhead?: number | null
+  /** Every change to the playhead — the scrubber's seek, play and reset. */
+  onPlayheadChange?: (next: number | null) => void
+  /** Where the view's own playhead starts when the host does not control it. Read once. */
+  defaultPlayhead?: number | null
 
   /**
    * The selection the user made — a click, Enter, Escape, a search pick, a
@@ -314,6 +328,7 @@ export const GraphView = React.forwardRef<GraphViewHandle, GraphViewProps>(funct
   search: searchProp, onSearchChange, defaultSearch,
   theme: themeProp, onThemeChange, defaultTheme, systemTheme, tokens,
   tuning: tuningProp, onTuningChange, defaultTuning,
+  playhead: playheadProp, onPlayheadChange, defaultPlayhead,
   onSelectionChange, onNodeActivate, onHover, onThemeResolved, onDiagnostics, onSettled,
 }: GraphViewProps, ref) {
   // The taxonomy: the prop, or the context. Neither is a wiring bug a
@@ -376,6 +391,7 @@ export const GraphView = React.forwardRef<GraphViewHandle, GraphViewProps>(funct
   const axesEditable = hostAxes === undefined || onAxesChange !== undefined
   const [search, setSearch] = useControllable(searchProp, onSearchChange, () => defaultSearch ?? { query: '', active: false }, 'search')
   const [themeChoice, setThemeChoice] = useControllable(themeProp, onThemeChange, () => defaultTheme ?? 'system', 'theme')
+  const [rawPlayhead, setPlayhead] = useControllable(playheadProp, onPlayheadChange, () => defaultPlayhead ?? null, 'playhead')
   const searchQuery = search.query
   const searchActive = search.active
   // The axes this view filters on are those shown, in order: an axis the host
@@ -394,6 +410,7 @@ export const GraphView = React.forwardRef<GraphViewHandle, GraphViewProps>(funct
     activateZoom: chrome?.activateZoom ?? true,
     controls: chrome?.controls ?? true,
     themeToggle: chrome?.themeToggle ?? true,
+    scrubber: chrome?.scrubber ?? true,
   }
   // The host's graph, checked once: every defect named, the edges an error
   // names left out of what is drawn, and the containment edge each `parentId`
@@ -572,15 +589,27 @@ export const GraphView = React.forwardRef<GraphViewHandle, GraphViewProps>(funct
   // Every visible edge's stroke, from the type the derivation resolved on the
   // edge's ORIGINAL endpoints, once, not per frame. An edge no type claims
   // draws in its relation's default stroke; the diagnostics have named it.
-  const edgeStrokes = React.useMemo(() => {
+  const typeStrokes = React.useMemo(() => {
     const strokes = new Map<GraphEdge, EdgeStroke>()
     for (const edge of visibleEdges) {
       const type = edgeTypes.get(edge.id)
-      const base = type !== undefined ? engineOf(taxonomy).edgeStrokeFor(type) : isContainment(edge) ? CONTAINMENT_STROKE : NEUTRAL_STROKE
-      strokes.set(edge, weighted(base, edge))
+      strokes.set(edge, type !== undefined ? engineOf(taxonomy).edgeStrokeFor(type) : isContainment(edge) ? CONTAINMENT_STROKE : NEUTRAL_STROKE)
     }
     return strokes
   }, [visibleEdges, edgeTypes, taxonomy])
+  // At a playhead, an edge with a series strokes its count there over the
+  // peak of the whole graph, not of what the filter shows; else its weight.
+  const timeWindow = windowOf(graph)
+  const peak = React.useMemo(() => peakOf(graph.edges, timeWindow), [graph, timeWindow])
+  const playhead = timeWindow && rawPlayhead !== null ? Math.min(timeWindow.buckets - 1, Math.max(0, rawPlayhead)) : null
+  const edgeStrokes = React.useMemo(() => {
+    const strokes = new Map<GraphEdge, EdgeStroke>()
+    for (const [edge, base] of typeStrokes) {
+      const series = seriesOf(edge, timeWindow)
+      strokes.set(edge, playhead !== null && series ? played(base, intensityAt(series, playhead, peak)) : weighted(base, unitWeight(edge)))
+    }
+    return strokes
+  }, [typeStrokes, playhead, timeWindow, peak])
 
   // Parallel dependency edges — two or more between one pair of visible nodes,
   // kept apart — take lanes a few pixels either side of the line so
@@ -1135,6 +1164,8 @@ export const GraphView = React.forwardRef<GraphViewHandle, GraphViewProps>(funct
             shifts the centred cluster; hidden when the simulation is paused. */}
         <span className={`gv-graph-count-fps${running ? '' : ' hidden'}`} title="Simulation frames per second">{fps} fps</span>
       </div>}
+
+      {show.scrubber && timeWindow && <Scrubber window={timeWindow} playhead={playhead} onPlayheadChange={setPlayhead} />}
 
       {/* Control panel */}
       {show.controls && <GraphControlPanel

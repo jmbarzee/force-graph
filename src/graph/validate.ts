@@ -9,7 +9,7 @@
 // bad graph before mounting calls it itself.
 
 import type { Graph, GraphEdge, GraphNode } from './model'
-import { nodesById, relationOf, unitWeight, withContainmentEdges } from './model'
+import { nodesById, relationOf, seriesOf, unitWeight, windowOf, withContainmentEdges } from './model'
 import type { Taxonomy } from './taxonomy'
 import { engineOf } from './taxonomy'
 
@@ -18,12 +18,14 @@ import { engineOf } from './taxonomy'
  * an edge whose endpoint is not in the graph, an unknown relation, a type
  * whose relation is not the edge's, a rule that threw, a parent not in the
  * graph, a cycle of parents. Warnings: an edge no type claims, an edge
- * weight outside `[0, 1]` or not finite, a style value the taxonomy does not
- * declare, containment edges that contradict `parentId`, containment edges
- * derived from `parentId` that no type claims (`containment-untyped`). The
- * view adds two of its own, through `onDiagnostics`: a key a colouring or the
- * groups do not declare (`key-undeclared`) and a key or group colour outside
- * the scheme's forms (`key-color-invalid`).
+ * weight outside `[0, 1]` or not finite, a window that is not one, an edge
+ * series that does not read against the window, a style value the taxonomy
+ * does not declare, containment edges that contradict `parentId`,
+ * containment edges derived from `parentId` that no type claims
+ * (`containment-untyped`). The view adds two of its own, through
+ * `onDiagnostics`: a key a colouring or the groups do not declare
+ * (`key-undeclared`) and a key or group colour outside the scheme's forms
+ * (`key-color-invalid`).
  */
 export type GraphDiagnosticCode =
   | 'edge-id-duplicate'
@@ -33,6 +35,8 @@ export type GraphDiagnosticCode =
   | 'edge-type-unclassified'
   | 'edge-type-relation-mismatch'
   | 'edge-weight-invalid'
+  | 'window-invalid'
+  | 'edge-series-invalid'
   | 'parent-missing'
   | 'parent-cycle'
   | 'containment-parent-mismatch'
@@ -63,10 +67,10 @@ const RELATIONS = new Set(['containment', 'dependency'])
  * draw as given (a duplicated node id, a dangling endpoint, an unknown
  * relation, a type whose relation is not the edge's, a parent not in the
  * graph, a cycle of parents) and warnings for what it draws but the host
- * should know (an unclassified edge, an invalid weight, an undeclared style
- * value, containment edges that contradict `parentId`, a derived containment
- * edge no type claims). Pure; the same graph and taxonomy give the same list,
- * in graph order.
+ * should know (an unclassified edge, an invalid weight, window or series,
+ * an undeclared style value, containment edges that contradict `parentId`,
+ * a derived containment edge no type claims). Pure; the same graph and
+ * taxonomy give the same list, in graph order.
  */
 export function validateGraph(graph: Graph, taxonomy: Taxonomy): GraphDiagnostic[] {
   const out: GraphDiagnostic[] = []
@@ -74,6 +78,10 @@ export function validateGraph(graph: Graph, taxonomy: Taxonomy): GraphDiagnostic
   const declaredValues = new Set(taxonomy.styleValues)
   const engine = engineOf(taxonomy)
   const byId = nodesById(graph.nodes)
+  const window = windowOf(graph)
+  if (graph.window !== undefined && !window) {
+    out.push({ severity: 'warning', code: 'window-invalid', message: `the graph's window ${JSON.stringify(graph.window)} is not one: it needs finite bounds, since before until, and a positive whole number of buckets; every series is ignored` })
+  }
 
   // Nodes: one per id, a parent that exists, a style value the taxonomy
   // declares.
@@ -124,6 +132,10 @@ export function validateGraph(graph: Graph, taxonomy: Taxonomy): GraphDiagnostic
     }
     if (edge.weight !== undefined && unitWeight(edge) !== edge.weight) {
       out.push({ severity: 'warning', code: 'edge-weight-invalid', edgeId: edge.id, message: `edge ${JSON.stringify(edge.id)} has weight ${String(edge.weight)}, which is not a weight in [0, 1]; the view clamps it, and draws one not finite as no weight` })
+    }
+    if (edge.series !== undefined && !seriesOf(edge, window)) {
+      const why = window ? `one finite count of at least 0 for each of the window's ${window.buckets} buckets` : 'a valid window on the graph'
+      out.push({ severity: 'warning', code: 'edge-series-invalid', edgeId: edge.id, message: `edge ${JSON.stringify(edge.id)} has a series that needs ${why}; it draws as having none` })
     }
     let typeId: string | undefined
     try {
@@ -224,7 +236,7 @@ export function dropInvalid(graph: Graph, diagnostics: readonly GraphDiagnostic[
     kept.add(e.id)
     edges.push(e)
   }
-  return { nodes, edges }
+  return { ...graph, nodes, edges }
 }
 
 /**

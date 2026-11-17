@@ -46,3 +46,27 @@ describe('a parentId pair no type claims', () => {
     expect(diagnostics.filter(d => d.code === 'containment-untyped').map(d => [d.severity, d.edgeId])).toEqual([['warning', 'in:c']])
   })
 })
+
+describe('a time window', () => {
+  const series = (id: string, counts: number[]) => ({ id, sourceId: 'a', targetId: 'b', series: counts })
+  const edges = [series('ok', [0, 2]), series('short', [1]), series('negative', [1, -1]), series('nan', [1, NaN])]
+  const everySeries = edges.map(e => ['edge-series-invalid', e.id])
+  const named = (window: Graph['window']) =>
+    validateGraph({ nodes: [node('a'), node('b')], edges, window }, taxonomy)
+      .filter(d => d.code === 'window-invalid' || d.code === 'edge-series-invalid')
+      .map(d => [d.code, d.edgeId])
+
+  it('names each series that does not read against it', () => {
+    expect(named({ since: 0, until: 10, buckets: 2 })).toEqual(everySeries.slice(1))
+  })
+
+  it('names itself when it is not one, and every series with it', () => {
+    for (const window of [{ since: 10, until: 10, buckets: 2 }, { since: 0, until: Infinity, buckets: 2 }, { since: 0, until: 10, buckets: 1.5 }, { since: 0, until: 10, buckets: 0 }]) {
+      expect(named(window)).toEqual([['window-invalid', undefined], ...everySeries])
+    }
+  })
+
+  it('is what every series needs', () => {
+    expect(named(undefined)).toEqual(everySeries)
+  })
+})

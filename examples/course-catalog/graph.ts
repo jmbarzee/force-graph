@@ -3,7 +3,7 @@
 // per listing, sharing a `copyKey`. A course and its labs carry the programmes
 // that list any of their codes, which `programmeGroups` reads.
 
-import type { DerivedGroups, Graph, GraphEdge, GraphNode } from '@jmbarzee/force-graph'
+import type { DerivedGroups, Graph, GraphEdge, GraphNode, TimeWindow } from '@jmbarzee/force-graph'
 import type { Catalog, Requirement } from './data'
 import { CAMPUS, ENTITY, REQUIREMENT } from './taxonomy'
 
@@ -13,6 +13,13 @@ const levelOf = (code: string) => Number(code.split(' ')[1]?.[0] ?? 0)
 /** The ids of the programmes that list any of `codes`. */
 const programmesOf = (catalog: Catalog, codes: readonly string[]) =>
   catalog.programmes.filter(p => p.courses.some(code => codes.includes(code))).map(p => p.id)
+
+/** A twelve-week term, a bucket a week. */
+const TERM: TimeWindow = { since: Date.UTC(2026, 0, 5), until: Date.UTC(2026, 2, 30), buckets: 12 }
+/** How often a requirement is looked up, by week of the term. */
+const PROFILE = [2, 5, 8, 6, 4, 3, 3, 4, 6, 9, 7, 3]
+/** The profile `level` weeks later, wrapping so that every level totals the same, scaled by `credits`. */
+const lookups = (level: number, credits: number) => PROFILE.map((_, i) => PROFILE[(i - level + PROFILE.length) % PROFILE.length]! * credits)
 
 export function buildGraph(catalog: Catalog): Graph {
   const nodes: GraphNode[] = []
@@ -31,12 +38,14 @@ export function buildGraph(catalog: Catalog): Graph {
   const depends = (from: string, req: Requirement) => {
     const to = byCode.get(req.code)
     if (!to) return // reported as a finding by the host shell
+    const weighs = credits.get(req.code)!
     edges.push({
       id: `${req.kind}:${from}->${to}`,
       sourceId: from,
       targetId: to,
       values: { [REQUIREMENT]: req.kind },
-      weight: credits.get(req.code)! / heaviest,
+      weight: weighs / heaviest,
+      series: lookups(levelOf(req.code), weighs),
     })
   }
 
@@ -110,7 +119,7 @@ export function buildGraph(catalog: Catalog): Graph {
     for (const lab of c.labs ?? []) for (const req of lab.requires ?? []) depends(`lab:${lab.code}`, req)
   }
 
-  return { nodes, edges }
+  return { nodes, edges, window: TERM }
 }
 
 /** Every programme as a group, in the catalog's order; a node belongs to the ones its `programmes` name. */

@@ -207,6 +207,16 @@ one.
   it) and a `ring` (`'dashed'`, for a node set apart). An edge may carry a
   `weight`, 0..1, which widens its stroke up to double; the spring does not
   read it.
+- **Playback.** A graph may declare a `window`, a `TimeWindow` of
+  `{ since, until, buckets }` in epoch milliseconds, and an edge a `series`,
+  one count per bucket. At the view's `playhead`, a fractional bucket index,
+  an edge with a series strokes its count there over the heaviest bucket in
+  the whole graph, widened by it as by a weight and faded with it; at `null`,
+  the whole window, every edge strokes its `weight`. The library derives
+  neither from the other: a `weight` that reads the whole window is the
+  edge's series total over the heaviest edge's total. The pane's scrubber
+  seeks, plays from the playhead to the window's end in 10 s, and resets to
+  the whole window.
 - **Identity.** Keep one `graph` object until something in it changes: a new
   object equal to the last rebuilds the layout for nothing, and the view says
   so once. The same for the taxonomy — build it once, outside render; the
@@ -218,7 +228,12 @@ one.
   table lacks, a duplicate node or edge id, a parent not in the graph, a
   weight outside 0..1 or not finite (`'edge-weight-invalid'`, a warning: the
   view clamps it, and draws one not finite as no weight), a containment edge
-  derived from `parentId` that no type claims (`'containment-untyped'`). The
+  derived from `parentId` that no type claims (`'containment-untyped'`), a
+  window with `since` not before `until`, a bound not finite or `buckets` not
+  a positive whole number (`'window-invalid'`, a warning: every series is
+  ignored and no scrubber shows), a series with no valid window, a length
+  other than `buckets` or a count not finite and at least 0
+  (`'edge-series-invalid'`, a warning: that edge draws as having none). The
   view runs it, lists the diagnostics under the bar, hands them to
   `onDiagnostics` and draws what remains — adding two warnings of its own:
   `'key-undeclared'`, once per key a derived group's `of` answers that its
@@ -237,17 +252,18 @@ A parent with no height gives the pane none, and the pane says so once on
 the console. Everything else is optional.
 
 - **State.** The filter, the locks, the axes shown, the search control
-  (`{ query, active }`), the theme choice, the selection and the tuning each
-  follow the React convention: pass the value and its callback to control it,
-  neither to let the view keep it, the callback alone to be told; and each
-  has a `default*` prop for where the view's own starts (`defaultFilter`,
-  `defaultLocks`, `defaultAxes`, `defaultSearch`, `defaultTheme`,
-  `defaultSelectedId`, `defaultTuning`), read once. A controlled value is the
-  host's: the view never rewrites it, and warns once if the prop flips
-  between defined and undefined. `initialFilter(taxonomy, graph)` is the
-  filter the view starts from — an `initialSelection` that splits a chip is
-  snapped to the whole chip, with a warning. `reseedFilter(filter, taxonomy,
-  graph, touched)` is what the view does to its own filter when the graph
+  (`{ query, active }`), the theme choice, the selection, the tuning and the
+  `playhead` each follow the React convention: pass the value and its
+  callback to control it, neither to let the view keep it, the callback alone
+  to be told; and each has a `default*` prop for where the view's own starts
+  (`defaultFilter`, `defaultLocks`, `defaultAxes`, `defaultSearch`,
+  `defaultTheme`, `defaultSelectedId`, `defaultTuning`, `defaultPlayhead`),
+  read once. A controlled value is the host's: the view never rewrites it,
+  and warns once if the prop flips between defined and undefined.
+  `initialFilter(taxonomy, graph)` is the filter the view starts from — an
+  `initialSelection` that splits a chip is snapped to the whole chip, with a
+  warning. `reseedFilter(filter, taxonomy, graph, touched)` is what the view
+  does to its own filter when the graph
   changes — every axis the user has not touched takes the new graph's
   opening selection — for a host that controls the filter to call from its
   own data effect; `onFilterChange(next, touched)` names the axes the user
@@ -328,16 +344,18 @@ the console. Everything else is optional.
   button), `search`, `locks` (the lock toggles; off until the host controls
   `locks` with `onLocksChange`), `transport` (the Fit / theme / Play / count
   cluster, which takes the theme button with it), `diagnostics`,
-  `shortcuts`, `directionLine` (the hover box's) and `activateZoom` (the
-  double-click zoom) — `searchTitle` and `searchPlaceholder` for the host's
-  own words, `systemTheme` (what `'system'` means, for a host that knows its
-  own theme), `className`, `style`, and `defaultPositions` (kept positions,
+  `shortcuts`, `directionLine` (the hover box's), `activateZoom` (the
+  double-click zoom) and `scrubber` (shown only for a valid `window`) —
+  `searchTitle` and `searchPlaceholder` for the host's own words,
+  `systemTheme` (what `'system'` means, for a host that knows its own
+  theme), `className`, `style`, and `defaultPositions` (kept positions,
   read whenever the simulation is built; a node the live layout already
   holds keeps its place).
 - **Outputs.** `onSelectionChange(node | null)`, `onNodeActivate(node)` on a
   double-click, `onHover(node | null)`, `onThemeResolved(theme)`,
   `onDiagnostics(diagnostics)` whenever the graph's defects are recomputed
   (the first graph's included), `onTuningChange(tuning)`,
+  `onPlayheadChange(playhead)`,
   `onSettled(positions)` each time the simulation comes to rest on its own
   (not on a pause). Every node handed out is the host's own object. The
   resolved theme is for the host's own chrome beside the pane; a host that
