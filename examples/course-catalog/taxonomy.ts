@@ -23,8 +23,7 @@ export const CAMPUS_LABEL: Record<Campus, string> = { north: 'North campus', sou
 // called, how it looks and how big it is; the rest is the library's — the
 // charge and rest band follow from the radius and the position in this list.
 // Only faculties and departments summarise what they contain; the others show
-// their dependency degree, which is the default. Faculties and departments are
-// one ladder, courses and labs another: each tunes as one when collapsed.
+// their dependency degree, which is the default.
 export const VALUES: readonly NodeStyle[] = [
   {
     id: 'faculty',
