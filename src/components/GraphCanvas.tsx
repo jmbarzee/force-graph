@@ -156,7 +156,6 @@ interface GraphCanvasProps {
   edgeStrokes: ReadonlyMap<GraphEdge, EdgeStroke>
   /** Lane offsets in screen pixels for edges that share a pair of endpoints, by edge id; absent means on the line. */
   edgeOffsets: ReadonlyMap<string, number>
-  /** The visible edges drawn without an arrowhead, by id. */
   undirectedEdges: ReadonlySet<string>
   activeSection: ForceSection
   activePushBucket: string | null

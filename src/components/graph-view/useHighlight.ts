@@ -40,7 +40,6 @@ export function useHighlight(
   visibleNodes: SimNode[],
   visibleEdges: GraphEdge[],
   visibleIds: Set<string>,
-  /** The visible edges the walk takes both ways, by id. */
   undirected: ReadonlySet<string>,
   getNode: (id: string) => SimNode | undefined,
   // Changes whenever the underlying graph is rebuilt; clears the hover and

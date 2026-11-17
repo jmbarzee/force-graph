@@ -238,6 +238,10 @@ export function computeVisibleGraph(
   }
 
   const originalTypes = classifyEdges(sim, taxonomy)
+  const undirectedTypes = new Set<EdgeTypeId | undefined>(taxonomy.edgeTypes.filter(t => t.direction === 'undirected').map(t => t.id))
+  // A pair by its ends in order, or in either order for an undirected edge.
+  const pairKey = (edge: GraphEdge, s: string, t: string): string =>
+    undirectedTypes.has(originalTypes.get(edge.id)) ? [s, t].sort().join('↔') : `${s}→${t}`
   const edgeTypes = new Map<string, EdgeTypeId | undefined>()
   const origins = new Map<string, string>()
 
@@ -275,7 +279,7 @@ export function computeVisibleGraph(
       kept.push(edge)
       edgeTypes.set(edge.id, originalTypes.get(edge.id))
       origins.set(edge.id, edge.id)
-      originalPairs.add(`${edge.sourceId}→${edge.targetId}`)
+      originalPairs.add(pairKey(edge, edge.sourceId, edge.targetId))
     } else {
       projected.push(edge)
     }
@@ -290,7 +294,7 @@ export function computeVisibleGraph(
     for (const rs of sources) {
       for (const rt of targets) {
         if (rs === rt) continue
-        const key = `${rs}→${rt}`
+        const key = pairKey(edge, rs, rt)
         if (originalPairs.has(key)) continue
         // Two graduated edges on one pair stand for two paths through hidden
         // nodes that now read as one reach; the taxonomy says which survives,
@@ -309,7 +313,6 @@ export function computeVisibleGraph(
     origins.set(edge.id, origin.id)
   }
 
-  const undirectedTypes = new Set<EdgeTypeId | undefined>(taxonomy.edgeTypes.filter(t => t.direction === 'undirected').map(t => t.id))
   const undirected = new Set(vEdges.filter(e => undirectedTypes.has(edgeTypes.get(e.id))).map(e => e.id))
 
   const vNodeMap = new Map<string, SimNode>()

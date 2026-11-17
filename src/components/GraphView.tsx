@@ -1204,7 +1204,6 @@ interface GraphHoverTooltipProps {
   hoveredNodeId: string | null
   simRef: React.RefObject<Simulation | null>
   visibleEdges: GraphEdge[]
-  /** The visible edges counted as `↔n`, by id. */
   undirected: ReadonlySet<string>
   visibleIds: Set<string>
   viewport: Viewport
