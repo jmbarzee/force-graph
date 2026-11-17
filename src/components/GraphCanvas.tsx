@@ -129,12 +129,12 @@ const EDGE_HIT_PX = 4
 const CULL_MARGIN = 100
 const FLASH_MS = 600
 
-// Zoom elision thresholds
 const LABEL_ELIDE_SCALE = 0.25    // hide name labels below this scale (except hovered/selected)
 
 // A node's rings stack outward, each RING_GAP screen px clear of the one inside it.
 const RING_GAP = 2
 const RING_WIDTH = 2
+const SELECTION_WIDTH = 2.5
 const NO_DASH: number[] = []
 const DATA_DASH = [3, 3]
 const FOCUS_DASH = [2, 2]
@@ -1007,7 +1007,7 @@ export function GraphCanvas({
           edge = drawRing(ctx, sx, sy, edge, RING_WIDTH, hue ? hue[d.theme] : fill, node.ring === 'dashed' ? DATA_DASH : NO_DASH, nodeAlpha)
         }
         if (d.activeDupDefKeys.has(copyKeyOf(node))) edge = drawRing(ctx, sx, sy, edge, RING_WIDTH, fill, NO_DASH, 0.55)
-        if (d.selectedNodeIds.has(node.id)) edge = drawRing(ctx, sx, sy, edge, 2.5, p.selectionRingColor, NO_DASH, nodeAlpha)
+        if (d.selectedNodeIds.has(node.id)) edge = drawRing(ctx, sx, sy, edge, SELECTION_WIDTH, p.selectionRingColor, NO_DASH, nodeAlpha)
         if (node.id === d.focusedNodeId) drawRing(ctx, sx, sy, edge, RING_WIDTH, p.focusRingColor, FOCUS_DASH, nodeAlpha)
         ctx.restore()
 
