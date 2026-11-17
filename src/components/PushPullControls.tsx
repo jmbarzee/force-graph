@@ -12,7 +12,6 @@ import type { AxisMapping } from '../graph/axis'
 import { ChargeMap, ChargeCurves } from './ChargeControls'
 import { SpringMap, SpringCurves } from './SpringControls'
 import { EquationSection } from './controls/EquationSection'
-import { NothingVisible } from './controls/NothingVisible'
 import { SubTabs, SubTab, SubTabBodies, SubTabBody } from './controls/SubTab'
 import { FormulaValue } from './controls/PopContext'
 import type { ForceSection } from './GraphControlPanel'
@@ -100,22 +99,18 @@ export function PushPullControls({
       <SubTabBodies>
         <SubTabBody active={sub === 'push'}>
           <EquationSection subtitle="" equation={PUSH_EQUATION} onHover={h => onActiveSection(h ? 'push' : null)}>
-            {present.push.size === 0 ? <NothingVisible /> : <>
-              <ChargeMap params={params} resolved={resolved} present={present.push} onParamChange={onParamChange}
-                hoveredBucket={hoveredPushBucket} onHoverBucket={onHoverPushBucket} />
-              <ChargeCurves params={params} resolved={resolved} present={present.push} onParamChange={onParamChange}
-                hoveredBucket={hoveredPushBucket} onHoverBucket={onHoverPushBucket} />
-            </>}
+            <ChargeMap params={params} resolved={resolved} present={present.push} onParamChange={onParamChange}
+              hoveredBucket={hoveredPushBucket} onHoverBucket={onHoverPushBucket} />
+            <ChargeCurves params={params} resolved={resolved} present={present.push} onParamChange={onParamChange}
+              hoveredBucket={hoveredPushBucket} onHoverBucket={onHoverPushBucket} />
           </EquationSection>
         </SubTabBody>
         <SubTabBody active={sub === 'pull'}>
           <EquationSection subtitle="" equation={PULL_EQUATION} onHover={h => onActiveSection(h ? 'pull' : null)}>
-            {present.springs.size === 0 ? <NothingVisible /> : <>
-              <SpringMap params={params} resolved={resolved} present={present.springs} onParamChange={onParamChange}
-                hoveredEdge={hoveredEdge} onHoverEdge={onHoverEdge} />
-              <SpringCurves params={params} resolved={resolved} present={present.springs} onParamChange={onParamChange}
-                hoveredEdge={hoveredEdge} onHoverEdge={onHoverEdge} />
-            </>}
+            <SpringMap params={params} resolved={resolved} present={present.springs} onParamChange={onParamChange}
+              hoveredEdge={hoveredEdge} onHoverEdge={onHoverEdge} />
+            <SpringCurves params={params} resolved={resolved} present={present.springs} onParamChange={onParamChange}
+              hoveredEdge={hoveredEdge} onHoverEdge={onHoverEdge} />
           </EquationSection>
         </SubTabBody>
       </SubTabBodies>

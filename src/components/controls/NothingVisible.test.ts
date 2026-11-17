@@ -56,6 +56,7 @@ function forceTabs(styles: string[]): string {
 }
 const count = (html: string, s: string) => html.split(s).length - 1
 const EQUATION = 'gv-graph-control-equation-formula'
+const SLIDER = 'type="range"'
 
 describe('a force tab over an empty visible set', () => {
   const empty = forceTabs([])
@@ -65,8 +66,9 @@ describe('a force tab over an empty visible set', () => {
     expect(count(empty, LINE)).toBe(4)
   })
 
-  it('keeps every equation', () => {
+  it('keeps every equation and every slider', () => {
     expect(count(empty, EQUATION)).toBe(count(full, EQUATION))
+    expect(count(empty, SLIDER)).toBe(count(full, SLIDER))
   })
 
   it('draws the maps and plots while anything is visible', () => {

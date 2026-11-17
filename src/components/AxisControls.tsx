@@ -127,8 +127,7 @@ export function AxisControls({ axis, params, resolved, axes, present, onParamCha
         {ignored && <span className="gv-axis-note">ignored in radial</span>}
       </div>
 
-      {/* The resolved axis decides the kind; the tuning is narrowed to match, loudly.
-          A scalar's gradient needs no visible node; a mapping's columns do. */}
+      {/* The resolved axis decides the kind; the tuning is narrowed to match, loudly. */}
       {isScalarAxis(table) ? (
         <ScalarPlot
           axis={axis}
@@ -140,8 +139,6 @@ export function AxisControls({ axis, params, resolved, axes, present, onParamCha
           onStrength={v => onParamChange(strengthPatch(axis, v))}
           onSpan={span => onParamChange(tuningPatch(axis, { scalar: table.scalar.id, span }))}
         />
-      ) : present.size === 0 ? (
-        <NothingVisible />
       ) : (
         <AxisPlot
           axis={axis}
@@ -330,7 +327,7 @@ function AxisPlot({ axis, radial, tuning, table, present, strength, onStrength, 
         <div className="gv-ctl-plot-xlabel">{radial && axis === 'y' ? 'ring: the band centre, innermost first' : `${label} position`}</div>
       }
     >
-      <svg
+      {buckets.length === 0 ? <NothingVisible /> : <svg
         ref={svgRef}
         className="gv-gravity-band-svg"
         viewBox={`0 0 ${AP_W} ${AP_H}`}
@@ -378,7 +375,7 @@ function AxisPlot({ axis, radial, tuning, table, present, strength, onStrength, 
             </g>
           )
         })}
-      </svg>
+      </svg>}
     </Plot>
   )
 }
