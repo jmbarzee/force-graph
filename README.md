@@ -169,7 +169,8 @@ step narrows the types the one before it left:
 Two types on one pair naming as many ends, in the same orientation, with the
 same `match`, are refused at construction unless the host gives
 `classifyEdge`. An untyped edge draws in its relation's stroke, springs
-with the middling spring, and `validateGraph` says so.
+with the middling spring, tuned on its relation's "untyped" token in the
+spring map, and `validateGraph` says so.
 
 ## The graph
 

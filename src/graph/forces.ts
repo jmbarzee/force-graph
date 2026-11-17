@@ -480,12 +480,12 @@ export function bandStripes(nodes: Iterable<PhysicsSubject>, axis: ResolvedAxis<
 export const ABSENT_EDGE_PHYSICS: SpringPhysics = { strength: 0, distance: 0 }
 
 /**
- * What a control token needs of a spring category: its identity, its two
- * endpoint buckets, its kind and its words. A declared edge type satisfies it;
- * a pair category synthesises it — and neither needs physics or a stroke here
- * (physics is `physicsFor`, and a pair is a spring, never a stroke).
+ * What a control token needs of a spring category: its identity, its swatch,
+ * its kind and its words. A declared edge type satisfies it; a pair or untyped
+ * category synthesises it — and none needs physics or a stroke here (physics
+ * is `physicsFor`, and a category is a spring, never a stroke).
  */
-export type EdgeCategoryDescription = Pick<ResolvedEdgeType, 'id' | 'label' | 'sources' | 'targets' | 'swatch' | 'relation' | 'tooltip'>
+export type EdgeCategoryDescription = Pick<ResolvedEdgeType, 'id' | 'label' | 'swatch' | 'relation' | 'tooltip'>
 
 
 /**
@@ -507,6 +507,16 @@ function parsePairId(id: EdgeTypeId): [Relation, string, string] | undefined {
   return undefined
 }
 
+/** The category of an edge no declared type claims, one per relation, encoded as `pairId` is so no type id collides with it. */
+function untypedId(relation: Relation): EdgeTypeId {
+  return JSON.stringify(['untyped', relation])
+}
+
+function describeUntyped(id: EdgeTypeId): EdgeCategoryDescription | undefined {
+  const relation = (['containment', 'dependency'] as const).find(r => untypedId(r) === id)
+  return relation && { id, label: 'untyped', swatch: [null, null], relation, tooltip: `untyped ${relation}` }
+}
+
 /**
  * The spring table, resolved from the pair tuning and the taxonomy.
  *
@@ -524,15 +534,14 @@ export interface ResolvedSprings {
   readonly mapping: AxisMapping
   /**
    * The category of an edge from its endpoints' bucket ids, or undefined when
-   * an endpoint is unbucketed, or — on the style axis — when no declared type
-   * of the edge's relation runs between its endpoint values and the
-   * taxonomy's `classifyEdge` names none; such an edge springs with the
-   * middling spring and draws in its relation's default stroke.
+   * an endpoint is unbucketed and no declared type claims it. On the style
+   * axis, a bucketed edge no declared type of its relation claims falls in
+   * its relation's untyped category; the pair rule leaves no edge untyped.
    */
   classify(edge: GraphEdge, src: string | undefined, tgt: string | undefined): EdgeTypeId | undefined
-  /** Effective physics: the override where one exists, else the declared spring — the middling spring, on a pair axis. */
+  /** Effective physics: the override where one exists, else the declared spring — the middling spring, for an untyped or pair category. */
   physicsFor(id: EdgeTypeId): SpringPhysics
-  /** What a control surface shows for a category — the declared entry, or one synthesized from a pair id. */
+  /** What a control surface shows for a category — the declared entry, or one synthesized from an untyped or pair id. */
   describe(id: EdgeTypeId): EdgeCategoryDescription | undefined
 }
 
@@ -543,12 +552,13 @@ export function resolveSprings(pair: PairTuning, taxonomy: Taxonomy): ResolvedSp
     return {
       mapping,
       classify: (edge, src, tgt) => {
+        const relation = relationOf(edge)
         const id = taxonomy.edgeTypeOf(edge, src, tgt)
-        const type = id === undefined ? undefined : table.get(id)
-        return type !== undefined && type.relation === relationOf(edge) ? id : undefined
+        if (id !== undefined && table.get(id)?.relation === relation) return id
+        return src === undefined || tgt === undefined ? undefined : untypedId(relation)
       },
       physicsFor: id => overrides.get(id) ?? table.get(id)?.physics ?? MIDDLING_SPRING,
-      describe: id => table.get(id),
+      describe: id => table.get(id) ?? describeUntyped(id),
     }
   }
   // Every pair category starts from the middling spring: the same start a
@@ -571,11 +581,8 @@ export function resolveSprings(pair: PairTuning, taxonomy: Taxonomy): ResolvedSp
       return {
         id,
         label: `${A.abbreviation}↔${B.abbreviation}`,
-        sources: [a],
-        targets: [b],
         swatch: [a, b],
         relation,
-        physics: typical,
         tooltip: `${A.label} ↔ ${B.label} ${relation}`,
       }
     },
@@ -596,7 +603,7 @@ export interface EdgeCategory {
 export function springFor(spring: ResolvedSprings, edge: GraphEdge, src: PhysicsSubject, tgt: PhysicsSubject): EdgeCategory {
   const a = bucketOf(spring, src), b = bucketOf(spring, tgt)
   const key = spring.classify(edge, a, b)
-  const ph = key !== undefined ? spring.physicsFor(key) : a === undefined || b === undefined ? ABSENT_EDGE_PHYSICS : MIDDLING_SPRING
+  const ph = key !== undefined ? spring.physicsFor(key) : ABSENT_EDGE_PHYSICS
   return { strength: ph.strength, distance: ph.distance, key }
 }
 
