@@ -20,10 +20,15 @@ describe('nodeGroupsOf', () => {
     ])
   })
 
-  it('reports a key no key declares once, however many nodes answer it', () => {
+  it('reports an undeclared key once', () => {
     const { diagnostics } = nodeGroupsOf(derived, nodes)
     expect(diagnostics).toHaveLength(1)
     expect(diagnostics[0]).toMatchObject({ severity: 'warning', code: 'group-key-undeclared', nodeId: 'c' })
+  })
+
+  it('answers no warnings with one shared empty list', () => {
+    const declared: DerivedGroups = { keys: derived.keys, of: () => ['red'] }
+    expect(nodeGroupsOf(declared, nodes).diagnostics).toBe(nodeGroupsOf([], nodes).diagnostics)
   })
 
   it('hands a listed form back as given', () => {

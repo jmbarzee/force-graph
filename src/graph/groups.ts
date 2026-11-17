@@ -88,13 +88,15 @@ export interface DerivedGroups {
 /** The groups a host hands the view: derived from the data, or listed. */
 export type Groups = readonly NodeGroup[] | DerivedGroups
 
+const NO_DIAGNOSTICS: readonly GraphDiagnostic[] = []
+
 /**
  * The listed form of `groups` over `nodes`, and a `group-key-undeclared`
  * warning per key `of` answers that `keys` does not declare. A listed form
- * comes back as given.
+ * comes back as given; no warnings come back as one shared empty list.
  */
-export function nodeGroupsOf(groups: Groups, nodes: readonly GraphNode[]): { groups: readonly NodeGroup[]; diagnostics: GraphDiagnostic[] } {
-  if (!('of' in groups)) return { groups, diagnostics: [] }
+export function nodeGroupsOf(groups: Groups, nodes: readonly GraphNode[]): { groups: readonly NodeGroup[]; diagnostics: readonly GraphDiagnostic[] } {
+  if (!('of' in groups)) return { groups, diagnostics: NO_DIAGNOSTICS }
   const listed = groups.keys.map(k => ({ id: k.id, nodeIds: new Set<string>(), color: k.color }))
   const members = new Map(listed.map(g => [g.id, g.nodeIds]))
   const diagnostics: GraphDiagnostic[] = []
@@ -109,7 +111,7 @@ export function nodeGroupsOf(groups: Groups, nodes: readonly GraphNode[]): { gro
       }
     }
   }
-  return { groups: listed, diagnostics }
+  return { groups: listed, diagnostics: diagnostics.length ? diagnostics : NO_DIAGNOSTICS }
 }
 
 /** A group as drawn: the visible node ids it covers and its palette colour. */

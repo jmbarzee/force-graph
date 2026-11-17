@@ -370,10 +370,8 @@ export const GraphView = React.forwardRef<GraphViewHandle, GraphViewProps>(funct
     const drawn = withContainmentEdges(dropInvalid(hostGraph, own))
     return { diagnostics: [...own, ...derivedContainmentDiagnostics(drawn, hostGraph, taxonomy)], graph: drawn }
   }, [hostGraph, taxonomy])
-  // Group membership, settled once per graph and groups; a key the groups
-  // do not declare joins the graph's diagnostics.
   const { groups: nodeGroups, diagnostics: groupDiagnostics } = React.useMemo(() => nodeGroupsOf(groups ?? NO_GROUPS, graph.nodes), [groups, graph])
-  const diagnostics = React.useMemo(() => [...graphDiagnostics, ...groupDiagnostics], [graphDiagnostics, groupDiagnostics])
+  const diagnostics = React.useMemo(() => groupDiagnostics.length ? [...graphDiagnostics, ...groupDiagnostics] : graphDiagnostics, [graphDiagnostics, groupDiagnostics])
   const graphIndex = React.useMemo(() => nodesById(graph.nodes), [graph])
   // The chip badges: the host's reading of its own data, or a count of the
   // graph's entities per axis and value.
