@@ -6,7 +6,7 @@ import { dirname, join, resolve } from 'node:path'
 import { fileURLToPath } from 'node:url'
 
 const SRC = resolve(dirname(fileURLToPath(import.meta.url)), '..', 'src')
-const LITERAL = /(?<![\w&])#(?:[0-9a-f]{8}|[0-9a-f]{6}|[0-9a-f]{3,4})\b|\b(?:rgba?|hsla?)\(/i
+const LITERAL = /(?<![\w&])#(?:[0-9a-f]{8}|[0-9a-f]{6}|[0-9a-f]{3,4})(?![\w-])|\b(?:rgba?|hsla?)\(/i
 
 const files = readdirSync(SRC, { recursive: true })
   .filter(f => f !== 'styles/tokens.css' && !/\.test\.tsx?$/.test(f))
