@@ -1,7 +1,8 @@
 import { describe, expect, it } from 'vitest'
 import React from 'react'
 import { renderToStaticMarkup } from 'react-dom/server'
-import { MiscControls } from './GraphControlPanel'
+import { MiscControls, PresetRow } from './GraphControlPanel'
+import { presetChoices, TUNING_PRESETS } from '../graph/presets'
 import { createTaxonomy } from '../graph/taxonomy'
 import { defaultParamsFor } from '../graph/simulation'
 import type { ForceParams } from '../graph/simulation'
@@ -72,5 +73,29 @@ describe('the Misc tab', () => {
     expect(ys[0]).toBe(ys[1])
     expect(ys[2]).toBe(ys[3])
     expect(ys[2]).toBeGreaterThan(ys[1])
+  })
+})
+
+describe('the preset row', () => {
+  const taxonomy = createTaxonomy({ styleAxis: 'kind', styles: [] })
+  const choices = presetChoices([...TUNING_PRESETS, { label: 'By credit', tuning: { forces: { bandY: { scalar: 'credit' } } } }], taxonomy)
+  const row = (selected: number) => renderToStaticMarkup(React.createElement(PresetRow, { menu: { choices, selected }, onPreset: noop }))
+  const options = (html: string) => [...html.matchAll(/<option([^>]*)>([^<]*)<\/option>/g)].map(([, attrs, text]) => ({ text, disabled: attrs.includes('disabled'), selected: attrs.includes('selected') }))
+
+  it('lists every preset in order, one the taxonomy refuses disabled with why', () => {
+    expect(options(row(0)).map(o => [o.text, o.disabled])).toEqual([
+      ...TUNING_PRESETS.map(p => [p.label, false]),
+      ['By credit — forces.bandY.scalar: no scalar &quot;credit&quot;', true],
+    ])
+    expect(row(0)).toContain('title="forces.bandY.scalar: no scalar &quot;credit&quot;"')
+  })
+
+  it('selects the preset the tuning is, else a disabled custom', () => {
+    expect(options(row(2)).filter(o => o.selected).map(o => o.text)).toEqual(['Spread out'])
+    expect(options(row(-1))[0]).toEqual({ text: 'custom', disabled: true, selected: true })
+  })
+
+  it('is not drawn without presets', () => {
+    expect(renderToStaticMarkup(React.createElement(PresetRow, { menu: { choices: [], selected: -1 }, onPreset: noop }))).toBe('')
   })
 })

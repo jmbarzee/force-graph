@@ -322,6 +322,10 @@ the console. Everything else is optional.
   `tuningToJSON(tuning)` carries a tuning to a store and
   `tuningFromJSON(json, taxonomy)` back, answering undefined, never a throw,
   for stored data that is not its shape.
+  `presets` names the tunings the control panel offers as a `TuningPreset`,
+  `{ label, tuning }` with `tuning` a `TuningJSON`: `TUNING_PRESETS` by
+  default, `[...TUNING_PRESETS, mine]` beside them, `[mine]` in place of
+  them, `[]` for no row.
 - **Inputs.** `counts` (chip badges; the graph's entity counts unless given,
   the copies of one `copyKey` once; `'faceted'` counts each axis under the
   other axes' selections),
@@ -590,8 +594,6 @@ What is not built is filed as issues:
   animated reveals ([#8](https://github.com/jmbarzee/force-graph/issues/8)), an empty state
   when the filter hides every node
   ([#6](https://github.com/jmbarzee/force-graph/issues/6)).
-- **The control panel** — named presets
-  ([#29](https://github.com/jmbarzee/force-graph/issues/29)).
 - **The package** — the pane's strings in other languages
   ([#13](https://github.com/jmbarzee/force-graph/issues/13)), the React 19
   types gate ([#14](https://github.com/jmbarzee/force-graph/issues/14)).
