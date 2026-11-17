@@ -470,8 +470,9 @@ axis)` reads them off any subjects carrying `values`) and, if the host reads
 its own data, the `counts` (or `'faceted'`, with the `graph`). Given every
 record the view holds as `records` and `matches(record, query)`, the bar
 badges each chip with the search matches it hides and the search with their
-"+N". A shown bar binds `/` to its search while focus is not in an editable
-field; a host that binds its own
+"+N"; a host whose visible set is not `passesSelection`'s passes its
+`hiddenMatchesOf` result as `hiddenMatches` instead. A shown bar binds `/` to
+its search while focus is not in an editable field; a host that binds its own
 passes `searchInputRef`. The lock toggles appear only when `locks` is
 controlled with its callback — `useLinkedViews` does — or `chrome.locks` asks.
 The bar tracks the values that just turned on for its chip flash

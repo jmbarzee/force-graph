@@ -43,7 +43,7 @@ import { GraphControlPanel } from './GraphControlPanel'
 import { hiddenByOf } from './controls/NothingVisible'
 import { Scrubber } from './Scrubber'
 import { activeGroupsOf, boostGroupsForNodes, cohesionOf, groupSlotsOf, groupsByNode, nodeGroupsOf, type ActiveGroup, type Groups, type NodeGroup } from '../graph/groups'
-import { FilterBar, hiddenMatchBadge } from './FilterBar'
+import { FilterBar } from './FilterBar'
 import type { SearchState } from './FilterBar'
 export type { SearchState } from './FilterBar'
 import { useRecentlyChanged } from './graph-view/useRecentlyChanged'
@@ -749,15 +749,14 @@ export const GraphView = React.forwardRef<GraphViewHandle, GraphViewProps>(funct
   // Hidden matches are counted on the chip hiding them: the first declared
   // axis the node fails, under its value there — a precedence a host's own
   // filter bar can share, so the two read alike.
-  const { visibleMatchIds, hiddenMatchCount, hiddenMatches } = React.useMemo(() => {
-    const none = new Map<string, ReadonlyMap<string, number>>()
-    if (!searchQuery) return { visibleMatchIds: null as Set<string> | null, hiddenMatchCount: 0, hiddenMatches: none }
+  const { visibleMatchIds, hiddenMatches } = React.useMemo(() => {
+    if (!searchQuery) return { visibleMatchIds: null as Set<string> | null, hiddenMatches: undefined }
     const lq = searchQuery.toLowerCase()
     const sim = simRef.current
-    if (!sim) return { visibleMatchIds: new Set<string>(), hiddenMatchCount: 0, hiddenMatches: none }
+    if (!sim) return { visibleMatchIds: new Set<string>(), hiddenMatches: undefined }
     // The host's hook is handed the host's own node, never the simulation's copy.
     const split = hiddenMatchesOf({ nodes: sim.nodes, filter, taxonomy, axes, visibleIds, matches: node => taxonomy.searchText(hostIndex.get(node.id) ?? node).toLowerCase().includes(lq) })
-    return { visibleMatchIds: split.visible, hiddenMatchCount: split.hiddenCount, hiddenMatches: split.hiddenByAxis }
+    return { visibleMatchIds: split.visible, hiddenMatches: split }
   }, [searchQuery, visibleIds, filter, axes, taxonomy, hostIndex])
 
   // Every node's position, by id: what `getPositions` answers and `onSettled` hears.
@@ -1157,7 +1156,6 @@ export const GraphView = React.forwardRef<GraphViewHandle, GraphViewProps>(funct
             searchInputRef={searchInputRef}
             searchTitle={searchTitle}
             searchPlaceholder={searchPlaceholder}
-            searchExtra={hiddenMatchBadge(hiddenMatchCount)}
             hiddenMatches={hiddenMatches}
             findings={findings}
           />

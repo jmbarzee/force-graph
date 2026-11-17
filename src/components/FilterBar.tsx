@@ -39,7 +39,7 @@ import React from 'react'
 import './FilterBar.css'
 import type { ResolvedAxisDescriptor } from '../graph/axis'
 import { changedAxes, filterStatesEqual, isEmptySelection, listEqual, lockedFor, locksEqual, seedSelection, selects, selectionsEqual, withLock, withSelection } from '../filter/types'
-import type { FilterState, AxisLocks } from '../filter/types'
+import type { FilterState, AxisLocks, HiddenMatches } from '../filter/types'
 import { toggleGroup } from '../filter/toggle'
 import { LockToggle } from './LockToggle'
 import { SearchIcon } from './icons/SearchIcon'
@@ -127,10 +127,8 @@ interface FilterBarBaseProps<R extends SearchRecord> {
   records?: readonly R[]
   /** Whether a record matches the search's query. */
   matches?: (record: R, query: string) => boolean
-  /** Search adornment rendered inside the search control. Default: the "+N" of the matches `records` hides. */
-  searchExtra?: React.ReactNode
-  /** Search matches hidden by a chip, per axis and value — the badge the chip hiding them wears. Default: read off `records`. */
-  hiddenMatches?: ReadonlyMap<string, ReadonlyMap<string, number>>
+  /** The search matches the view hides — the search's "+N" and each chip's badge — for a host whose visible set is not `passesSelection`'s. Default: read off `records`. */
+  hiddenMatches?: Pick<HiddenMatches, 'hiddenCount' | 'hiddenByAxis'>
   /** The axes shown, in order; may be empty. Default: every declared axis, editable in place. */
   axes?: readonly string[]
   /** Omitted by a host that controls the axes and does not want it edited in place. */
@@ -139,15 +137,6 @@ interface FilterBarBaseProps<R extends SearchRecord> {
   findings?: React.ReactNode
   /** Flash the whole bar once whenever this value changes to something truthy — a counter a host bumps when its data reloads. */
   refreshFlash?: boolean | number
-}
-
-/** The "+N" a search wears for the matches its filter hides; nothing for none. */
-export function hiddenMatchBadge(count: number): React.ReactNode {
-  return count > 0 ? (
-    <span className="gv-header-search-badge" title={`${count} match${count !== 1 ? 'es' : ''} hidden by filters`}>
-      +{count}
-    </span>
-  ) : null
 }
 
 function rendered(element: HTMLElement): boolean {
@@ -260,7 +249,6 @@ export function FilterBar<R extends SearchRecord = SearchRecord>({
   searchPlaceholder = 'Search…',
   records,
   matches,
-  searchExtra,
   hiddenMatches,
   findings,
   refreshFlash,
@@ -355,10 +343,11 @@ export function FilterBar<R extends SearchRecord = SearchRecord>({
     [hostCounts, graph, axes, hostCounts === 'faceted' && filter, taxonomy],
   )
   const hidden = React.useMemo(() => {
+    if (hiddenMatches) return hiddenMatches
     if (!records || !matches || !searchQuery) return undefined
     const visibleIds = new Set(records.filter(node => passesSelection({ filter, taxonomy, axes, node })).map(r => r.id))
     return hiddenMatchesOf({ nodes: records, filter, taxonomy, axes, visibleIds, matches: r => matches(r, searchQuery) })
-  }, [records, matches, searchQuery, filter, taxonomy, axes])
+  }, [hiddenMatches, records, matches, searchQuery, filter, taxonomy, axes])
 
   // What a section is made of: the values the host read off its data, their
   // counts and hidden matches, and the classes its declared presentation
@@ -367,7 +356,7 @@ export function FilterBar<R extends SearchRecord = SearchRecord>({
   const lookFor = (axis: string, descriptor?: ResolvedAxisDescriptor) => ({
     values: [...(valuesByAxis.get(axis) ?? [])],
     counts: counts?.get(axis),
-    hidden: (hiddenMatches ?? hidden?.hiddenByAxis)?.get(axis),
+    hidden: hidden?.hiddenByAxis.get(axis),
     ...LOOKS[descriptor?.presentation ?? 'chip'],
   })
 
@@ -542,7 +531,11 @@ export function FilterBar<R extends SearchRecord = SearchRecord>({
               onKeyDown={e => { if (e.key === 'Escape') toggleSearch() }}
             />
           )}
-          {searchExtra ?? hiddenMatchBadge(hidden?.hiddenCount ?? 0)}
+          {!!hidden?.hiddenCount && (
+            <span className="gv-header-search-badge" title={`${hidden.hiddenCount} match${hidden.hiddenCount !== 1 ? 'es' : ''} hidden by filters`}>
+              +{hidden.hiddenCount}
+            </span>
+          )}
         </div>
       </div>}
 

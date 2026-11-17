@@ -90,6 +90,15 @@ describe('FilterBar', () => {
     expect(host.querySelector('.gv-header-search-badge')?.textContent).toBe('+1')
   })
 
+  it('badges from hiddenMatches over what its records would give', async () => {
+    const records: Row[] = [{ id: '1', name: 'xb', values: { team: 'b' } }]
+    const hiddenMatches = { hiddenCount: 3, hiddenByAxis: new Map([['team', new Map([['b', 2]])]]) }
+    const { host } = await mount({ records, matches: (r, q) => r.name.includes(q), hiddenMatches, search: { query: 'x', active: true } })
+    const chipB = [...host.querySelectorAll('.gv-chip')].find(c => c.querySelector('.gv-chip-label')?.textContent === 'b')!
+    expect(chipB.querySelector('.gv-header-hidden-badge')?.textContent).toBe('2')
+    expect(host.querySelector('.gv-header-search-badge')?.textContent).toBe('+3')
+  })
+
   it('shows a chip by its label and toggles it by its value', async () => {
     const changes: FilterState[] = []
     const { host } = await mount({ labels: { team: { a: 'Alpha', b: 'Alpha' } }, onFilterChange: next => { changes.push(next) } })
