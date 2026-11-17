@@ -40,6 +40,8 @@ export interface VisibleGraph {
    * declare — `validateGraph` names those; here they draw neutral.
    */
   edgeTypes: Map<string, EdgeTypeId | undefined>
+  /** The visible edges whose type is undirected, by id. */
+  undirected: Set<string>
   /** Each visible edge's original: the host's edge it is, or the one a graduated edge stands for. */
   origins: Map<string, string>
   nodeSummaries: Map<string, string>
@@ -61,6 +63,7 @@ export const EMPTY_VISIBLE_GRAPH: VisibleGraph = {
   visibleEdges: [],
   visibleIds: new Set<string>(),
   edgeTypes: new Map<string, EdgeTypeId | undefined>(),
+  undirected: new Set<string>(),
   origins: new Map<string, string>(),
   nodeSummaries: new Map<string, string>(),
   downstreamScores: new Map<string, number>(),
@@ -306,6 +309,9 @@ export function computeVisibleGraph(
     origins.set(edge.id, origin.id)
   }
 
+  const undirectedTypes = new Set<EdgeTypeId | undefined>(taxonomy.edgeTypes.filter(t => t.direction === 'undirected').map(t => t.id))
+  const undirected = new Set(vEdges.filter(e => undirectedTypes.has(edgeTypes.get(e.id))).map(e => e.id))
+
   const vNodeMap = new Map<string, SimNode>()
   for (const n of vNodes) vNodeMap.set(n.id, n)
   const nodeSummaries = new Map<string, string>()
@@ -318,5 +324,5 @@ export function computeVisibleGraph(
   // over the whole graph is a layout axis (graph/scalar.ts).
   const downstreamScores = computeDownstreamReach({ nodes: vNodes, edges: vEdges, getNode: id => vNodeMap.get(id) })
 
-  return { visibleNodes: vNodes, visibleEdges: vEdges, visibleIds: ids, edgeTypes, origins, nodeSummaries, downstreamScores }
+  return { visibleNodes: vNodes, visibleEdges: vEdges, visibleIds: ids, edgeTypes, undirected, origins, nodeSummaries, downstreamScores }
 }

@@ -108,6 +108,9 @@ never by spreading the built object.
   declared value — its `relation` (`'containment'` or `'dependency'`), and
   optionally a `match`, values the edge itself must carry on the host's edge
   axes (a call and a signal between two services, by the edge's `kind`);
+  `direction` defaults to `'directed'`, and `'undirected'` marks a
+  symmetric relation: no arrowhead, a highlight from either end, and its
+  own `↔n` in the hover box (a containment type is refused one);
   `label` defaults to the id, `style` (colour per theme, alpha, dash, width)
   field by field to the relation's stroke (`NEUTRAL_STROKE`, a quiet solid
   grey; `CONTAINMENT_STROKE`, the same grey faint and dashed, for a

@@ -44,6 +44,19 @@ describe('computeVisibleGraph origins', () => {
   })
 })
 
+describe('computeVisibleGraph undirected', () => {
+  it('names a visible edge of an undirected type, graduated or not', () => {
+    const peers = createTaxonomy({
+      styleAxis: 'kind', styles: [style('parent'), style('child')],
+      edgeTypes: [{ id: 'peer', sourceValue: 'child', targetValue: 'child', relation: 'dependency', direction: 'undirected' }],
+    })
+    const all = computeVisibleGraph(sim, withSelection(initialFilter(peers, graph), 'kind', new Set(['parent', 'child'])), peers)
+    expect([...all.undirected]).toEqual(['call'])
+    const parents = computeVisibleGraph(sim, withSelection(initialFilter(peers, graph), 'kind', new Set(['parent'])), peers)
+    expect([...parents.undirected]).toEqual(['grad:p1→p2'])
+  })
+})
+
 describe('neighborhoodOf', () => {
   it('leaves out a hidden neighbor', () => {
     const vg = computeVisibleGraph(sim, withSelection(initialFilter(taxonomy, graph), 'kind', new Set(['parent'])), taxonomy)

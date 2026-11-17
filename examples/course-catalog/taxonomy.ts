@@ -107,6 +107,7 @@ export const EDGE_TYPES: readonly EdgeType[] = [
     targetValue: ['course', 'lab'],
     relation: 'dependency',
     match: { [REQUIREMENT]: 'corequisite' },
+    direction: 'undirected',
     physics: { strength: 1.2, distance: 120 },
     tooltip: 'Taken in the same term',
     style: {

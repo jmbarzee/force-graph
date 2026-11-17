@@ -319,7 +319,8 @@
 }
 
 .gv-tooltip-conn-out,
-.gv-tooltip-conn-in {
+.gv-tooltip-conn-in,
+.gv-tooltip-conn-both {
   font-size: 11px;
   font-family: var(--gv-font-mono);
   color: var(--gv-color-text);

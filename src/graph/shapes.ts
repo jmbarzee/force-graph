@@ -178,6 +178,13 @@ export interface EdgeType {
   /** Which relation an edge of this type expresses; an edge is classified only as a type of its own relation. */
   relation: 'containment' | 'dependency'
   /**
+   * Whether an edge of this type runs one way, or is a symmetric relation:
+   * an undirected edge draws no arrowhead, highlights from either end, and
+   * counts as `↔n` in the hover box. Default: `directed`. A containment type
+   * declares none.
+   */
+  direction?: 'directed' | 'undirected'
+  /**
    * Values the edge itself must carry on the host's edge axes to be this
    * type — how two types on one pair are told apart (a call and a signal
    * between the same two values, by the edge's `kind`). An edge lacking
