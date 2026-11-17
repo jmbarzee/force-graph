@@ -17,11 +17,29 @@ function misc(p: Partial<ForceParams> = {}, s: Partial<NodeScaleParams> = {}): s
     onParamChange: noop, onNodeScaleChange: noop, onActiveSection: noop,
   }))
 }
-const curves = (html: string) => [...html.matchAll(/<polyline points="([^"]*)"/g)].map(m => m[1])
+
+/** Each curve's points and marks as fractions of its frame: x from the left, y from the bottom. */
+function plots(html: string) {
+  return [...html.matchAll(/viewBox="0 0 (\S+) (\S+)".*?<\/svg>/g)].map(([svg, w, h]) => {
+    const fx = (v: string) => Number(v) / Number(w)
+    const fy = (v: string) => 1 - Number(v) / Number(h)
+    const points = svg.match(/<polyline points="([^"]*)"/)![1].split(' ').map(p => p.split(','))
+    return {
+      points: points.map(([x, y]) => [fx(x), fy(y)] as const),
+      marks: [...svg.matchAll(/<line x1="([^"]+)"/g)].map(m => fx(m[1])),
+    }
+  })
+}
+type Drawn = ReturnType<typeof plots>[number]
 const popIds = (html: string) => [...html.matchAll(/data-pop-id="([^"]+)"/g)].map(m => m[1]).sort()
+const inMiddleHalf = (f: number) => expect(f >= 0.25 && f <= 0.75, `${f} in [0.25, 0.75]`).toBe(true)
+const movesVisibly = (a: number, b: number) => expect(Math.abs(a - b)).toBeGreaterThan(0.05)
 
 describe('the Misc tab', () => {
   const html = misc()
+  const [dynamics, scaling] = plots(html)
+  const foot = (p: Drawn) => p.points[p.points.length - 1][1]
+  const capRun = (p: Drawn) => p.points[3][1]
 
   it('marks every symbol in its equations with the slider it names', () => {
     expect(html.split('gv-ctl-formula-value').length - 1).toBe(6)
@@ -34,18 +52,24 @@ describe('the Misc tab', () => {
     expect(misc({ alphaDecay: 0.01 })).toContain('100 ticks')
   })
 
-  it('moves the dynamics curve with cooling and the scaling curve with the grow cap', () => {
-    const [dynamics, scaling] = curves(html)
-    const [cooled] = curves(misc({ alphaDecay: 0.01 }))
-    const [, capped] = curves(misc({}, { maxZoomMul: 1 }))
-    expect(cooled).not.toBe(dynamics)
-    expect(capped).not.toBe(scaling)
+  it('lands the defaults in the middle half of each plot', () => {
+    inMiddleHalf(dynamics.marks[0])
+    inMiddleHalf(foot(dynamics))
+    scaling.marks.forEach(inMiddleHalf)
+    inMiddleHalf(scaling.points[0][1])
+    inMiddleHalf(capRun(scaling))
+  })
+
+  it('moves the stop with cooling, its foot with threshold, and the top run with the grow cap', () => {
+    movesVisibly(plots(misc({ alphaDecay: 0.01 }))[0].marks[0], dynamics.marks[0])
+    movesVisibly(foot(plots(misc({ alphaMin: 0.001 }))[0]), foot(dynamics))
+    movesVisibly(capRun(plots(misc({}, { maxZoomMul: 1 }))[1]), capRun(scaling))
   })
 
   it('draws node scale flat below the shrink floor and above the grow cap', () => {
-    const ys = curves(html)[1].split(' ').map(p => Number(p.split(',')[1]))
+    const ys = scaling.points.map(([, y]) => y)
     expect(ys[0]).toBe(ys[1])
     expect(ys[2]).toBe(ys[3])
-    expect(ys[2]).toBeLessThan(ys[1])
+    expect(ys[2]).toBeGreaterThan(ys[1])
   })
 })

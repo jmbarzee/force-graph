@@ -14,6 +14,7 @@ import { Slider } from './controls/Slider'
 import { EquationSection } from './controls/EquationSection'
 import { PopProvider, FormulaValue } from './controls/PopContext'
 import { Curve } from './controls/Curve'
+import type { Span } from './controls/Curve'
 import type { AxisOption, LayoutAxisOption } from '../graph/simulation'
 import type { AxisMapping } from '../graph/axis'
 
@@ -108,24 +109,19 @@ interface NodeScaleSliderDef extends RangeDef {
 // same per-axis surface, Y carrying the Radial switch) and Topological. Center
 // gravity is the unexplained baseline.
 
-// --- DYNAMICS section sliders ---
-//
-// Tightened ranges so each default sits well inside its slider:
-//   friction default 0.40 in 0.05–0.95
-//   cooling  default 0.005 in 0.0005–0.02
-//   threshold default 0.001 in 0–0.005
-
 const FRICTION: SliderDef = { key: 'velocityDecay', label: 'friction', min: 0.05, max: 0.95, step: 0.05,
-  tooltip: 'Damping factor per tick. Higher = more friction' }
+  tooltip: 'Fraction of velocity kept per tick. Higher = coasts longer' }
 const COOLING: SliderDef = { key: 'alphaDecay', label: 'cooling', min: 0.0005, max: 0.02, step: 0.0005,
   tooltip: 'Energy lost per tick. Higher = settles faster' }
 const THRESHOLD: SliderDef = { key: 'alphaMin', label: 'threshold', min: 0, max: 0.005, step: 0.0001,
   tooltip: 'Energy level below which simulation pauses' }
 
 // α starts at 1 and loses `cooling` a tick until it reaches `threshold` (see
-// Simulation.tick). The x span is the slowest cooling's run, so cooling slower
-// stretches the line rather than rescaling the plot.
-const TICKS_SHOWN = 1 / COOLING.min
+// Simulation.tick). On log axes centred on the default stop tick and
+// threshold, cooling moves the drop and threshold its foot.
+const TICKS: Span = [10, 4000]
+const ALPHA: Span = [1e-8, 1]
+const TICK_SAMPLES = 48
 
 const DYNAMICS_EQUATION = (
   <>
@@ -136,12 +132,6 @@ const DYNAMICS_EQUATION = (
   </>
 )
 
-// --- NODE SCALING section sliders ---
-//
-// Render-time controls for how big nodes are drawn. On-screen size is
-// `baseR × size × clamp(zoom, shrink-floor, grow-cap)`. Lowering "grow cap"
-// makes nodes start shrinking sooner as the user zooms out (the common fix for
-// "nodes are too big when zoomed out").
 const SIZE: NodeScaleSliderDef = { key: 'baseMul', label: 'size', min: 0.3, max: 2.0, step: 0.05,
   tooltip: 'Overall node + label size. 1 = default.' }
 const GROW_CAP: NodeScaleSliderDef = { key: 'maxZoomMul', label: 'grow cap', min: 0.5, max: 3.0, step: 0.05,
@@ -149,11 +139,11 @@ const GROW_CAP: NodeScaleSliderDef = { key: 'maxZoomMul', label: 'grow cap', min
 const SHRINK_FLOOR: NodeScaleSliderDef = { key: 'minZoomMul', label: 'shrink floor', min: 0.1, max: 1.0, step: 0.05,
   tooltip: 'Smallest nodes may get when zoomed all the way out.' }
 
-// Fixed spans, so moving a slider moves the curve: zoom runs past the highest
-// grow cap, so the flat run above the cap always shows, and scale reaches the
-// largest size at that cap.
-const ZOOM_SHOWN = GROW_CAP.max + 1
-const SCALE_SHOWN = SIZE.max * GROW_CAP.max
+// Log axes: zoom a decade either side of 1, past every floor and cap, and
+// scale across every value the sliders reach. On them the clamp's three runs are
+// straight, so its corners are the curve's only points.
+const ZOOM: Span = [0.1, 10]
+const SCALE: Span = [SIZE.min * SHRINK_FLOOR.min, SIZE.max * GROW_CAP.max]
 
 const NODE_SCALE_EQUATION = (
   <div className="gv-eq-line">
@@ -318,15 +308,18 @@ export function MiscControls({ params, nodeScale, onParamChange, onNodeScaleChan
   onNodeScaleChange: (patch: Partial<NodeScaleParams>) => void
   onActiveSection: (section: ForceSection) => void
 }) {
-  const stop = (1 - params.alphaMin) / params.alphaDecay
+  const { alphaDecay: cooling, alphaMin: threshold } = params
+  const stop = (1 - threshold) / cooling
+  // Log-spaced ticks from the axis's start to the stop, where α = threshold.
+  const ticks = Array.from({ length: TICK_SAMPLES + 1 }, (_, i) => TICKS[0] * (stop / TICKS[0]) ** (i / TICK_SAMPLES))
   const { minZoomMul: floor, maxZoomMul: cap } = nodeScale
   return <>
     <div className="gv-graph-control-subsection">
       <div className="gv-graph-control-subsection-title">Dynamics</div>
       <EquationSection subtitle="" equation={DYNAMICS_EQUATION} onHover={h => onActiveSection(h ? 'dynamics' : null)}>
         <Curve
-          points={[[0, 1], [stop, params.alphaMin]]}
-          xMax={TICKS_SHOWN} yMax={1}
+          points={ticks.map(t => [t, Math.max(1 - cooling * t, threshold)] as const)}
+          x={TICKS} y={ALPHA}
           marks={[{ x: stop, label: `${Math.round(stop)} ticks` }]}
           xLabel="ticks" yLabel="α"
           ariaLabel="Energy α against ticks, to the tick the simulation stops at"
@@ -340,8 +333,8 @@ export function MiscControls({ params, nodeScale, onParamChange, onNodeScaleChan
       <div className="gv-graph-control-subsection-title">Node scaling</div>
       <EquationSection subtitle="" equation={NODE_SCALE_EQUATION} onHover={() => {}}>
         <Curve
-          points={[0, floor, cap, ZOOM_SHOWN].map(z => [z, nodeSizeMul(z, nodeScale)] as const)}
-          xMax={ZOOM_SHOWN} yMax={SCALE_SHOWN}
+          points={[ZOOM[0], floor, cap, ZOOM[1]].map(z => [z, nodeSizeMul(z, nodeScale)] as const)}
+          x={ZOOM} y={SCALE}
           marks={[{ x: floor }, { x: cap }]}
           xLabel="zoom" yLabel="scale"
           ariaLabel="Node scale against zoom: flat below the shrink floor and above the grow cap"
