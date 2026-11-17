@@ -88,7 +88,9 @@ it('keeps the positions, the viewport and its selection over a reload', async ()
 })
 
 it('carries a held frame over a reload, on the new graph\'s nodes among its ids', async () => {
-  const view = await mount(first)
+  // `d` starts clear of the others: seeded at random, it could land within
+  // half a pixel of their frame, and framing it would move nothing.
+  const view = await mount(first, new Map([['d', { x: 300, y: 200 }]]))
   // Past the warm-up, while the opening frame still holds.
   while (frames.size && viewport === DEFAULT_VIEWPORT) await tick(1)
   await view.render(grown)
