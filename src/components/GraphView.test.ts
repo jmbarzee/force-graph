@@ -25,14 +25,14 @@ const first = graphOf(['a', 'x'], ['b', 'y'])
 const grown = graphOf(['a', 'x'], ['b', 'y'], ['c', 'z'])
 
 /** Mount a view that keeps its filter, and the last filter it reported. */
-async function mount(props: Partial<React.ComponentProps<typeof GraphView>>) {
+async function mount(props: Partial<React.ComponentProps<typeof GraphView>>, start = first) {
   const ref = React.createRef<GraphViewHandle>()
   const reported: FilterState[] = []
   const root = createRoot(document.createElement('div'))
   const render = (graph: Graph) => act(async () => {
     root.render(React.createElement(GraphView, { ref, graph, taxonomy, onFilterChange: next => reported.push(next), ...props }))
   })
-  await render(first)
+  await render(start)
   return { ref, render, last: () => reported[reported.length - 1]! }
 }
 
@@ -46,7 +46,7 @@ it('writes one axis through updateFilter, and re-seeds the rest when the graph g
 })
 
 it('keeps the axes defaultFilter changed, and re-seeds the rest', async () => {
-  const view = await mount({ defaultFilter: new Map([['team', { except: new Set(['a']) }], ['site', { except: new Set() }]]) })
+  const view = await mount({ defaultFilter: new Map([['team', { except: new Set(['a']) }], ['site', { except: new Set() }]]) }, graphOf())
   await view.render(grown)
   expect(selectionFor(view.last(), 'team')).toEqual({ except: new Set(['a']) })
   expect(selectionFor(view.last(), 'site')).toEqual({ except: new Set(['z']) })

@@ -178,7 +178,7 @@ export interface GraphViewProps {
   /**
    * Every change to the filter — the user's and, when the view keeps the
    * filter itself, its own re-seed on a graph change. `touched` names the
-   * axes the user changed in the bar; a write of the view's own (its re-seed,
+   * axes the user changed, in the bar or through `updateFilter`; a write of the view's own (its re-seed,
    * a focus's widening) names none — so a host that controls the filter can
    * keep the set `reseedFilter` takes.
    */
@@ -432,14 +432,13 @@ export const GraphView = React.forwardRef<GraphViewHandle, GraphViewProps>(funct
     return () => ro.disconnect()
   }, [])
 
-  const recentlyChanged = useRecentlyChanged(filter)
-
   // What each filter axis can take, read off the graph: the engine declares no
   // value vocabulary, so the bar learns an axis's domain from the nodes.
   const valuesByAxis = React.useMemo(
     () => new Map(taxonomy.filterAxes.map(d => [d.id, valuesOn(graph.nodes, d.id)])),
     [graph, taxonomy],
   )
+  const recentlyChanged = useRecentlyChanged(filter, valuesByAxis)
 
   // Reset camera/fps coordination on each sim rebuild. Held by useSimulation
   // and invoked from its build effect.

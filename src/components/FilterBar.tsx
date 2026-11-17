@@ -292,14 +292,14 @@ export function FilterBar({
     clicked.current = [axis]
     onFilterChange(next, [axis])
   }
-  const tracked = useRecentlyChanged(filter)
-  const recentlyChanged = hostRecentlyChanged ?? tracked
   // Values for every declared axis, not only the shown ones: an axis the user
   // removed is offered back by "+" only if its values are known.
   const valuesByAxis = React.useMemo(
     () => hostValues ?? new Map([...new Set([...taxonomy.filterAxes.map(d => d.id), ...axes])].map(d => [d, graph ? valuesOn(graph.nodes, d) : []])),
     [hostValues, graph, axes, taxonomy],
   )
+  const tracked = useRecentlyChanged(filter, valuesByAxis)
+  const recentlyChanged = hostRecentlyChanged ?? tracked
   // Opened before paint, so the chips that turned on flash in view. An axis
   // whose values changed since the last filter change and whose selection is
   // their seed is being re-seeded, and stays as it is.
