@@ -118,7 +118,7 @@ export function validateGraph(graph: Graph, taxonomy: Taxonomy): GraphDiagnostic
     const declared = typeId === undefined ? undefined : declaredTypes.get(typeId)
     if (!declared) {
       const said = typeId === undefined ? 'no declared type fits its endpoints and values' : `classifyEdge answered ${JSON.stringify(typeId)}, which edgeTypes does not declare`
-      out.push({ severity: 'warning', code: 'edge-type-unclassified', edgeId: edge.id, message: `edge ${JSON.stringify(edge.id)} has no type: ${said}; it draws in its relation's default stroke and pulls nothing while push and pull key on the style axis` })
+      out.push({ severity: 'warning', code: 'edge-type-unclassified', edgeId: edge.id, message: `edge ${JSON.stringify(edge.id)} has no type: ${said}; it draws in its relation's default stroke and springs with the middling spring` })
       continue
     }
     if (declared.relation !== relation) {
@@ -178,9 +178,9 @@ export function dropInvalid(graph: Graph, diagnostics: readonly GraphDiagnostic[
  * The one warning the drawn graph adds to the host's: the containment edges
  * the view derived from `parentId` that no declared containment type claims
  * (a dependency type the host's rule answers does not count). They draw in
- * the containment stroke and pull nothing while push and pull key on the
- * style axis; a host that wants them typed declares a containment type
- * between the child's value and the parent's.
+ * the containment stroke and spring with the middling spring; a host that
+ * wants them typed declares a containment type between the child's value and
+ * the parent's.
  */
 export function derivedContainmentDiagnostics(drawn: Graph, host: Graph, taxonomy: Taxonomy): GraphDiagnostic[] {
   const listed = new Set<GraphEdge>(host.edges)
@@ -206,6 +206,6 @@ export function derivedContainmentDiagnostics(drawn: Graph, host: Graph, taxonom
     severity: 'warning',
     code: 'containment-untyped',
     edgeId: untyped[0],
-    message: `${untyped.length} derived containment edge${one ? '' : 's'} (${shown}${untyped.length > 3 ? ', …' : ''}) ${one ? 'has' : 'have'} no type: no declared containment type runs between the child's value and the parent's; ${one ? 'it draws' : 'they draw'} in the containment stroke and pull${one ? 's' : ''} nothing while push and pull key on the style axis`,
+    message: `${untyped.length} derived containment edge${one ? '' : 's'} (${shown}${untyped.length > 3 ? ', …' : ''}) ${one ? 'has' : 'have'} no type: no declared containment type runs between the child's value and the parent's; ${one ? 'it draws' : 'they draw'} in the containment stroke and spring${one ? 's' : ''} with the middling spring`,
   }]
 }

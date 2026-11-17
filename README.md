@@ -102,32 +102,18 @@ never by spreading the built object.
 
   `fallbackStyle` draws a value nobody declared; `styleLabel` names the axis
   in the controls.
-- **Edge types and classification.** Each `EdgeType` has an `id`, the
-  `sourceValue` and `targetValue` it runs between — a style value, or several
-  at either end: the type runs between every source value and every target
-  value — and its `relation` (`containment` or `dependency`); `label`
-  defaults to the id, `style` (colour per theme, alpha, dash, width) field by
-  field to the relation's stroke (`NEUTRAL_STROKE`, a quiet solid grey;
-  `CONTAINMENT_STROKE`, the same grey faint and dashed, for a containment
-  type), `physics` (a spring's strength and rest length) to a middling
-  spring, `tooltip` to the label. An edge is classified once, on the style
-  values of its original endpoints: the declared type of its relation whose
-  endpoints match in either orientation and whose `match` — values the edge
-  itself must carry on the host's edge axes — its `values` satisfy. Two
-  types on one pair are told apart by `match` (a call and a signal between
-  two services, by the edge's `kind`), with the type that declares none as
-  the fallback, or by their declared orientation: a satisfied `match` beats
-  the pair alone, the declared orientation beats the reverse, and declaration
-  order settles the rest. Two types nothing tells apart are refused at
-  construction unless the host gives `classifyEdge(edge, sourceValue,
-  targetValue, declared)`, which sees what the declarations answered and may
-  keep it, replace it, or supply a type where they answered none — the
-  exceptions declarations cannot express. An edge keeps its type when
-  graduation re-points it (graduation: a dependency edge whose end is hidden
-  is re-pointed to a visible node — see Collapse rules); an edge no type
-  claims draws in its relation's stroke, pulls nothing while push and pull
-  key on the style axis (on another axis every edge is sprung by its
-  endpoints' buckets), and `validateGraph` says so.
+- **Edge types.** Each `EdgeType` has an `id`, the `sourceValue` and
+  `targetValue` it runs between — a style value, several (the type runs
+  between every source value and every target value), or left out for any
+  declared value — its `relation` (`containment` or `dependency`), and
+  optionally a `match`, values the edge itself must carry on the host's edge
+  axes (a call and a signal between two services, by the edge's `kind`);
+  `label` defaults to the id, `style` (colour per theme, alpha, dash, width)
+  field by field to the relation's stroke (`NEUTRAL_STROKE`, a quiet solid
+  grey; `CONTAINMENT_STROKE`, the same grey faint and dashed, for a
+  containment type), `physics` (a spring's strength and rest length) to a
+  middling spring, `tooltip` to the label. Which type an edge is:
+  [Classifying an edge](#classifying-an-edge).
 - **Filter axes.** `filterAxes` defaults to the style axis as an
   allow-list. Each `AxisDescriptor` is an `id`, a `label` (default the id)
   and what an empty selection means: `none` (an allow-list: nothing selected
@@ -159,6 +145,27 @@ never by spreading the built object.
   candidate)` picks which of two graduated edges on one visible pair survives.
   Every hook is handed the host's own node objects, never the view's copies,
   so a host may key them by identity.
+
+### Classifying an edge
+
+An edge is classified once, on the style values of its original endpoints,
+and keeps its type when graduation re-points it (see Collapse rules). Each
+step narrows the types the one before it left:
+
+| Step | Leaves |
+|---|---|
+| relation | the types of the edge's relation |
+| pair | those running between its endpoints' values, either way round, whose `match` (if any) the edge's `values` satisfy |
+| ends named | those naming both ends, else one, else neither |
+| `match` | those declaring a `match`, else those declaring none |
+| orientation | those declared in the edge's direction, else the reverse |
+| declaration order | the first declared |
+| `classifyEdge(edge, sourceValue, targetValue, declared)` | its answer: an id replaces `declared`, `null` leaves the edge untyped, undefined keeps `declared` |
+
+Two types on one pair naming as many ends, in the same orientation, with the
+same `match`, are refused at construction unless the host gives
+`classifyEdge`. An untyped edge draws in its relation's stroke, springs
+with the middling spring, and `validateGraph` says so.
 
 ## The graph
 
@@ -311,14 +318,11 @@ the console. Everything else is optional.
   leaves, so a tooltip can be reached. Removing an axis in the bar resets its
   selection to "match everything" and fires `onFilterChange` before
   `onAxesChange`; an axis the taxonomy does not declare renders as a header
-  with its remove control and filters nothing.
-  Two declared types on one pair with no `match` to tell them apart are
-  refused; with `classifyEdge` given, its answer stands. Derived containment
-  edges are `in:<id>` (numbered on a collision) and reach `highlight` and
-  `collapse`. An error diagnostic drops the edge, or the later node of a
-  duplicated id, or clears the `parentId`, it names. The pane's theme
-  observer watches every `data-theme` in the document unless `systemTheme` is
-  given.
+  with its remove control and filters nothing. Derived containment edges are
+  `in:<id>` (numbered on a collision) and reach `highlight` and `collapse`.
+  An error diagnostic drops the edge, or the later node of a duplicated id,
+  or clears the `parentId`, it names. The pane's theme observer watches every
+  `data-theme` in the document unless `systemTheme` is given.
 - **Keyboard.** `keyboard` scopes the shortcuts: `pane` (the default — the
   focusable root handles the keys that reach it, so a page keeps Tab and
   Space for its own controls), `global` (the window — a page that is the
