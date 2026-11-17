@@ -1,6 +1,6 @@
 import React from 'react'
 import { createRoot } from 'react-dom/client'
-import { GraphView, createTaxonomy } from '@jmbarzee/force-graph'
+import { FilterBar, GraphView, createTaxonomy, initialFilter } from '@jmbarzee/force-graph'
 import type { Graph } from '@jmbarzee/force-graph'
 
 const AXES = ['Region', 'Team', 'Product', 'Language', 'Week']
@@ -30,8 +30,22 @@ const graph: Graph = {
   edges: [],
 }
 
+function App() {
+  const [shown, setShown] = React.useState(false)
+  const [filter, setFilter] = React.useState(() => initialFilter(taxonomy, graph))
+  return (
+    <>
+      <button onClick={() => setShown(!shown)}>{shown ? 'Hide' : 'Show'} the second bar</button>
+      <div style={{ display: shown ? 'block' : 'none' }}>
+        <FilterBar graph={graph} taxonomy={taxonomy} filter={filter} onFilterChange={setFilter} />
+      </div>
+      <GraphView graph={graph} taxonomy={taxonomy} />
+    </>
+  )
+}
+
 createRoot(document.getElementById('root')!).render(
   <React.StrictMode>
-    <GraphView graph={graph} taxonomy={taxonomy} />
+    <App />
   </React.StrictMode>,
 )

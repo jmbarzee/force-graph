@@ -13,6 +13,10 @@ describe('firstLine', () => {
   it('has nothing to collapse in an empty row', () => {
     expect(firstLine([])).toEqual({ height: 0, rest: 0 })
   })
+
+  it('has nothing to collapse in a hidden row, whose items have no height', () => {
+    expect(firstLine([{ top: 0, bottom: 0 }, { top: 0, bottom: 0 }])).toEqual({ height: 0, rest: 0 })
+  })
 })
 
 describe('axesOpenedBy', () => {
