@@ -13,6 +13,7 @@
 
 import type { AxisId, AxisValue } from './axis'
 import type { EdgeStroke, ThemedColor } from './scheme'
+import { hueOf, pairOf } from './scheme'
 
 // ── Node styles ─────────────────────────────────────────────────────────────
 
@@ -26,10 +27,12 @@ export interface Band {
 
 /**
  * How one value on the style axis is drawn, sized, and physically weighted,
- * as a host declares it. Only the id, the label and the colour are required;
- * the rest is derived from them and from the value's position in the
- * declaration order (top of the hierarchy first):
+ * as a host declares it. Only the id is required; the rest is derived from
+ * it and from the value's position in the declaration order (top of the
+ * hierarchy first):
  *
+ *   - `label`: the id.
+ *   - `color`: the palette's hue at the value's position (`PALETTE`).
  *   - `abbreviation`: the first two characters of the label.
  *   - `icon`: none.
  *   - `size.r`: 12; `size.iconSize`: nine tenths of the radius, rounded, at least 9.
@@ -46,7 +49,7 @@ export interface NodeStyle {
   /** The value on the style axis this style is for. */
   id: AxisValue
   /** Display name, e.g. "Service". */
-  label: string
+  label?: string
   /**
    * One or two characters for a control token: a control surface renders a
    * token per value and has no room for a name.
@@ -55,7 +58,7 @@ export interface NodeStyle {
   /** Single glyph drawn inside the canvas node. */
   icon?: string
   /** Fill and border in both themes; the canvas reads `color[theme]`. */
-  color: ThemedColor
+  color?: ThemedColor
   /** The node's drawn size. */
   size?: {
     /** Circle radius in world units. Hit-test radius = r + 4. */
@@ -278,9 +281,12 @@ export function stackBand(i: number, n: number): Band {
  */
 export function resolveNodeStyle(style: NodeStyle, i: number, n: number): ResolvedNodeStyle {
   const r = style.size?.r ?? DEFAULT_RADIUS
+  const label = style.label ?? style.id
   return {
     ...style,
-    abbreviation: style.abbreviation ?? style.label.slice(0, 2),
+    label,
+    color: style.color ?? pairOf(hueOf(undefined, i)),
+    abbreviation: style.abbreviation ?? label.slice(0, 2),
     icon: style.icon ?? '',
     size: { r, iconSize: style.size?.iconSize ?? Math.max(9, Math.round(r * 0.9)) },
     physics: {

@@ -168,7 +168,7 @@ export interface TaxonomySpec {
   /**
    * Drawn for a value the taxonomy does not declare, and for a node with no
    * value on the style axis. Absent, a grey disc with a question mark that
-   * rests anywhere in the stack.
+   * rests anywhere in the stack; a label or colour left out is that disc's.
    */
   fallbackStyle?: Omit<NodeStyle, 'id' | 'ladder'>
   /** The edge types, in control-panel order. Absent, none: every edge draws untyped in its relation's stroke, and `validateGraph` says so. */
@@ -266,9 +266,11 @@ export function createTaxonomy(spec: TaxonomySpec): Taxonomy {
     if (b && !(b.min <= b.max)) problems.push(`${where} runs from ${b.min} to ${b.max}; a band's min must not exceed its max`)
   }
   const checkStyle = (where: string, style: Omit<NodeStyle, 'id'>) => {
-    for (const theme of ['light', 'dark'] as const) {
-      colour(`${where}.color.${theme}.fill`, style.color[theme].fill)
-      colour(`${where}.color.${theme}.border`, style.color[theme].border)
+    if (style.color) {
+      for (const theme of ['light', 'dark'] as const) {
+        colour(`${where}.color.${theme}.fill`, style.color[theme].fill)
+        colour(`${where}.color.${theme}.border`, style.color[theme].border)
+      }
     }
     if (style.whenHidden !== undefined && style.whenHidden !== 'ascend' && style.whenHidden !== 'splice') {
       problems.push(`${where}.whenHidden is ${JSON.stringify(style.whenHidden)}, not 'ascend' or 'splice'`)
@@ -376,7 +378,7 @@ export function createTaxonomy(spec: TaxonomySpec): Taxonomy {
   const styles: Record<AxisValue, ResolvedNodeStyle> = Object.create(null)
   spec.styles.forEach((v, i) => { styles[v.id] = resolveNodeStyleDefaults(v, i, n) })
   // The fallback rests anywhere in the stack: it is nobody's tier.
-  const fallback = resolveNodeStyleDefaults({ id: '', ...fallbackSpec }, 0, 1)
+  const fallback = resolveNodeStyleDefaults({ id: '', label: DEFAULT_FALLBACK.label, color: DEFAULT_FALLBACK.color, ...fallbackSpec }, 0, 1)
   if (n > 0 && fallbackSpec.physics?.band?.y === undefined) {
     fallback.physics.band.y = { min: styles[values[0]].physics.band.y.min, max: styles[values[n - 1]].physics.band.y.max }
   }

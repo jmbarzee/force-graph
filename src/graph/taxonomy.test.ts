@@ -1,5 +1,6 @@
 import { describe, expect, it } from 'vitest'
 import { createTaxonomy } from './taxonomy'
+import { PALETTE, THEMES, pairOf } from './scheme'
 import type { EdgeType, NodeStyle } from './shapes'
 import type { GraphEdge } from './model'
 
@@ -91,5 +92,18 @@ describe('createTaxonomy', () => {
   it('refuses a ladder id that is empty or a value’s', () => {
     expect(() => createTaxonomy({ styleAxis: 'kind', styles: [{ ...style('service'), ladder: '' }] })).toThrow(/styles\.service\.ladder is empty/)
     expect(() => createTaxonomy({ styleAxis: 'kind', styles: [{ ...style('service'), ladder: 'queue' }, style('queue')] })).toThrow(/styles\.service\.ladder is "queue", a style value's id/)
+  })
+  it('resolves bare-id styles to their ids and distinct palette colours in both themes', () => {
+    const taxonomy = createTaxonomy({ styleAxis: 'kind', styles: [{ id: 'service' }, { id: 'queue' }, { id: 'store' }] })
+    expect(taxonomy.styleValues.map(v => taxonomy.styleOf(v).label)).toEqual(['service', 'queue', 'store'])
+    expect(taxonomy.styleOf('queue').color).toEqual(pairOf(PALETTE[1]))
+    for (const theme of THEMES) {
+      expect(new Set(taxonomy.styleValues.map(v => taxonomy.styleOf(v).color[theme].fill)).size).toBe(3)
+    }
+  })
+  it('keeps a declared colour, and refuses one no reader parses', () => {
+    expect(createTaxonomy({ styleAxis: 'kind', styles: [{ id: 'q' }, style('service')] }).styleOf('service').color).toEqual(style('service').color)
+    const color = { light: { fill: 'teal', border: '#000' }, dark: { fill: '#fff', border: '#fff' } }
+    expect(() => createTaxonomy({ styleAxis: 'kind', styles: [{ id: 'service', color }] })).toThrow(/styles\.service\.color\.light\.fill is "teal"/)
   })
 })
