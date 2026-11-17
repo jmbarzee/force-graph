@@ -661,7 +661,6 @@ export const GraphView = React.forwardRef<GraphViewHandle, GraphViewProps>(funct
     activePullEdge, setActivePullEdge,
   } = useHighlight(visibleNodes, visibleEdges, visibleIds, undirected, getSimNode, graph, taxonomy, selectedNodeId, hostIndex)
 
-  // The control a force tab names when nothing is visible.
   const hiddenBy = React.useMemo(() => hiddenByOf(graph.nodes, filter, groupsOf), [graph, filter, groupsOf])
 
   // The groups as drawn: the ones the filter shows, restricted to the visible
