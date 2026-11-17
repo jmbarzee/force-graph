@@ -1,8 +1,8 @@
 // useSimulationLoop — drives the simulation each frame and reacts to filter
-// changes. Owns the requestAnimationFrame physics loop (tick + one-shot initial
-// fit + cross-view center + fps + stability stop), the hover tooltip re-render
+// changes. Owns the requestAnimationFrame physics loop (tick + the held
+// framings' tick + fps + stability stop), the hover tooltip re-render
 // tick, and the seed-on-type-change / reheat-on-file-change effects. It consumes
-// the sim instance, the visible subgraph, and the camera/selection handles as
+// the sim instance, the visible subgraph, and the camera's framing as
 // inputs (the explicit data links) rather than owning any of them.
 
 import type { FilterState } from '../../filter/types'
@@ -11,9 +11,8 @@ import { foldReheatPolicy } from '../../graph/axis'
 import type { ResolvedAxisDescriptor } from '../../graph/axis'
 import { passesFilter } from './visibleGraph'
 import React from 'react'
-import type { Simulation, SimNode } from '../../graph/simulation'
-import type { Viewport } from '../../graph/viewport'
-import { fitToView } from '../../graph/viewport'
+import type { Simulation } from '../../graph/simulation'
+import type { FrameRequest } from './frame'
 import type { Taxonomy } from '../../graph/taxonomy'
 
 export interface SimulationLoopParams {
@@ -21,29 +20,24 @@ export interface SimulationLoopParams {
   running: boolean
   setRunning: React.Dispatch<React.SetStateAction<boolean>>
   visibleIds: Set<string>
-  visibleNodes: SimNode[]
   downstreamScores: Map<string, number>
   filter: FilterState
   /** The axes the view filters on — its chain; a change elsewhere in the filter moves nothing here. */
   axes: readonly ResolvedAxisDescriptor[]
   hoveredNodeId: string | null
   selectedNodeId: string | null
-  /** The container's size, recorded as the one the viewport is computed for. */
-  measure: () => { width: number; height: number } | null
-  initialFitDone: React.MutableRefObject<boolean>
-  pendingCenterRef: React.MutableRefObject<{ nodeId: string } | null>
-  setViewport: React.Dispatch<React.SetStateAction<Viewport>>
-  /** Select a node the way the user would — the focus recipe's landing. */
-  setSelectedNodeId: (id: string | null) => void
+  /** The camera's framing, for a refitting filter change, and its tick for what it holds. */
+  requestFrame: (request: FrameRequest) => void
+  tickFrame: (alpha: number) => void
   taxonomy: Taxonomy
 }
 
 export function useSimulationLoop({
   simRef, running, setRunning,
-  visibleIds, visibleNodes, downstreamScores,
+  visibleIds, downstreamScores,
   filter, axes,
   hoveredNodeId, selectedNodeId,
-  measure, initialFitDone, pendingCenterRef, setViewport, setSelectedNodeId, taxonomy,
+  requestFrame, tickFrame, taxonomy,
 }: SimulationLoopParams): { fps: number } {
   // Frame-rate indicator. Updated ~2×/sec from the loop.
   const [fps, setFps] = React.useState(0)
@@ -52,7 +46,7 @@ export function useSimulationLoop({
   // Physics animation loop. Decoupled from React rendering: the canvas has its
   // own RAF draw loop reading live SimNode.x/.y through a ref, so the physics
   // tick does NOT trigger a React re-render each frame. We only touch React state
-  // for one-shot events (initial fit, pending cross-view center, stability, FPS).
+  // for one-shot events (a held framing, stability, FPS).
   React.useEffect(() => {
     if (!running) return
     let frameId = 0
@@ -64,32 +58,7 @@ export function useSimulationLoop({
 
       sim.tick(visibleIds, downstreamScores)
 
-      // Initial fit — once per sim instance, after warmup.
-      if (!initialFitDone.current && sim.alpha < 0.3) {
-        const size = measure()
-        if (size && size.width > 0 && size.height > 0) {
-          setViewport(fitToView(visibleNodes, size.width, size.height))
-          initialFitDone.current = true
-        }
-      }
-
-      // Cross-view navigation: center on target after warmup.
-      if (initialFitDone.current && pendingCenterRef.current) {
-        const targetNode = sim.getNode(pendingCenterRef.current.nodeId)
-        if (targetNode) {
-          const size = measure()
-          if (size) {
-            const { width, height } = size
-            setViewport(prev => ({
-              scale: Math.max(prev.scale, 1.2),
-              x: width / 2 - targetNode.x * Math.max(prev.scale, 1.2),
-              y: height / 2 - targetNode.y * Math.max(prev.scale, 1.2),
-            }))
-            setSelectedNodeId(targetNode.id)
-          }
-        }
-        pendingCenterRef.current = null
-      }
+      tickFrame(sim.alpha)
 
       // FPS meter — recompute ~2×/sec; setFps only fires on change.
       const now = performance.now()
@@ -114,7 +83,7 @@ export function useSimulationLoop({
 
     frameId = requestAnimationFrame(loop)
     return () => { if (frameId) cancelAnimationFrame(frameId) }
-  }, [running, visibleIds, visibleNodes, selectedNodeId]) // eslint-disable-line react-hooks/exhaustive-deps
+  }, [running, visibleIds, selectedNodeId]) // eslint-disable-line react-hooks/exhaustive-deps
 
   // While hovering a node during a running sim, re-render at ~10fps so the DOM
   // tooltip tracks the moving node (canvas nodes update at 60fps via refs).
@@ -170,7 +139,7 @@ export function useSimulationLoop({
       }
       sim.reheat(alpha)
       if (resume) setRunning(true)
-      if (refit) initialFitDone.current = false
+      if (refit) requestFrame({ ids: sim.nodes.map(n => n.id), when: 'warm' })
     }
     prevFilter.current = filter
   }, [filter]) // eslint-disable-line react-hooks/exhaustive-deps
