@@ -125,6 +125,7 @@ const CULL_MARGIN = 100
 // Zoom elision thresholds
 const LABEL_ELIDE_SCALE = 0.25    // hide name labels below this scale (except hovered/selected)
 const DETAIL_REDUCE_SCALE = 0.1   // drop decorative rings below this scale
+const FLASH_MS = 600
 
 interface GraphCanvasProps {
   nodes: SimNode[]
@@ -144,6 +145,8 @@ interface GraphCanvasProps {
   hoveredNodeId: string | null
   selectedNodeId: string | null
   focusedNodeId: string | null
+  /** A node to flash: a ring that widens and fades for `FLASH_MS` from `at`, a `performance.now()` time. */
+  flashNode: { id: string; at: number } | null
   searchMatchIds: ReadonlySet<string> | null
   running: boolean
   forceParams: ForceParams
@@ -204,6 +207,7 @@ interface DrawData {
   hoveredNodeId: string | null
   selectedNodeId: string | null
   focusedNodeId: string | null
+  flashNode: { id: string; at: number } | null
   searchMatchIds: ReadonlySet<string> | null
   forceParams: ForceParams
   resolved: ResolvedPhysics
@@ -234,7 +238,7 @@ export function GraphCanvas({
   onNodeDragStart, onNodeDragMove, onNodeDragEnd,
   onDoubleClickNode, onFitView, onHoverNode, onSelectNode,
   highlightedNodes, highlightedEdges,
-  hoveredNodeId, selectedNodeId, focusedNodeId, searchMatchIds,
+  hoveredNodeId, selectedNodeId, focusedNodeId, flashNode, searchMatchIds,
   running, forceParams, resolved, overlay, theme, edgeStrokes, edgeOffsets, undirectedEdges, activeSection, activePushBucket,
   activeGravityBucket, activePullEdge, nodeScale, groupGlows, markedEdges,
 }: GraphCanvasProps) {
@@ -286,14 +290,14 @@ export function GraphCanvas({
   const drawData = React.useRef<DrawData>({
     taxonomy,
     nodes, edges, nodeMap, viewport, groupGlows, markedEdges, highlightedNodes, highlightedEdges,
-    hoveredNodeId, selectedNodeId, focusedNodeId, searchMatchIds,
+    hoveredNodeId, selectedNodeId, focusedNodeId, flashNode, searchMatchIds,
     forceParams, resolved, overlay, theme, edgeStrokes, edgeOffsets, undirectedEdges, activeSection, activePushBucket, activeGravityBucket, activePullEdge, nodeScale, running,
     dupNodeIds, activeDupDefKey, palette,
   })
   drawData.current = {
     taxonomy,
     nodes, edges, nodeMap, viewport, groupGlows, markedEdges, highlightedNodes, highlightedEdges,
-    hoveredNodeId, selectedNodeId, focusedNodeId, searchMatchIds,
+    hoveredNodeId, selectedNodeId, focusedNodeId, flashNode, searchMatchIds,
     forceParams, resolved, overlay, theme, edgeStrokes, edgeOffsets, undirectedEdges, activeSection, activePushBucket, activeGravityBucket, activePullEdge, nodeScale, running,
     dupNodeIds, activeDupDefKey, palette,
   }
@@ -969,6 +973,20 @@ export function GraphCanvas({
           ctx.restore()
         }
 
+        if (node.id === d.flashNode?.id) {
+          const t = (performance.now() - d.flashNode.at) / FLASH_MS
+          if (t < 1) {
+            ctx.save()
+            ctx.strokeStyle = p.selectionRingColor
+            ctx.lineWidth = 3
+            ctx.globalAlpha = 1 - t
+            ctx.beginPath()
+            ctx.arc(sx, sy, r + 5 + 10 * t, 0, Math.PI * 2)
+            ctx.stroke()
+            ctx.restore()
+          }
+        }
+
         ctx.globalAlpha = 1
 
         // Badges — the host's chip row above the node. Gated on the same
@@ -1049,9 +1067,11 @@ export function GraphCanvas({
     // When paused, a single frame is drawn on demand via the dirty flag.
     const loop = () => {
       if (!active) return
-      const isRunning = drawData.current.running
-      if (isRunning || dirtyRef.current) {
-        dirtyRef.current = false
+      const { running: isRunning, flashNode } = drawData.current
+      const flashing = flashNode !== null && performance.now() - flashNode.at < FLASH_MS
+      if (isRunning || flashing || dirtyRef.current) {
+        // A flash's last frame is followed by one without it.
+        dirtyRef.current = flashing
         drawFrame()
       }
       loopId = requestAnimationFrame(loop)

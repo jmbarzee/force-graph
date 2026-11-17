@@ -16,7 +16,9 @@ import type { SimNode } from '../../graph/simulation'
  * warm one. A waiting request replaces the one waiting for the same `when`,
  * and `then` runs when the owner acts on it. One that `hold`s re-frames each
  * tick after it acts, until a user's pan, zoom or drag, a newer request or a
- * settled layout releases it.
+ * settled layout releases it, and `released` runs then, unless for a newer
+ * request. These release one waiting to hold, too, save a `'warm'` request
+ * a waiting `'next'` one, which acts after it anyway.
  */
 export interface FrameRequest {
   ids: Iterable<string>
@@ -25,6 +27,7 @@ export interface FrameRequest {
   when?: 'warm' | 'next'
   hold?: boolean
   then?: () => void
+  released?: () => void
 }
 
 /**
@@ -38,14 +41,16 @@ export function frameQueue(apply: (request: FrameRequest) => boolean) {
     held = request.hold ? request : undefined
     request.then?.()
   }
-  const release = () => {
+  const drop = () => {
     if (warm?.hold) warm = undefined
     if (next?.hold) next = undefined
     held = undefined
   }
   return {
     request(request: FrameRequest) {
-      release()
+      const behind = request.when === 'warm' ? next : undefined
+      drop()
+      next ??= behind
       if (request.when === 'warm') warm = request
       else if (request.when === 'next') next = request
       else { apply(request); act(request) }
@@ -65,7 +70,11 @@ export function frameQueue(apply: (request: FrameRequest) => boolean) {
         act(request)
       }
     },
-    release,
+    release() {
+      const released = held?.released
+      drop()
+      released?.()
+    },
   }
 }
 

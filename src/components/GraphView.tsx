@@ -106,11 +106,11 @@ export interface GraphViewChrome {
 /**
  * What a host may ask of a mounted view. `focusNode` is the whole focus
  * recipe in one call: widen the filter just enough on the axes shown
- * (overriding a lock, which flashes), centre on the node once the layout has
- * settled, and select it.
+ * (overriding a lock, which flashes), frame the node with its neighbors until
+ * the layout settles, select it, and flash it.
  */
 export interface GraphViewHandle {
-  /** Reveal, centre and select a node by id. False when the id is not in the graph or the filter cannot be widened to show it. */
+  /** Reveal, frame and select a node by id. False when the id is not in the graph or the filter cannot be widened to show it. */
   focusNode(id: string): boolean
   /** Select a node, or clear the selection with null. An id the graph does not hold is ignored. */
   select(id: string | null): void
@@ -175,7 +175,7 @@ export interface GraphViewProps {
   /** Where the view's own selection starts when the host does not control it. Read once. */
   defaultSelectedId?: string | null
   /**
-   * A request to reveal, centre and select a node — the declarative form of
+   * A request to reveal, frame and select a node — the declarative form of
    * the handle's `focusNode`. Compared by value: a new `id` or `key` is a new
    * request. It waits until its node is in the graph, then `onFocusResult`
    * reports whether the filter could show it. Null, a newer request, or one
@@ -560,6 +560,7 @@ export const GraphView = React.forwardRef<GraphViewHandle, GraphViewProps>(funct
   const { visibleNodes, visibleEdges, visibleIds, edgeTypes, undirected, origins, nodeSummaries, downstreamScores } =
     useVisibleGraph(simRef, simVersion, filter, filterAxes, taxonomy, groupsOf)
   visibleNodesRef.current = visibleNodes
+  const visibleEdgesRef = useLatest(visibleEdges)
 
   // The visible edges the host marks, each through its original.
   const visibleMarked = React.useMemo(() => {
@@ -783,10 +784,11 @@ export const GraphView = React.forwardRef<GraphViewHandle, GraphViewProps>(funct
     requestFrame({ ids: [nodeId], minScale: 0 })
   }
 
+  const [flashNode, setFlashNode] = React.useState<{ id: string; at: number } | null>(null)
   // What a host may ask of the mounted view. `focusNode` is the whole focus
   // recipe: widen the filter just enough on the axes shown (a lock it
-  // overrides flashes), then centre on and select the node once the layout
-  // has settled — the loop consumes the request after its warm-up.
+  // overrides flashes), then frame the node and its neighbors until the
+  // layout settles, select it, and flash it when the frame lets go.
   const focusNodeById = React.useCallback((id: string): boolean => {
     const node = graphIndex.get(id)
     if (!node) return false
@@ -794,7 +796,7 @@ export const GraphView = React.forwardRef<GraphViewHandle, GraphViewProps>(funct
     // Widened by whole chips: the graph says which values each chip holds.
     const result = reconcileFilter({ destination: base, source: base, locks, transition: { kind: 'focus', target: { values: node.values, groups: groupsOf.get(id) } }, taxonomy, axes, graph })
     // A read-only filter (controlled, no callback) cannot be widened: the
-    // node is judged, centred and reported against the filter the view holds.
+    // node is judged, framed and reported against the filter the view holds.
     const applied = filterWritable ? result.filter : base
     if (applied !== base) {
       writeFilter(applied, [])
@@ -804,13 +806,19 @@ export const GraphView = React.forwardRef<GraphViewHandle, GraphViewProps>(funct
     // cannot be revealed by widening, and the host should know.
     const shown = passesFilter(node, applied, taxonomy, filterAxes, groupsOf)
     if (!shown) return false
-    requestFrame({ ids: [id], minScale: 1.2, when: 'next', then: () => requestSelect(id) })
+    // Read at each frame, so the neighbors the widened filter draws count.
+    const neighborhood = { *[Symbol.iterator]() { for (const n of neighborhoodOf(id, visibleNodesRef.current, visibleEdgesRef.current)) yield n.id } }
+    requestFrame({
+      ids: neighborhood, when: 'next', hold: true,
+      then: () => requestSelect(id),
+      released: () => setFlashNode({ id, at: performance.now() }),
+    })
     if (!running) {
       simRef.current?.reheat(0.1)
       setRunning(true)
     }
     return true
-  }, [graphIndex, graph, groupsOf, filterRef, filterWritable, writeFilter, flash, locks, axes, filterAxes, running, setRunning, simRef, requestFrame, requestSelect, taxonomy])
+  }, [graphIndex, graph, groupsOf, filterRef, filterWritable, writeFilter, flash, locks, axes, filterAxes, running, setRunning, simRef, requestFrame, requestSelect, taxonomy, visibleEdgesRef])
   // The declarative focus. A request is new when its id or key differs from
   // the last one; it waits until its node is in the graph, then runs the
   // focus recipe once and reports whether the node could be shown. A null
@@ -1015,6 +1023,7 @@ export const GraphView = React.forwardRef<GraphViewHandle, GraphViewProps>(funct
             hoveredNodeId={hoveredNodeId}
             selectedNodeId={selectedNodeId}
             focusedNodeId={focusedNodeId}
+            flashNode={flashNode}
             searchMatchIds={visibleMatchIds}
             running={running}
             forceParams={forceParams}

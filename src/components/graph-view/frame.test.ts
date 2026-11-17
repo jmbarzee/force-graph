@@ -88,6 +88,36 @@ describe('frameQueue', () => {
     queue.tick(0.1); queue.tick(0.1)
     expect(framed).toEqual([opening, fit, opening, focus])
   })
+
+  it('keeps a next frame waiting to hold behind a newer warm one, and holds it after', () => {
+    const { framed, queue } = queued()
+    let thens = 0
+    const focus = { ids: ['c'], when: 'next', hold: true, then: () => thens++ } as const
+    queue.request(focus)
+    queue.request(opening)
+    queue.tick(0.5)
+    queue.tick(0.1); queue.tick(0.1)
+    expect(framed).toEqual([opening, focus, focus])
+    expect(thens).toBe(1)
+  })
+
+  it('runs released when a held frame is released, but not for a newer request or before it holds', () => {
+    const { queue } = queued()
+    let releases = 0
+    const focus = { ids: ['a'], when: 'next', hold: true, released: () => releases++ } as const
+    queue.request(focus)
+    queue.release()
+    queue.request(focus)
+    queue.tick(0.1)
+    queue.request({ ids: ['b'] })
+    queue.release()
+    expect(releases).toBe(0)
+    queue.request(focus)
+    queue.tick(0.1)
+    queue.release()
+    queue.release()
+    expect(releases).toBe(1)
+  })
 })
 
 describe('a held frame over a settling layout', () => {

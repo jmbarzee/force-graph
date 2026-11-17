@@ -1,7 +1,7 @@
 // The declarative focus request and how two of them compare.
 
 /**
- * A request to reveal, centre and select a node — the declarative form of the
+ * A request to reveal, frame and select a node — the declarative form of the
  * handle's `focusNode`, for a host whose pane mounts lazily or whose data
  * arrives after the request. Compared by value: a new `id` or `key` is a new
  * request, the same pair on a re-render is not, so a host repeats a request

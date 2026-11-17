@@ -273,7 +273,7 @@ the console. Everything else is optional.
   defined the view shows it and nothing else, `onSelectionChange` reports the
   selections the user makes (never one the host made), and the host answers
   by setting the prop, or not. Absent, the view keeps the selection and still
-  reports. `focus={{ id, key }}` reveals, centres and selects a node — the
+  reports. `focus={{ id, key }}` reveals, frames and selects a node — the
   declarative form of the handle's `focusNode`, for a pane that mounts lazily
   or whose data arrives late. It is compared by value, so a new `id` or `key`
   is a new request; it waits until its node is in the graph; and
@@ -341,10 +341,11 @@ the console. Everything else is optional.
   resolved theme is for the host's own chrome beside the pane; a host that
   writes it as a `data-theme` on an ancestor of the pane passes `systemTheme`
   too, so `'system'` follows the host's answer and not the pane's own echo.
-- **The handle.** Through a ref, `focusNode(id)` reveals, centres and selects
+- **The handle.** Through a ref, `focusNode(id)` reveals, frames and selects
   a node in one call — it widens the filter on the axes shown and the groups
   it belongs to when the group filter hides it, flashes a lock
-  it overrides, and centres once the layout has settled — and answers
+  it overrides, frames the node with its neighbors until the layout settles,
+  then flashes the node — and answers
   whether the node ended visible (a value absent on a hiding axis cannot be
   revealed); `select(id | null)` sets or clears the selection; `fit()` frames
   the visible set; `getPositions()` and `setPositions()` carry a layout out
@@ -374,7 +375,7 @@ A host with a second view gives both views one state through `useLinkedViews`
 and renders `FilterBar` in the view that is not a `GraphView`. The hook owns
 each view's filter, locks and axes, the view shown and the search they share,
 hands each view its props, reconciles on a switch, records the locks a focus
-overrode so the bar flashes them, and asks the graph view to centre on a node
+overrode so the bar flashes them, and asks the graph view to frame a node
 a focus names:
 
 ```tsx
@@ -387,7 +388,7 @@ export function TwoViews({ taxonomy, graph }: { taxonomy: Taxonomy; graph: Graph
   const list = linked.of('list')
   const shown = graph.nodes.filter(node => passesSelection({ filter: list.filter, taxonomy, axes: list.axes, node }))
   // `linked.focus` switches to the view, widens its filter to show the node
-  // and, for the graph view, asks it to centre on and select the node.
+  // and, for the graph view, asks it to frame and select the node.
   return linked.active === 'graph'
     ? <GraphView graph={graph} taxonomy={taxonomy} {...linked.of('graph')} nodeAction={{ label: 'Show in list', onSelect: node => linked.focus('list', node) }} />
     : (
