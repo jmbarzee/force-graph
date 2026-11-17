@@ -102,7 +102,8 @@ pointer, so zoomed content bleeds visibly under it. The bar is one row of chips
 per axis shown, each with its lock and a `×` on hover that removes it; a `+`
 adds a declared axis not shown; then the search. The host's `findings` fill a
 slot at its bottom, and the bar can flash on a host's refresh. A host's
-`groupsControl` anchors under it, at `--gv-toolbar-height`.
+`groupsControl` anchors under it, at `--gv-toolbar-height`; a `GroupLegend`
+ends above the pane's foot, its items scrolling under the host's controls.
 
 An axis whose chips overflow its row shows the row and a count of the rest;
 the count opens it and **Less** closes it. Every axis starts closed, and which

@@ -1,10 +1,16 @@
-/* The group legend: anchored under the bar inside the pane, in the pane's theme. */
+/* The group legend: anchored under the bar inside the pane, in the pane's theme.
+   It ends 48px above the pane's foot, clear of the counts there, and past
+   that its items scroll under the title and the host's controls. */
 @layer gv {
 .gv-group-legend {
   color: var(--gv-color-text);
   position: absolute;
   top: calc(var(--gv-toolbar-height, 0px) + 12px);
   left: 12px;
+  max-height: calc(100% - var(--gv-toolbar-height, 0px) - 12px - 48px);
+  box-sizing: border-box;
+  display: flex;
+  flex-direction: column;
   z-index: 9;
   padding: 8px 10px;
   font-family: var(--gv-font-sans);
@@ -15,6 +21,7 @@
   box-shadow: var(--gv-tooltip-shadow);
 }
 .gv-group-legend-title { font-weight: 600; margin-bottom: 4px; }
+.gv-group-legend-items { min-height: 0; overflow-y: auto; }
 .gv-group-legend-row { display: flex; align-items: center; gap: 6px; padding: 2px 0; }
 label.gv-group-legend-row { cursor: pointer; }
 .gv-group-legend-row.off .gv-group-legend-label { color: var(--gv-color-text-muted); }
