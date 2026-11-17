@@ -464,9 +464,17 @@ naming its `data-gv-theme`:
 | `--gv-color-graph-label` | Node labels | `#334155` | `#cbd5e1` |
 | `--gv-badge-fill` | Node badge fill | `#7C3AED` | `#7C3AED` |
 | `--gv-badge-text` | Node badge text | `#ffffff` | `#ffffff` |
+| `--gv-on-accent` | On the accent: the switch's knob | `#ffffff` | `#ffffff` |
+| `--gv-color-attention` | An overridden lock, a search's hidden matches | `#F59E0B` | `#F59E0B` |
+| `--gv-panel-shadow` | Panels' shadow | `0 2px 8px rgba(0, 0, 0, 0.1)` | `0 2px 8px rgba(0, 0, 0, 0.4)` |
+| `--gv-bar-shadow` | The bar's shadow | `0 1px 4px rgba(0, 0, 0, 0.06)` | `0 1px 4px rgba(0, 0, 0, 0.3)` |
 | `--gv-font-sans` | Sans font | `inherit` | `inherit` |
 | `--gv-font-mono` | Mono font | `inherit` | `inherit` |
 | `--gv-radius` | Corner radius | `6px` | `6px` |
+
+Every colour the stylesheet draws is a token: `make check` refuses a hex,
+`rgb()` or `hsl()` literal in it outside `tokens.css`. A brand applied to both
+themes in a host's own CSS is [`examples/branded/`](examples/branded/).
 
 The typed path produces the same variables: `createTheme({ light, dark })`
 takes, per theme, the tokens to override, each by its role — the token

@@ -1,0 +1,27 @@
+/* The brand, per theme, on the pane's root; the bar inside it inherits. */
+
+.brand[data-gv-theme] {
+  --gv-color-surface: #FFF9F0;
+  --gv-color-bg: #F4ECDF;
+  --gv-color-border: #E3D3BC;
+  --gv-color-text: #062F40;
+  --gv-color-text-muted: #5C6F78;
+  --gv-accent: #0B4F6C;
+  --gv-focus-ring-color: #E4572E;
+  --gv-selection-ring-color: #E4572E;
+  --gv-font-sans: 'Avenir Next', 'Trebuchet MS', sans-serif;
+  --gv-font-mono: 'Menlo', 'Consolas', monospace;
+  /* The pane's text that names no font inherits it: take the brand's. */
+  font-family: var(--gv-font-sans);
+}
+
+.brand[data-gv-theme="dark"] {
+  --gv-color-surface: #0D2530;
+  --gv-color-bg: #071A22;
+  --gv-color-border: #1F4250;
+  --gv-color-text: #EAF4F8;
+  --gv-color-text-muted: #8FAAB5;
+  --gv-accent: #5FB3D4;
+  --gv-focus-ring-color: #F08A6C;
+  --gv-selection-ring-color: #F08A6C;
+}

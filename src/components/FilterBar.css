@@ -6,7 +6,7 @@
   border: 1px solid var(--gv-color-border);
   border-radius: 10px;
   margin-bottom: 20px;
-  box-shadow: 0 1px 4px rgba(0, 0, 0, 0.06);
+  box-shadow: var(--gv-bar-shadow);
   /* No overflow clip: the add-axis menu hangs below the bar. */
 }
 
@@ -16,9 +16,9 @@
 }
 
 @keyframes refreshFlash {
-  0% { box-shadow: 0 1px 4px rgba(0, 0, 0, 0.06); }
-  30% { box-shadow: 0 0 0 2px color-mix(in srgb, var(--gv-accent) var(--gv-accent-tint-ring), transparent), 0 1px 4px rgba(0, 0, 0, 0.06); }
-  100% { box-shadow: 0 1px 4px rgba(0, 0, 0, 0.06); }
+  0% { box-shadow: var(--gv-bar-shadow); }
+  30% { box-shadow: 0 0 0 2px color-mix(in srgb, var(--gv-accent) var(--gv-accent-tint-ring), transparent), var(--gv-bar-shadow); }
+  100% { box-shadow: var(--gv-bar-shadow); }
 }
 
 
@@ -283,8 +283,8 @@
   font-family: var(--gv-font-mono);
   font-size: 10px;
   font-weight: 600;
-  color: #F59E0B;
-  background: rgba(245, 158, 11, 0.16);
+  color: var(--gv-color-attention);
+  background: color-mix(in srgb, var(--gv-color-attention) 16%, transparent);
   border-radius: 8px;
   line-height: 1;
 }

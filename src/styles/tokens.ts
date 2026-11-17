@@ -11,7 +11,8 @@ import type { Taxonomy } from '../graph/taxonomy'
 export const TOKEN_ROLES = [
   'colorSurface', 'colorBg', 'colorText', 'colorTextMuted', 'colorBorder',
   'accent', 'focusRingColor', 'selectionRingColor', 'colorGraphLabel',
-  'badgeFill', 'badgeText', 'fontSans', 'fontMono', 'radius',
+  'badgeFill', 'badgeText', 'onAccent', 'colorAttention', 'panelShadow', 'barShadow',
+  'fontSans', 'fontMono', 'radius',
 ] as const
 
 type TokenRole = (typeof TOKEN_ROLES)[number]
