@@ -1,6 +1,6 @@
-/* The shell's own chrome, in its own palette: the library's tokens are the
-   pane's, declared on its root. The side panel reads the scheme's per-value
-   variables (--gv-node-<value>), which `schemeVars` puts on it. */
+/* The shell's own chrome: the side panel is scoped by `useScheme`, so it
+   reads the library's tokens and the scheme's per-value variables
+   (--gv-node-<value>) as the pane does. */
 
 html, body, #root { height: 100%; margin: 0; }
 
@@ -12,25 +12,12 @@ html, body, #root { height: 100%; margin: 0; }
 }
 /* The themed elements are the view's root and the side panel, not this shell:
    an ancestor's `data-theme` is what the view reads as the host's. */
-.catalog-pane [data-gv-theme="dark"] { color-scheme: dark; }
-.catalog-details {
-  --catalog-text: #1e293b;
-  --catalog-muted: #64748b;
-  --catalog-surface: #ffffff;
-  --catalog-border: #e2e8f0;
-}
-.catalog-details[data-theme="dark"] {
-  color-scheme: dark;
-  --catalog-text: #d4d4d4;
-  --catalog-muted: #9ca3af;
-  --catalog-surface: #252526;
-  --catalog-border: #3c3c3c;
-}
+.catalog-app [data-gv-theme="dark"] { color-scheme: dark; }
 
 /* GraphView fills a flex column with a definite height. */
 .catalog-pane { flex: 1; min-width: 0; display: flex; flex-direction: column; }
 
-.catalog-muted { color: var(--catalog-muted); }
+.catalog-muted { color: var(--gv-color-text-muted); }
 
 .catalog-findings {
   padding: 6px 14px;
@@ -50,19 +37,19 @@ html, body, #root { height: 100%; margin: 0; }
   padding: 16px;
   overflow: auto;
   font-size: 13px;
-  color: var(--catalog-text);
-  background: var(--catalog-surface);
-  border-left: 1px solid var(--catalog-border);
+  color: var(--gv-color-text);
+  background: var(--gv-color-surface);
+  border-left: 1px solid var(--gv-color-border);
 }
 .catalog-details h2 { margin: 2px 0 12px; font-size: 18px; }
 .catalog-details h3 { margin: 16px 0 6px; font-size: 13px; }
 .catalog-details dl { display: grid; grid-template-columns: auto 1fr; gap: 4px 12px; margin: 0 0 12px; }
-.catalog-details dt { color: var(--catalog-muted); }
+.catalog-details dt { color: var(--gv-color-text-muted); }
 .catalog-details dd { margin: 0; }
 .catalog-close { position: absolute; top: 8px; right: 8px; border: none; background: none; font-size: 18px; color: inherit; cursor: pointer; }
 .catalog-requires { list-style: none; margin: 0; padding: 0; }
 .catalog-requires li { display: flex; align-items: center; gap: 6px; padding: 3px 0; }
 .catalog-requires button { margin-left: auto; }
-.catalog-req { font-size: 11px; padding: 1px 6px; border-radius: 8px; border: 1px solid var(--catalog-border); }
+.catalog-req { font-size: 11px; padding: 1px 6px; border-radius: 8px; border: 1px solid var(--gv-color-border); }
 .catalog-req-prerequisite { color: var(--gv-node-course); border-color: var(--gv-node-course); }
 .catalog-missing { margin-left: auto; color: #B91C1C; font-size: 11px; }

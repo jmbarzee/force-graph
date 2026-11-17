@@ -15,7 +15,8 @@ import type { AxisId, AxisMapping } from '../graph/axis'
 import type { PresentSets } from './graph-view/present'
 import { presentSetsOf } from './graph-view/present'
 import type { EdgeStroke, Theme } from '../graph/scheme'
-import { schemeVars } from '../graph/scheme'
+import { scopeStyle } from '../styles/tokens'
+import type { ThemeTokens } from '../styles/tokens'
 import { useResolvedTheme, THEME_CHOICES } from './graph-view/useTheme'
 import type { ThemeChoice } from './graph-view/useTheme'
 import { axisOptions, layoutAxisOptions, pairTuning, sprungEdges } from '../graph/simulation'
@@ -233,6 +234,8 @@ export interface GraphViewProps {
   defaultTheme?: ThemeChoice
   /** What `system` resolves to, for a host that knows its own theme. Given, the pane reads no ancestor's `data-theme` and no OS preference for it. */
   systemTheme?: Theme
+  /** Per theme, the tokens `createTheme` overrides on the pane's root. */
+  tokens?: ThemeTokens
   /**
    * The layout — the force tuning and the node scale, as the user set them.
    * Controlled while defined: the view reads it, retunes it for the graph and
@@ -298,7 +301,7 @@ export const GraphView = React.forwardRef<GraphViewHandle, GraphViewProps>(funct
   locks: locksProp, onLocksChange, defaultLocks, overriddenLocks: hostOverridden,
   axes: hostAxes, onAxesChange, defaultAxes,
   search: searchProp, onSearchChange, defaultSearch,
-  theme: themeProp, onThemeChange, defaultTheme, systemTheme,
+  theme: themeProp, onThemeChange, defaultTheme, systemTheme, tokens,
   layout: layoutProp, onLayoutChange, defaultLayout,
   onSelectionChange, onNodeActivate, onHover, onThemeResolved, onDiagnostics,
 }: GraphViewProps, ref) {
@@ -527,7 +530,7 @@ export const GraphView = React.forwardRef<GraphViewHandle, GraphViewProps>(funct
   // visible edge's stroke is resolved here once, not per frame.
   const resolvedTheme = useResolvedTheme(containerRef, themeChoice, systemTheme)
   const theme = resolvedTheme ?? 'light'
-  const schemeStyle = React.useMemo(() => schemeVars(taxonomy, theme) as React.CSSProperties, [taxonomy, theme])
+  const schemeStyle = React.useMemo(() => scopeStyle(taxonomy, theme, tokens), [taxonomy, theme, tokens])
   const overlay = React.useMemo(() => bandOverlay(graph.nodes, forceParams, resolved, frame,
     (axis, bucket) => axis.mapping.axis === taxonomy.styleAxis() && isIdentityMapping(axis.mapping)
       ? taxonomy.styleOf(bucket).color[theme].fill
@@ -1016,7 +1019,7 @@ export const GraphView = React.forwardRef<GraphViewHandle, GraphViewProps>(funct
       data-gv-theme={theme}
       tabIndex={keyboard === 'pane' ? 0 : undefined}
       onKeyDown={keyboard === 'pane' ? paneKeyDown : undefined}
-      style={{ ...schemeStyle, ...(toolbarHeight ? { ['--gv-toolbar-height' as string]: `${toolbarHeight}px` } : {}), ...style } as React.CSSProperties}
+      style={{ ...schemeStyle, ...(toolbarHeight ? { ['--gv-toolbar-height' as string]: `${toolbarHeight}px` } : {}), ...style }}
     >
       {/* Canvas fills the full viewport beneath the floating overlay */}
       <div className="gv-graph-canvas-area">

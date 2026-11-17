@@ -7,10 +7,10 @@
 
 import React from 'react'
 import {
-  GraphView, GroupLegend, TaxonomyContext, copyGroups, initialFilter, nodesById, payloadNumber, payloadString, schemeVars, selectionFor, useFocusRequest, withSelection,
+  GraphView, GroupLegend, TaxonomyContext, copyGroups, initialFilter, nodesById, payloadNumber, payloadString, selectionFor, useFocusRequest, useScheme, withSelection,
 } from '@jmbarzee/force-graph'
 import type {
-  AxisSelection, FilterState, GraphNode, Theme, ThemeChoice,
+  AxisSelection, FilterState, GraphNode, ThemeChoice,
 } from '@jmbarzee/force-graph'
 import { catalog } from './data'
 import type { Campus, Catalog } from './data'
@@ -70,9 +70,6 @@ export function App({ initialTheme = 'system' }: { initialTheme?: ThemeChoice })
   // is a fresh one, so asking again for the same node asks again.
   const [focus, requestFocus] = useFocusRequest()
 
-  // The side panel follows the pane's theme: the view reports the one it drew in.
-  const [theme, setTheme] = React.useState<Theme>('light')
-
   const counts = React.useMemo(() => countsOf(catalog, selectionFor(filter, CAMPUS)), [filter])
   const groups = React.useMemo(() => programmeGroups(catalog, enabled), [enabled])
 
@@ -103,7 +100,6 @@ export function App({ initialTheme = 'system' }: { initialTheme?: ThemeChoice })
             onNodeActivate={setDetails}
             theme={themeChoice}
             onThemeChange={setThemeChoice}
-            onThemeResolved={setTheme}
             filter={filter}
             onFilterChange={setFilter}
             selectedId={selected?.id ?? null}
@@ -114,7 +110,7 @@ export function App({ initialTheme = 'system' }: { initialTheme?: ThemeChoice })
         {details && (
           <Details
             node={details}
-            theme={theme}
+            themeChoice={themeChoice}
             onReveal={reveal}
             onOnlyCampus={onlyCampus}
             onClose={() => { setDetails(null); setSelected(null) }}
@@ -144,27 +140,26 @@ function Findings({ messages }: { messages: readonly string[] }) {
  * What "Open details" shows: the node the view hands over, and its listings —
  * the nodes that share its copy key — for the records the node does not carry.
  *
- * The panel sits beside the view, not above it, so it carries the theme the
- * view reported on its own element. On an ancestor of the view it would be the
- * "host theme" the view reads for `system`, and the choice would stop following
- * the OS.
+ * The panel sits beside the view, not above it, and resolves the view's choice
+ * itself. On an ancestor of the view its theme would be the "host theme" the
+ * view reads for `system`, and the choice would stop following the OS.
  */
-function Details({ node, theme, onReveal, onOnlyCampus, onClose }: {
+function Details({ node, themeChoice, onReveal, onOnlyCampus, onClose }: {
   node: GraphNode
-  theme: Theme
+  themeChoice: ThemeChoice
   onReveal: (node: GraphNode) => void
   onOnlyCampus: (campus: string) => void
   onClose: () => void
 }) {
   const entity = node.values[ENTITY] as Entity | undefined
   const campus = node.values[CAMPUS] as Campus | undefined
-  const scheme = React.useMemo(() => schemeVars(taxonomy, theme) as React.CSSProperties, [theme])
+  const { scopeProps } = useScheme(taxonomy, { choice: themeChoice })
   const listings = [...(copies.get(node.copyKey ?? node.id) ?? [node.id])].flatMap(id => nodeById.get(id) ?? [])
   const first = listings[0]
   const course = catalog.courses.find(c => c.id === (first && payloadString(first, 'courseId')))
   const credits = first && payloadNumber(first, 'credits')
   return (
-    <aside className="catalog-details" data-theme={theme} style={scheme}>
+    <aside className="catalog-details" {...scopeProps}>
       <button className="catalog-close" onClick={onClose} aria-label="Close details">×</button>
       <div className="catalog-muted">{entity ? taxonomy.styleOf(entity).label : 'Unknown'}</div>
       <h2>{node.name}</h2>
