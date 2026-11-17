@@ -66,3 +66,9 @@ describe('edgeTypes', () => {
     expect(fromService!.swatch).toEqual(['service', null])
   })
 })
+
+describe('filterAxes', () => {
+  it("refuses an axis by the group filter's id", () => {
+    expect(() => createTaxonomy({ styleAxis: 'kind', styles, filterAxes: [{ id: '@groups', emptyMeans: 'none' }] })).toThrow(/"@groups" is the group filter's entry/)
+  })
+})

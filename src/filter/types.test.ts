@@ -4,7 +4,7 @@ import type { GraphNode } from '../graph/model'
 import { reconcileFilter } from './reconcile'
 import { toggleGroup, toggleValue } from './toggle'
 import type { AxisSelection, FilterState } from './types'
-import { changedAxes, filterFromJSON, filterToJSON, initialFilter, passesDescriptors, reseedFilter, selectionFor, withSelection } from './types'
+import { GROUPS, changedAxes, filterFromJSON, filterToJSON, initialFilter, passesDescriptors, passesGroups, reseedFilter, selectionFor, withSelection } from './types'
 
 // An allow-list `team` and a narrowing `region`.
 const taxonomy = createTaxonomy({
@@ -89,5 +89,34 @@ describe('a saved filter restored after the data gained a value', () => {
       const filter = reseedFilter(restored, taxonomy, grown, touched)
       expect([shown(filter, 'a'), shown(filter, 'c')]).toEqual([a, c])
     }
+  })
+})
+
+describe('the group filter', () => {
+  const opening = initialFilter(taxonomy, before)
+  const csOff = toggleValue(opening, GROUPS, 'cs')
+
+  it('shows every group while absent, so a group that arrives later shows', () => {
+    expect(opening.has(GROUPS)).toBe(false)
+    expect(selectionFor(csOff, GROUPS)).toEqual({ except: new Set(['cs']) })
+    expect([passesGroups(csOff, ['cs']), passesGroups(csOff, ['cs', 'math']), passesGroups(csOff, ['new']), passesGroups(csOff, [])]).toEqual([false, true, true, true])
+  })
+
+  it('survives filterToJSON and filterFromJSON, and a re-seed leaves it alone', () => {
+    const { restored } = restore(csOff, grown)
+    expect(filterToJSON(csOff)[GROUPS]).toEqual({ except: ['cs'] })
+    expect(selectionFor(reseedFilter(restored, taxonomy, grown), GROUPS)).toEqual({ except: new Set(['cs']) })
+  })
+
+  it('turns on every group of a focus target it hides, and nothing for one it shows', () => {
+    const focus = (filter: FilterState, groups: string[]) => reconcileFilter({ destination: filter, source: filter, locks: new Map(), transition: { kind: 'focus', target: { values: {}, groups } }, taxonomy, axes: ['team'] }).filter
+    const bothOff = toggleValue(csOff, GROUPS, 'math')
+    expect(selectionFor(focus(bothOff, ['cs', 'math']), GROUPS)).toEqual({ except: new Set() })
+    expect(focus(csOff, ['cs', 'math'])).toBe(csOff)
+  })
+
+  it("stays the destination's own on a manual switch", () => {
+    const { filter } = reconcileFilter({ destination: opening, source: csOff, locks: new Map(), transition: { kind: 'manual' }, taxonomy, axes: ['team', GROUPS] })
+    expect(filter).toBe(opening)
   })
 })

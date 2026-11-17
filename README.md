@@ -207,11 +207,13 @@ engine compares them and never parses one.
   dangling endpoint, an unknown relation, a type the rule returns that the
   table lacks, a duplicate node or edge id, a parent not in the graph. The
   view runs it, lists the diagnostics under the bar, hands them to
-  `onDiagnostics` and draws what remains — adding two warnings of its own:
+  `onDiagnostics` and draws what remains — adding three warnings of its own:
   `'containment-untyped'`, when a containment edge it derived from `parentId`
-  has no declared type, and `'group-key-undeclared'`, once per key a derived
-  group's `of` answers that its `keys` do not declare. A host that wants to
-  refuse a bad graph calls it first.
+  has no declared type, `'group-key-undeclared'`, once per key a derived
+  group's `of` answers that its `keys` do not declare, and
+  `'group-color-invalid'`, once per group or key whose `color` is not hex,
+  `rgb()` or `hsl()`, which takes a palette colour instead. A host that wants
+  to refuse a bad graph calls it first.
 
 ## The view
 
@@ -246,11 +248,13 @@ the console. Everything else is optional.
   off shows; a set the host writes stays exactly its values. `filterToJSON`
   / `filterFromJSON` and `locksToJSON` / `locksFromJSON` carry a filter and
   its locks to a URL or a store and back, and a restored filter is the
-  user's on every axis where it differs from the opening one:
+  user's on every axis where it differs from the opening one. Which groups
+  are shown rides along as the `GROUPS` entry, `'@groups'`, an exclusion
+  of the groups turned off:
 
   ```tsx
   localStorage.setItem('filter', JSON.stringify(filterToJSON(filter)))
-  // { "team": { "except": ["ops"] }, "region": ["north"] }
+  // { "team": { "except": ["ops"] }, "region": ["north"], "@groups": { "except": ["cs"] } }
   const saved = filterFromJSON(JSON.parse(localStorage.getItem('filter') ?? 'null'))
   <GraphView graph={graph} taxonomy={taxonomy} defaultFilter={saved} />
   ```
@@ -286,14 +290,19 @@ the console. Everything else is optional.
   and the node ids it covers; membership is settled once per graph and
   groups, a key or group with no `color` takes a palette slot no earlier group
   joined to it by an edge holds, so a filter that hides one recolours no
-  other, and `weight`, 0..1, swells its glow, up to double), `groupCohesion`
+  other, and `weight`, 0..1, swells its glow, up to double; the filter's
+  `GROUPS` entry hides a group's glow and every node no shown group holds, a
+  node in no group always passing, and `passesGroups(filter, groupIds)`
+  judges one), `groupCohesion`
   (a multiplier, default 1, on the stiffness of every edge whose ends share a
   visible group, so members drift together), `groupsControl` for a legend
-  inside the pane (anchor it under `--gv-toolbar-height`, and handed the
-  groups as drawn and `emphasize`;
-  `GroupLegend` is one — items, the active groups, a toggle and the
-  emphasis), `markedEdges` (edge ids drawn with a dashed band behind their
-  stroke, a graduated edge when the edge it stands for is), a `nodeAction`
+  inside the pane (anchor it under `--gv-toolbar-height`), handed the groups
+  as drawn and a `GroupsControl` — `shown(id)`, `toggle(id)` while the filter
+  is writable, which writes `GROUPS` as the bar writes an axis, and
+  `emphasize(id | null)`; `GroupLegend` is one — `items`, the `active`
+  groups and the `control`), `markedEdges` (edge ids drawn with a dashed
+  band behind their stroke, a graduated edge when the edge it stands for
+  is), a `nodeAction`
   for the hover box (`{ label, onSelect }`, or a function of the node
   answering one or null), `chrome` to turn parts of
   the pane off — `controls` (the control panel), `themeToggle` (the theme
@@ -315,7 +324,8 @@ the console. Everything else is optional.
   ancestor of the pane passes `systemTheme` too, so `'system'` follows the
   host's answer and not the pane's own echo.
 - **The handle.** Through a ref, `focusNode(id)` reveals, centres and selects
-  a node in one call — it widens the filter on the axes shown, flashes a lock
+  a node in one call — it widens the filter on the axes shown and the groups
+  it belongs to when the group filter hides it, flashes a lock
   it overrides, and centres once the layout has settled — and answers
   whether the node ended visible (a value absent on a hiding axis cannot be
   revealed); `select(id | null)` sets or clears the selection; `fit()` frames
@@ -517,9 +527,6 @@ What is not built is filed as issues:
   pair-axis mappings ([#32](https://github.com/jmbarzee/force-graph/issues/32)),
   a node drawn as a stack of ghosts
   ([#19](https://github.com/jmbarzee/force-graph/issues/19)).
-- **Groups** — hiding through the legend, one emphasis path, colours
-  validated on arrival
-  ([#17](https://github.com/jmbarzee/force-graph/issues/17)).
 - **Interaction** — selecting several nodes
   ([#28](https://github.com/jmbarzee/force-graph/issues/28)), edge hover and
   its outputs ([#16](https://github.com/jmbarzee/force-graph/issues/16)), a

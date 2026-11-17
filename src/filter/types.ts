@@ -38,17 +38,33 @@ export type FilterState = ReadonlyMap<AxisId, AxisSelection>
 export type AxisLocks = ReadonlyMap<AxisId, boolean>
 
 
+/**
+ * The entry for which groups are shown: an `AxisSelection` over group ids,
+ * saved and controlled with the axes but not one of them — a node belongs to
+ * many groups, and no taxonomy may declare an axis by this id.
+ */
+export const GROUPS: AxisId = '@groups'
+
 const EMPTY: AxisSelection = new Set<string>()
+const EVERY_GROUP: AxisSelection = { except: new Set<string>() }
 
 /**
- * The selection on one axis, or an empty one.
+ * The selection on one axis, or, absent, an empty one — `GROUPS`'s shows
+ * every group, so a filter written before a group arrived shows it.
  *
- * Always returns the *same* empty Set, so an absent axis does not change
+ * Always returns the *same* absent selection, so an absent axis does not change
  * identity between reads — a fresh `new Set()` per call would defeat exactly the
  * memoisation this module exists to protect.
  */
 export function selectionFor(state: FilterState, axis: AxisId): AxisSelection {
-  return state.get(axis) ?? EMPTY
+  return state.get(axis) ?? (axis === GROUPS ? EVERY_GROUP : EMPTY)
+}
+
+/** Whether the group filter shows a node in `groupIds`: one in no group, or one in any group it shows. */
+export function passesGroups(filter: FilterState, groupIds: readonly string[]): boolean {
+  if (groupIds.length === 0) return true
+  const selection = selectionFor(filter, GROUPS)
+  return groupIds.some(id => selects(selection, id))
 }
 
 /** Every axis the state carries a selection for. */
@@ -153,6 +169,8 @@ export function lockedFor(locks: AxisLocks, axis: AxisId): boolean {
  */
 export type FocusTarget = {
   values: Readonly<Record<AxisId, string | undefined>>
+  /** The groups the target belongs to, which a focus turns on when the group filter hides it. */
+  groups?: readonly string[]
 }
 
 /** How a view is being switched to: by the user (`manual`: adopt the source's selections) or to show a node (`focus`: widen for its values). */

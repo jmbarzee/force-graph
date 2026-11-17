@@ -6,8 +6,9 @@ import './GraphView.css'
 import { nodesById, readableGraph, isContainment, withContainmentEdges } from '../graph/model'
 import type { Graph, GraphEdge, GraphNode } from '../graph/model'
 import type { FilterState, AxisLocks } from '../filter/types'
-import { changedAxes, initialFilter, filterStatesEqual, hiddenMatchesOf, listEqual, locksEqual, passesDescriptors, reseedFilter } from '../filter/types'
+import { GROUPS, changedAxes, initialFilter, filterStatesEqual, hiddenMatchesOf, listEqual, locksEqual, reseedFilter, selectionFor, selects } from '../filter/types'
 import { reconcileFilter } from '../filter/reconcile'
+import { toggleValue } from '../filter/toggle'
 import { NO_OVERRIDES } from '../filter/linked'
 import type { LinkedViewState } from '../filter/linked'
 import type { ForceParams, SimNode, Simulation } from '../graph/simulation'
@@ -35,7 +36,7 @@ import { zoomAt } from '../graph/viewport'
 import { GraphCanvas } from './GraphCanvas'
 import { CanvasErrorBoundary } from './CanvasErrorBoundary'
 import { GraphControlPanel } from './GraphControlPanel'
-import { activeGroupsOf, boostGroupsForNodes, cohesionOf, groupSlotsOf, nodeGroupsOf, type ActiveGroup, type Groups, type NodeGroup } from '../graph/groups'
+import { activeGroupsOf, boostGroupsForNodes, cohesionOf, groupSlotsOf, groupsByNode, nodeGroupsOf, type ActiveGroup, type Groups, type NodeGroup } from '../graph/groups'
 import { FilterBar, hiddenMatchBadge } from './FilterBar'
 import type { SearchState } from './FilterBar'
 export type { SearchState } from './FilterBar'
@@ -44,7 +45,7 @@ import { useViewport } from './graph-view/useViewport'
 import { useHighlight } from './graph-view/useHighlight'
 import { useSimulation } from './graph-view/useSimulation'
 import { useVisibleGraph } from './graph-view/useVisibleGraph'
-import { neighborhoodOf } from './graph-view/visibleGraph'
+import { neighborhoodOf, passesFilter } from './graph-view/visibleGraph'
 import { useSimulationLoop } from './graph-view/useSimulationLoop'
 import { useControllable, useControlledWarning, useLatest, useStable } from './graph-view/useControllable'
 import { namesNode, sameFocusRequest } from './graph-view/focus'
@@ -72,6 +73,10 @@ export interface NodeAction {
 
 /** What `groupsControl` may ask of the view. */
 export interface GroupsControl {
+  /** Whether the filter shows this group (its `GROUPS` entry). */
+  shown(id: string): boolean
+  /** Show or hide this group, as the bar writes an axis: `onFilterChange` names `GROUPS` touched. Absent when the filter is read-only. */
+  toggle?(id: string): void
   /** Emphasise one group (a legend row under the pointer), or none; the view glows it stronger. */
   emphasize(id: string | null): void
 }
@@ -148,7 +153,7 @@ export interface GraphViewProps {
   groups?: Groups
   /** A multiplier on the stiffness of every edge whose two ends share a visible group, so members drift together. Default 1, off. */
   groupCohesion?: number
-  /** The host's control for its groups (`GroupLegend`, or its own), rendered inside the pane — which sets `--gv-toolbar-height` on its root so a control can anchor under the bar — and handed the groups as drawn, colours included, and the view's `emphasize`. */
+  /** The host's control for its groups (`GroupLegend`, or its own), rendered inside the pane — which sets `--gv-toolbar-height` on its root so a control can anchor under the bar — and handed the groups as drawn, colours included, and the view's control over them. */
   groupsControl?: (active: readonly ActiveGroup[], control: GroupsControl) => React.ReactNode
   /** Edges to mark, by id, with a dashed band behind their stroke; a graduated edge is marked when the edge it stands for is. */
   markedEdges?: ReadonlySet<string>
@@ -398,6 +403,7 @@ export const GraphView = React.forwardRef<GraphViewHandle, GraphViewProps>(funct
   }, [hostGraph, taxonomy])
   const { groups: nodeGroups, diagnostics: groupDiagnostics } = React.useMemo(() => nodeGroupsOf(groups ?? NO_GROUPS, graph.nodes), [groups, graph])
   const groupSlots = React.useMemo(() => groupSlotsOf(nodeGroups, graph.edges), [nodeGroups, graph])
+  const groupsOf = React.useMemo(() => groupsByNode(nodeGroups), [nodeGroups])
   const diagnostics = React.useMemo(() => groupDiagnostics.length ? [...graphDiagnostics, ...groupDiagnostics] : graphDiagnostics, [graphDiagnostics, groupDiagnostics])
   const graphIndex = React.useMemo(() => nodesById(graph.nodes), [graph])
   // The chip badges: the host's reading of its own data, or a count of the
@@ -552,7 +558,7 @@ export const GraphView = React.forwardRef<GraphViewHandle, GraphViewProps>(funct
   // Visible subgraph derived from the live sim (filter + edge graduation +
   // summaries + downstream-depth scores), recomputed on filter / sim-rebuild.
   const { visibleNodes, visibleEdges, visibleIds, edgeTypes, origins, nodeSummaries, downstreamScores } =
-    useVisibleGraph(simRef, simVersion, filter, filterAxes, taxonomy)
+    useVisibleGraph(simRef, simVersion, filter, filterAxes, taxonomy, groupsOf)
   visibleNodesRef.current = visibleNodes
 
   // The visible edges the host marks, each through its original.
@@ -653,12 +659,16 @@ export const GraphView = React.forwardRef<GraphViewHandle, GraphViewProps>(funct
     activePullEdge, setActivePullEdge,
   } = useHighlight(visibleNodes, visibleEdges, visibleIds, getSimNode, graph, taxonomy, selectedNodeId, hostIndex)
 
-  // The groups as drawn: the host's, restricted to the visible set and
-  // coloured by slot, the one its control emphasises glowing stronger.
+  // The groups as drawn: the ones the filter shows, restricted to the visible
+  // set and coloured by slot, the one its control emphasises glowing stronger.
   // Drives the canvas glow and the host's control.
   const [emphasizedGroup, setEmphasizedGroup] = React.useState<string | null>(null)
-  const groupsHandle = React.useMemo<GroupsControl>(() => ({ emphasize: setEmphasizedGroup }), [])
-  const activeGroups = React.useMemo(() => activeGroupsOf(nodeGroups, groupSlots, visibleIds, theme, emphasizedGroup), [nodeGroups, groupSlots, visibleIds, theme, emphasizedGroup])
+  const groupsHandle = React.useMemo<GroupsControl>(() => ({
+    shown: id => selects(selectionFor(filter, GROUPS), id),
+    toggle: filterWritable ? id => userWriteFilter(toggleValue(filterRef.current, GROUPS, id), [GROUPS]) : undefined,
+    emphasize: setEmphasizedGroup,
+  }), [filter, filterWritable, userWriteFilter, filterRef])
+  const activeGroups = React.useMemo(() => activeGroupsOf(nodeGroups, groupSlots, visibleIds, groupsHandle.shown, theme, emphasizedGroup), [nodeGroups, groupSlots, visibleIds, groupsHandle, theme, emphasizedGroup])
 
   // Canvas glow set: the active groups with the group under the hovered/selected
   // node strengthened, so one group surfaces from many faint ones as the pointer
@@ -690,7 +700,7 @@ export const GraphView = React.forwardRef<GraphViewHandle, GraphViewProps>(funct
   const { fps } = useSimulationLoop({
     simRef, running, setRunning,
     visibleIds, downstreamScores,
-    filter, axes: filterAxes,
+    filter, axes: filterAxes, groupsOf,
     hoveredNodeId, selectedNodeId,
     requestFrame, tickFrame, taxonomy,
   })
@@ -777,7 +787,7 @@ export const GraphView = React.forwardRef<GraphViewHandle, GraphViewProps>(funct
     if (!node) return false
     const base = filterRef.current
     // Widened by whole chips: the graph says which values each chip holds.
-    const result = reconcileFilter({ destination: base, source: base, locks, transition: { kind: 'focus', target: { values: node.values } }, taxonomy, axes, graph })
+    const result = reconcileFilter({ destination: base, source: base, locks, transition: { kind: 'focus', target: { values: node.values, groups: groupsOf.get(id) } }, taxonomy, axes, graph })
     // A read-only filter (controlled, no callback) cannot be widened: the
     // node is judged, centred and reported against the filter the view holds.
     const applied = filterWritable ? result.filter : base
@@ -787,7 +797,7 @@ export const GraphView = React.forwardRef<GraphViewHandle, GraphViewProps>(funct
     }
     // Whether the filter shows the node: a value absent on a hiding axis
     // cannot be revealed by widening, and the host should know.
-    const shown = passesDescriptors(applied, filterAxes, axis => node.values[axis])
+    const shown = passesFilter(node, applied, taxonomy, filterAxes, groupsOf)
     if (!shown) return false
     requestFrame({ ids: [id], minScale: 1.2, when: 'next', then: () => requestSelect(id) })
     if (!running) {
@@ -795,7 +805,7 @@ export const GraphView = React.forwardRef<GraphViewHandle, GraphViewProps>(funct
       setRunning(true)
     }
     return true
-  }, [graphIndex, graph, filterRef, filterWritable, writeFilter, flash, locks, axes, filterAxes, running, setRunning, simRef, requestFrame, requestSelect, taxonomy])
+  }, [graphIndex, graph, groupsOf, filterRef, filterWritable, writeFilter, flash, locks, axes, filterAxes, running, setRunning, simRef, requestFrame, requestSelect, taxonomy])
   // The declarative focus. A request is new when its id or key differs from
   // the last one; it waits until its node is in the graph, then runs the
   // focus recipe once and reports whether the node could be shown. A null

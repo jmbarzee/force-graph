@@ -1,5 +1,5 @@
 import { describe, expect, it } from 'vitest'
-import { activeGroupsOf, cohesionOf, GROUP_PALETTE, groupSlotsOf, nodeGroupsOf } from './groups'
+import { activeGroupsOf, cohesionOf, GROUP_PALETTE, groupsByNode, groupSlotsOf, nodeGroupsOf } from './groups'
 import type { DerivedGroups, NodeGroup } from './groups'
 import type { GraphEdge, GraphNode } from './model'
 
@@ -32,8 +32,23 @@ describe('nodeGroupsOf', () => {
   })
 
   it('hands a listed form back as given', () => {
-    const listed: NodeGroup[] = [{ id: 'x', nodeIds: new Set(['a']) }]
+    const listed: NodeGroup[] = [{ id: 'x', nodeIds: new Set(['a']), color: ' HSL(120, 50%, 40%) ' }]
     expect(nodeGroupsOf(listed, nodes)).toEqual({ groups: listed, diagnostics: [] })
+  })
+
+  it('drops a colour that is not hex, rgb() or hsl(), with one warning, for a palette slot', () => {
+    for (const color of ['nope', '#11223344', 'var(--x)']) {
+      const { groups, diagnostics } = nodeGroupsOf([group('x', 'a')].map(g => ({ ...g, color })), nodes)
+      expect(diagnostics.map(d => d.code)).toEqual(['group-color-invalid'])
+      expect(activeGroupsOf(groups, groupSlotsOf(groups, []), new Set(['a']))[0]!.color).toBe(GROUP_PALETTE.dark[0])
+    }
+    expect(nodeGroupsOf({ ...derived, keys: [{ id: 'red', label: 'Red', color: 'nope' }] }, nodes).diagnostics.map(d => d.code)).toContain('group-color-invalid')
+  })
+})
+
+describe('groupsByNode', () => {
+  it("lists each node's groups in the groups' order, and no node in none", () => {
+    expect([...groupsByNode([group('x', 'a', 'b'), group('y', 'b')])]).toEqual([['a', ['x']], ['b', ['x', 'y']]])
   })
 })
 
@@ -46,6 +61,12 @@ describe('activeGroupsOf over derived groups', () => {
     expect(redHidden.has('red')).toBe(false)
     expect(redHidden.get('green')).toBe(all.get('green'))
     expect(all.get('green')).toBe(GROUP_PALETTE.dark[2])
+  })
+
+  it('draws no glow for a group not shown, and recolours none of the others', () => {
+    const { groups } = nodeGroupsOf(derived, nodes)
+    const drawn = activeGroupsOf(groups, groupSlotsOf(groups, []), new Set(['a', 'b', 'c']), id => id !== 'red')
+    expect(drawn.map(g => [g.id, g.color])).toEqual([['blue', '#123456'], ['green', GROUP_PALETTE.dark[2]]])
   })
 })
 

@@ -107,10 +107,10 @@ export function buildGraph(catalog: Catalog): Graph {
   return { nodes, edges }
 }
 
-/** Every programme as a group, in the catalog's order; a node belongs to the enabled ones its `programmes` name. */
-export function programmeGroups(catalog: Catalog, enabled: ReadonlySet<string>): DerivedGroups {
+/** Every programme as a group, in the catalog's order; a node belongs to the ones its `programmes` name. */
+export function programmeGroups(catalog: Catalog): DerivedGroups {
   return {
     keys: catalog.programmes.map(p => ({ id: p.id, label: p.name })),
-    of: node => ((node.payload?.programmes ?? []) as string[]).filter(id => enabled.has(id)),
+    of: node => (node.payload?.programmes ?? []) as string[],
   }
 }

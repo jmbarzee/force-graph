@@ -16,9 +16,11 @@ import type {
   FocusTarget,
 } from './types'
 import {
+  GROUPS,
   filterStatesEqual,
   isEmptySelection,
   lockedFor,
+  passesGroups,
   selectionFor,
   selects,
   withSelection,
@@ -59,7 +61,8 @@ export interface ReconcileInput {
 
 /**
  * The destination view's filter after a switch: on a manual switch it adopts
- * the source's selections on the axes it shows, except where locked; on a
+ * the source's selections on the axes it shows, except where locked, and
+ * keeps its own `GROUPS` — groups are one pane's; on a
  * focus it widens just enough to show the target, overriding locks, which
  * come back in `overriddenLocks` for the bar to flash. The same filter object
  * comes back when nothing changed.
@@ -101,7 +104,8 @@ function reconcileManual(
  * adds it only while a selection is active — on a narrowing axis an empty
  * selection already shows everything, and adding the first value would
  * narrow to it. With the graph given, the whole chip holding the value is
- * added, as far as the graph presents it. Locks are not changed; each locked
+ * added, as far as the graph presents it. A target the group filter hides
+ * turns every group it belongs to on. Locks are not changed; each locked
  * axis that had to widen is reported, so the destination's bar can flash it.
  */
 function reconcileFocus(
@@ -125,6 +129,8 @@ function reconcileFocus(
     next = withSelection(next, axis.id, withValues(current, chipValues(axis, value, graph), true))
     if (lockedFor(destLocks, axis.id)) overridden.add(axis.id)
   }
+  const groups = target.groups ?? []
+  if (!passesGroups(destFilter, groups)) next = withSelection(next, GROUPS, withValues(selectionFor(destFilter, GROUPS), groups, true))
 
   return {
     filter: filterStatesEqual(next, destFilter) ? destFilter : next,

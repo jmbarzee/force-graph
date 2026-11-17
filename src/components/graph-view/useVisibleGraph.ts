@@ -1,7 +1,7 @@
 // useVisibleGraph — derives the visible subgraph from the live simulation.
 //
 // A memo wrapper over `computeVisibleGraph` (./visibleGraph), which owns the
-// derivation itself. Recomputes only on filter, axis or sim-rebuild changes
+// derivation itself. Recomputes only on filter, axis, group or sim-rebuild changes
 // (keyed on simVersion, the explicit data link to useSimulation), never per
 // frame.
 
@@ -22,11 +22,13 @@ export function useVisibleGraph(
   /** The axes the view shows — the only ones that filter. */
   axes: readonly ResolvedAxisDescriptor[],
   taxonomy: Taxonomy,
+  /** Each node's group ids, by `groupsByNode`. */
+  groupsOf: ReadonlyMap<string, readonly string[]>,
 ): VisibleGraph {
   return React.useMemo<VisibleGraph>(() => {
     const sim = simRef.current
     if (!sim) return EMPTY_VISIBLE_GRAPH
-    return computeVisibleGraph(sim, filter, taxonomy, axes)
+    return computeVisibleGraph(sim, filter, taxonomy, axes, groupsOf)
     // `filter` is a strictly better signal than the Sets it replaced: every
     // operation on a FilterState is copy-on-write and returns the SAME object
     // when content is unchanged, so its identity means "some axis actually
@@ -34,5 +36,5 @@ export function useVisibleGraph(
     //
     // simVersion is the data link to useSimulation — it bumps on (re)creation so
     // this memo recomputes when the sim instance changes.
-  }, [filter, axes, simVersion, taxonomy]) // eslint-disable-line react-hooks/exhaustive-deps
+  }, [filter, axes, simVersion, taxonomy, groupsOf]) // eslint-disable-line react-hooks/exhaustive-deps
 }

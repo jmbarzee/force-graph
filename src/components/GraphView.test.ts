@@ -8,7 +8,10 @@ import { createTaxonomy } from '../graph/taxonomy'
 import type { Graph, GraphNode } from '../graph/model'
 import type { GraphDiagnostic } from '../graph/validate'
 import type { FilterState } from '../filter/types'
-import { selectionFor, withSelection } from '../filter/types'
+import { GROUPS, initialFilter, selectionFor, withSelection } from '../filter/types'
+import { GroupLegend } from './GroupLegend'
+import type { ActiveGroup, NodeGroup } from '../graph/groups'
+import { GROUP_PALETTE } from '../graph/groups'
 
 beforeEach(() => {
   ;(globalThis as { IS_REACT_ACT_ENVIRONMENT?: boolean }).IS_REACT_ACT_ENVIRONMENT = true
@@ -64,4 +67,48 @@ it('names a parent cycle and draws past it with every node hidden', async () => 
   const view = await mount({ defaultFilter: new Map([['team', new Set<string>()]]), onDiagnostics: d => { reported = d } }, cycle)
   expect(reported.filter(d => d.code === 'parent-cycle').map(d => d.nodeId)).toEqual(['n0'])
   expect(view.el.textContent).toContain('parent-cycle')
+})
+
+// `red` holds n0 alone and shares n1 with `blue`.
+const groups: NodeGroup[] = [{ id: 'red', nodeIds: new Set(['n0', 'n1']) }, { id: 'blue', nodeIds: new Set(['n1']) }]
+
+/** Mount a view with a legend over `groups`, and what it drew and reported. */
+async function mountGroups(props: Partial<React.ComponentProps<typeof GraphView>>) {
+  let drawn: readonly ActiveGroup[] = []
+  const writes: [FilterState, readonly string[]][] = []
+  const view = await mount({
+    groups,
+    groupsControl: (active, control) => { drawn = active; return React.createElement(GroupLegend, { items: groups.map(g => ({ id: g.id, label: g.id })), active, control }) },
+    onFilterChange: (next, touched) => writes.push([next, touched]),
+    ...props,
+  })
+  return { ...view, drawn: () => drawn, lastWrite: () => writes[writes.length - 1]! }
+}
+
+it("hides a group's glow and only-members from its legend row, and a focus turns it back on", async () => {
+  const view = await mountGroups({})
+  await act(async () => view.el.querySelector<HTMLInputElement>('.gv-group-legend input')!.click())
+  const [hidden, touched] = view.lastWrite()
+  expect(selectionFor(hidden, GROUPS)).toEqual({ except: new Set(['red']) })
+  expect(touched).toEqual([GROUPS])
+  expect(view.drawn().map(g => [g.id, [...g.nodeIds]])).toEqual([['blue', ['n1']]])
+  let shown = false
+  await act(async () => { shown = view.ref.current!.focusNode('n0') })
+  expect(shown).toBe(true)
+  expect(view.lastWrite()).toEqual([withSelection(hidden, GROUPS, { except: new Set() }), []])
+})
+
+it('asks the host to widen a controlled group filter for a focus, and writes nothing of its own', async () => {
+  const filter = withSelection(initialFilter(taxonomy, first), GROUPS, { except: new Set(['red']) })
+  const view = await mountGroups({ filter })
+  await act(async () => { view.ref.current!.focusNode('n0') })
+  expect(selectionFor(view.lastWrite()[0], GROUPS)).toEqual({ except: new Set() })
+  expect(view.drawn().map(g => g.id)).toEqual(['blue'])
+})
+
+it('reports a group colour it cannot read once, and draws the group from the palette', async () => {
+  let reported: readonly GraphDiagnostic[] = []
+  const view = await mountGroups({ groups: [{ ...groups[0]!, color: 'nope' }], onDiagnostics: d => { reported = d } })
+  expect(reported.filter(d => d.code === 'group-color-invalid')).toHaveLength(1)
+  expect(view.drawn()[0]!.color).toBe(GROUP_PALETTE.light[0])
 })

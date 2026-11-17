@@ -27,6 +27,7 @@ import type { ResolvedScalarAxis, ScalarAxis } from './scalar'
 import type { EdgeStroke } from './scheme'
 import { cssSuffix, isSchemeColor } from './scheme'
 import { BUILT_IN_SCALARS, resolveScalarAxis } from './scalar'
+import { GROUPS } from '../filter/types'
 
 /** A highlight. */
 export interface Highlight {
@@ -344,6 +345,7 @@ export function createTaxonomy(spec: TaxonomySpec): Taxonomy {
   const axisIds = new Set<AxisId>()
   for (const d of filterAxes) {
     if (axisIds.has(d.id)) problems.push(`filter axis ${JSON.stringify(d.id)} is declared twice`)
+    if (d.id === GROUPS) problems.push(`filter axis ${JSON.stringify(d.id)} is the group filter's entry; name the axis otherwise`)
     axisIds.add(d.id)
     if (d.emptyMeans !== 'all' && d.emptyMeans !== 'none') {
       problems.push(`filterAxes.${d.id}.emptyMeans is ${JSON.stringify(d.emptyMeans)}, not 'all' or 'none'`)

@@ -270,7 +270,11 @@ BIOL 310) halos every listing.
 `groups` glow behind everything else on the canvas: derived, as keys the host
 declares and a function answering each node's keys, or listed, as node ids per
 group. Membership is settled once per graph and groups; a key the function
-answers that the keys do not declare is ignored and reported. Each visible
+answers that the keys do not declare is ignored and reported, and so is a
+`color` that is not hex, `rgb()` or `hsl()`, which falls back to the palette.
+Which groups are shown is the filter's `GROUPS` entry, saved and controlled
+with the axes: a hidden group draws no glow and hides every node no shown
+group holds, a node in no group always passing. Each visible
 member gets a radial halo in its group's colour that fuses with its
 neighbours' into one blob; an edge glows when both ends are in one group. A
 group without a `color` takes a small cycling palette's slot, settled in list
@@ -280,7 +284,7 @@ the palette has a slot free, and hiding one group recolours no other. A
 group's `weight` (0..1) swells its halo and corridor, up to double; hue and
 brightness stay. A focused group — the one `emphasize` names, or the one
 holding the active node — brightens and swells. In the catalog each degree
-programme is a group.
+programme is a group, and its legend's checkboxes write the group filter.
 
 ## Appearance
 
@@ -309,10 +313,12 @@ A host with a second view links them through `useLinkedViews`
 
 - **The search query** is shared by every view.
 - **A switch reconciles.** A manual switch adopts the source view's selection
-  on every axis the destination shows, except where the destination is locked.
-  A focus widens the destination only as far as its target needs, by each
-  axis's `widens` and by whole chips, and overrides a lock for that switch
-  alone; the bar flashes the overridden lock and the chips that turned on.
+  on every axis the destination shows, except where the destination is locked;
+  its group filter stays its own. A focus widens the destination only as far
+  as its target needs, by each axis's `widens` and by whole chips, turns on
+  every group of a target the group filter hides, and overrides a lock for
+  that switch alone; the bar flashes the overridden lock and the chips that
+  turned on.
   There is no switch that copies one view's filter onto another past its
   locks.
 - **`/`** opens the search of the bar on screen, unless focus is in a field

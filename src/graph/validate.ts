@@ -20,7 +20,8 @@ import type { Taxonomy } from './taxonomy'
  * the taxonomy does not declare, containment edges that contradict
  * `parentId`, derived containment edges no type claims
  * (`containment-untyped`, from `derivedContainmentDiagnostics`), a group key
- * the groups do not declare (`group-key-undeclared`, from `nodeGroupsOf`).
+ * the groups do not declare (`group-key-undeclared`) and a group colour
+ * outside the scheme's forms (`group-color-invalid`), both from `nodeGroupsOf`.
  */
 export type GraphDiagnosticCode =
   | 'edge-id-duplicate'
@@ -36,6 +37,7 @@ export type GraphDiagnosticCode =
   | 'node-id-duplicate'
   | 'containment-untyped'
   | 'group-key-undeclared'
+  | 'group-color-invalid'
 
 /** One defect in a host's graph, as data. */
 export interface GraphDiagnostic {

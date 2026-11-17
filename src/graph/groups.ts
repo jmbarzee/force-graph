@@ -9,6 +9,7 @@
 
 import type { GraphEdge, GraphNode } from './model'
 import type { Theme } from './scheme'
+import { isSchemeColor } from './scheme'
 import type { GraphDiagnostic } from './validate'
 
 // A small cycling palette per theme. Identity is carried by the host's legend,
@@ -43,9 +44,9 @@ export const GROUP_PALETTE: Readonly<Record<Theme, readonly string[]>> = {
   ],
 }
 
-// Glow intensity multiplier for a group the host emphasises (`NodeGroup
-// .emphasized`: hovered in its legend, vs. the default 1). Drives both
-// brightness and — since the canvas swells focused groups — halo/corridor size.
+// Glow intensity multiplier for the group its control emphasises (hovered in
+// its legend, vs. the default 1). Drives both brightness and — since the
+// canvas swells focused groups — halo/corridor size.
 const HOVER_STRENGTH = 2.2
 
 // Glow intensity multiplier for the group that contains the node currently
@@ -63,9 +64,7 @@ export interface NodeGroup {
   id: string
   /** The nodes in the group, visible or not. */
   nodeIds: ReadonlySet<string>
-  /** Whether the host emphasises this group; the view glows it stronger. A host's legend inside the pane uses `groupsControl`'s `emphasize` instead and leaves this out. */
-  emphasized?: boolean
-  /** The glow's colour, hex or rgb(); absent, a palette slot no group joined to it by an edge holds. */
+  /** The glow's colour: hex, `rgb()` or `hsl()`; absent or any other, a palette slot no group joined to it by an edge holds. */
   color?: string
   /** 0..1: how far the glow's halo and corridor swell; absent, they do not. */
   weight?: number
@@ -77,7 +76,7 @@ export interface LegendKey {
   id: string
   /** The key's name in a legend. */
   label: string
-  /** The key's colour, hex or rgb(); absent, a palette slot no key joined to it by an edge holds. */
+  /** The key's colour: hex, `rgb()` or `hsl()`; absent or any other, a palette slot no key joined to it by an edge holds. */
   color?: string
   /** 0..1: how far the key's glow swells; absent, it does not. */
   weight?: number
@@ -101,15 +100,25 @@ export type Groups = readonly NodeGroup[] | DerivedGroups
 const NO_DIAGNOSTICS: readonly GraphDiagnostic[] = []
 
 /**
- * The listed form of `groups` over `nodes`, and a `group-key-undeclared`
- * warning per key `of` answers that `keys` does not declare. A listed form
- * comes back as given; no warnings come back as one shared empty list.
+ * The listed form of `groups` over `nodes`, with a `group-color-invalid`
+ * warning per colour outside the scheme's forms, which is dropped, and a
+ * `group-key-undeclared` warning per key `of` answers that `keys` does not
+ * declare. A listed form with no such colour comes back as given; no
+ * warnings come back as one shared empty list.
  */
 export function nodeGroupsOf(groups: Groups, nodes: readonly GraphNode[]): { groups: readonly NodeGroup[]; diagnostics: readonly GraphDiagnostic[] } {
-  if (!('of' in groups)) return { groups, diagnostics: NO_DIAGNOSTICS }
-  const listed = groups.keys.map(k => ({ id: k.id, nodeIds: new Set<string>(), color: k.color, weight: k.weight }))
-  const members = new Map(listed.map(g => [g.id, g.nodeIds]))
   const diagnostics: GraphDiagnostic[] = []
+  const checked = <G extends { id: string; color?: string }>(g: G): G => {
+    if (g.color === undefined || isSchemeColor(g.color)) return g
+    diagnostics.push({ severity: 'warning', code: 'group-color-invalid', message: `group ${JSON.stringify(g.id)} has colour ${JSON.stringify(g.color)}, which is not hex, rgb() or hsl(); the view gives it a palette colour` })
+    return { ...g, color: undefined }
+  }
+  if (!('of' in groups)) {
+    const listed = groups.map(checked)
+    return diagnostics.length ? { groups: listed, diagnostics } : { groups, diagnostics: NO_DIAGNOSTICS }
+  }
+  const listed = groups.keys.map(checked).map(k => ({ id: k.id, nodeIds: new Set<string>(), color: k.color, weight: k.weight }))
+  const members = new Map(listed.map(g => [g.id, g.nodeIds]))
   const undeclared = new Set<string>()
   for (const node of nodes) {
     for (const key of groups.of(node)) {
@@ -155,6 +164,19 @@ export function groupSlotsOf(groups: readonly NodeGroup[], edges: readonly Graph
   return slots
 }
 
+/** Each node's group ids, in the groups' order; a node in none is absent. */
+export function groupsByNode(groups: readonly NodeGroup[]): ReadonlyMap<string, readonly string[]> {
+  const out = new Map<string, string[]>()
+  for (const g of groups) {
+    for (const id of g.nodeIds) {
+      const of = out.get(id)
+      if (of) of.push(g.id)
+      else out.set(id, [g.id])
+    }
+  }
+  return out
+}
+
 const NO_COHESION: ReadonlyMap<string, number> = new Map()
 
 /** `factor` for each edge whose two ends share a group; none when the factor is 1. */
@@ -184,18 +206,19 @@ export interface GlowGroup extends ActiveGroup {
 }
 
 /**
- * The groups as drawn: each restricted to the visible set
+ * The groups as drawn: the ones `shown`, each restricted to the visible set
  * (filter-as-source-of-truth), the empty dropped, each coloured by its slot
  * in the theme's palette — so hiding one group recolours none of the others.
  */
-export function activeGroupsOf(groups: readonly NodeGroup[], slots: readonly number[], visibleIds: ReadonlySet<string>, theme: Theme = 'dark', emphasized: string | null = null): GlowGroup[] {
+export function activeGroupsOf(groups: readonly NodeGroup[], slots: readonly number[], visibleIds: ReadonlySet<string>, shown: (id: string) => boolean = () => true, theme: Theme = 'dark', emphasized: string | null = null): GlowGroup[] {
   const palette = GROUP_PALETTE[theme]
   const out: GlowGroup[] = []
   groups.forEach((g, i) => {
+    if (!shown(g.id)) return
     const nodeIds = new Set<string>()
     for (const id of g.nodeIds) if (visibleIds.has(id)) nodeIds.add(id)
     if (nodeIds.size === 0) return
-    out.push({ id: g.id, strength: g.emphasized || g.id === emphasized ? HOVER_STRENGTH : 1, nodeIds, color: g.color ?? palette[slots[i]], weight: g.weight })
+    out.push({ id: g.id, strength: g.id === emphasized ? HOVER_STRENGTH : 1, nodeIds, color: g.color ?? palette[slots[i]], weight: g.weight })
   })
   return out
 }

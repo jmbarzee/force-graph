@@ -4,7 +4,7 @@ import { catalog } from './data'
 import { buildGraph, programmeGroups } from './graph'
 
 const graph = buildGraph(catalog)
-const { groups, diagnostics } = nodeGroupsOf(programmeGroups(catalog, new Set(catalog.programmes.map(p => p.id))), graph.nodes)
+const { groups, diagnostics } = nodeGroupsOf(programmeGroups(catalog), graph.nodes)
 const slots = groupSlotsOf(groups, graph.edges)
 const colours = (visible: ReadonlySet<string>) => new Map(activeGroupsOf(groups, slots, visible).map(g => [g.id, g.color]))
 
