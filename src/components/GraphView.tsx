@@ -8,7 +8,7 @@ import type { Graph, GraphEdge, GraphNode } from '../graph/model'
 import type { FilterState, AxisLocks } from '../filter/types'
 import { changedAxes, initialFilter, filterStatesEqual, hiddenMatchesOf, listEqual, locksEqual, passesDescriptors, reseedFilter } from '../filter/types'
 import { reconcileFilter } from '../filter/reconcile'
-import type { ForceParams, Simulation } from '../graph/simulation'
+import type { ForceParams, SimNode, Simulation } from '../graph/simulation'
 import { bandOverlay, layoutFrame, resolvePhysics } from '../graph/forces'
 import { countsOn, isIdentityMapping, valuesOn } from '../graph/axis'
 import type { AxisId, AxisMapping } from '../graph/axis'
@@ -406,8 +406,10 @@ export const GraphView = React.forwardRef<GraphViewHandle, GraphViewProps>(funct
   const copies = React.useMemo(() => copyGroups(graph), [graph])
 
   // --- Core state ---
-  // Camera (viewport transform, container ref, fit/center coordination).
-  const { viewport, setViewport, containerRef, initialFitDone, pendingCenterRef, measure, fit } = useViewport()
+  // Camera (viewport transform, container and overlay refs, every framing),
+  // framing the visible nodes, set below once they are derived.
+  const visibleNodesRef = React.useRef<SimNode[]>([])
+  const { viewport, setViewport, containerRef, overlayRef, overlayHeight, requestFrame, tickFrame } = useViewport(visibleNodesRef)
   // The simulation instance + its handlers are owned by useSimulation, and the
   // RAF loop + fps by useSimulationLoop, both called below once `graph` and the
   // visible subgraph are available.
@@ -420,22 +422,6 @@ export const GraphView = React.forwardRef<GraphViewHandle, GraphViewProps>(funct
   const searchInputRef = React.useRef<HTMLInputElement>(null)
   const [shortcutsOpen, setShortcutsOpen] = React.useState(false)
 
-  // The overlay (filter chips, search, the host's findings, the pane's
-  // diagnostics, the search results) floats over the full-bleed canvas, and
-  // its height is dynamic. It is measured whole, so a host control anchored
-  // at `--gv-toolbar-height` sits under everything the overlay shows, the open
-  // search results included.
-  const toolbarRef = React.useRef<HTMLDivElement>(null)
-  const [toolbarHeight, setToolbarHeight] = React.useState(0)
-  useIsomorphicLayoutEffect(() => {
-    const el = toolbarRef.current
-    if (!el || typeof ResizeObserver === 'undefined') return
-    const update = () => setToolbarHeight(el.getBoundingClientRect().height)
-    update()
-    const ro = new ResizeObserver(update)
-    ro.observe(el)
-    return () => ro.disconnect()
-  }, [])
   // A pane that measures no height while displayed draws nothing and says
   // nothing: said once here, with the fix. A pane hidden by its host
   // (`display: none`, a tab shell's other tab) has no offset parent and is
@@ -466,13 +452,12 @@ export const GraphView = React.forwardRef<GraphViewHandle, GraphViewProps>(funct
   )
   const recentlyChanged = useRecentlyChanged(filter, valuesByAxis)
 
-  // Reset camera/fps coordination on each sim rebuild. Held by useSimulation
-  // and invoked from its build effect.
-  // The camera refits after the first build only: a rebuild that carried the
-  // layout over keeps the user's pan and zoom.
-  const onSimRebuild = React.useCallback((continued: boolean) => {
-    if (!continued) initialFitDone.current = false
-  }, [initialFitDone])
+  // The opening frame, on each sim rebuild; invoked from useSimulation's
+  // build effect. A rebuild that carried the layout over keeps the user's pan
+  // and zoom.
+  const onSimRebuild = (continued: boolean) => {
+    if (!continued) requestFrame({ ids: graph.nodes.map(n => n.id), when: 'warm' })
+  }
 
   // The layout: the host's while `layout` is defined, the view's own
   // otherwise. Every write — the control panel's, a retune — goes through
@@ -573,6 +558,7 @@ export const GraphView = React.forwardRef<GraphViewHandle, GraphViewProps>(funct
   // summaries + downstream-depth scores), recomputed on filter / sim-rebuild.
   const { visibleNodes, visibleEdges, visibleIds, edgeTypes, origins, nodeSummaries, downstreamScores } =
     useVisibleGraph(simRef, simVersion, filter, filterAxes, taxonomy)
+  visibleNodesRef.current = visibleNodes
 
   // The visible edges the host marks, each through its original.
   const visibleMarked = React.useMemo(() => {
@@ -706,16 +692,12 @@ export const GraphView = React.forwardRef<GraphViewHandle, GraphViewProps>(funct
     return { visibleMatchIds: split.visible, hiddenMatchCount: split.hiddenCount, hiddenMatches: split.hiddenByAxis }
   }, [searchQuery, visibleIds, filter, axes, taxonomy, hostIndex])
 
-  // Physics loop + filter-driven reheats. Owns the RAF tick (with one-shot
-  // initial fit, cross-view center, fps, and stability stop), the hover tooltip
-  // re-render tick, and the seed/reheat-on-filter-change effects. It consumes the
-  // sim, the visible subgraph, and the camera/selection handles as inputs.
   const { fps } = useSimulationLoop({
     simRef, running, setRunning,
-    visibleIds, visibleNodes, downstreamScores,
+    visibleIds, downstreamScores,
     filter, axes: filterAxes,
     hoveredNodeId, selectedNodeId,
-    measure, initialFitDone, pendingCenterRef, setViewport, setSelectedNodeId: requestSelect, taxonomy,
+    requestFrame, tickFrame, taxonomy,
   })
 
   // What the host hears: the hover, a double-click, the resolved theme and
@@ -742,13 +724,13 @@ export const GraphView = React.forwardRef<GraphViewHandle, GraphViewProps>(funct
   const handleDoubleClickNode = React.useCallback((id: string) => {
     const hostNode = hostIndex.get(id)
     if (hostNode) onNodeActivateRef.current?.(hostNode)
-    if (show.activateZoom) fit(neighborhoodOf(id, visibleNodes, visibleEdges), 80)
-  }, [fit, hostIndex, show.activateZoom, visibleNodes, visibleEdges])
+    if (show.activateZoom) requestFrame({ ids: neighborhoodOf(id, visibleNodes, visibleEdges).map(n => n.id), padding: 80 })
+  }, [requestFrame, hostIndex, show.activateZoom, visibleNodes, visibleEdges])
 
   // Fit-to-view
   const handleFitToView = React.useCallback(() => {
-    fit(visibleNodes)
-  }, [fit, visibleNodes])
+    requestFrame({ ids: visibleIds })
+  }, [requestFrame, visibleIds])
 
   // Search toggle — used by the keyboard handler (Escape closes search). The
   // filter-bar's own search button has its own copy inside FilterBar. Search
@@ -788,24 +770,13 @@ export const GraphView = React.forwardRef<GraphViewHandle, GraphViewProps>(funct
   // Select node from search result
   const handleSelectSearchResult = (nodeId: string) => {
     requestSelect(nodeId)
-    // Center viewport on the node
-    const sim = simRef.current
-    const node = sim?.getNode(nodeId)
-    const size = node && measure()
-    if (!node || !size) return
-    const { width, height } = size
-    setViewport({
-      scale: viewport.scale,
-      x: width / 2 - node.x * viewport.scale,
-      y: height / 2 - node.y * viewport.scale,
-    })
+    requestFrame({ ids: [nodeId], minScale: 0 })
   }
 
   // What a host may ask of the mounted view. `focusNode` is the whole focus
   // recipe: widen the filter just enough on the axes shown (a lock it
   // overrides flashes), then centre on and select the node once the layout
   // has settled — the loop consumes the request after its warm-up.
-  const visibleNodesRef = useLatest(visibleNodes)
   const focusNodeById = React.useCallback((id: string): boolean => {
     const node = graphIndex.get(id)
     if (!node) return false
@@ -823,13 +794,13 @@ export const GraphView = React.forwardRef<GraphViewHandle, GraphViewProps>(funct
     // cannot be revealed by widening, and the host should know.
     const shown = passesDescriptors(applied, filterAxes, axis => node.values[axis])
     if (!shown) return false
-    pendingCenterRef.current = { nodeId: id }
+    requestFrame({ ids: [id], minScale: 1.2, when: 'next', then: () => requestSelect(id) })
     if (!running) {
       simRef.current?.reheat(0.1)
       setRunning(true)
     }
     return true
-  }, [graphIndex, graph, filterRef, filterWritable, writeFilter, locks, axes, filterAxes, running, setRunning, simRef, pendingCenterRef, taxonomy])
+  }, [graphIndex, graph, filterRef, filterWritable, writeFilter, locks, axes, filterAxes, running, setRunning, simRef, requestFrame, requestSelect, taxonomy])
   // The declarative focus. A request is new when its id or key differs from
   // the last one; it waits until its node is in the graph, then runs the
   // focus recipe once and reports whether the node could be shown. A null
@@ -864,7 +835,7 @@ export const GraphView = React.forwardRef<GraphViewHandle, GraphViewProps>(funct
   React.useImperativeHandle(ref, () => ({
     focusNode: focusNodeById,
     select: requestSelect,
-    fit: () => fit(visibleNodesRef.current),
+    fit: handleFitToView,
     getPositions: () => new Map((simRef.current?.nodes ?? []).map(n => [n.id, { x: n.x, y: n.y }])),
     setPositions: (next: ReadonlyMap<string, Position>) => {
       const sim = simRef.current
@@ -882,7 +853,7 @@ export const GraphView = React.forwardRef<GraphViewHandle, GraphViewProps>(funct
       const next = fn(prev)
       if (!filterStatesEqual(prev, next)) userWriteFilter(next, changedAxes(prev, next))
     },
-  }), [focusNodeById, fit, setRunning, requestSelect, simRef, visibleNodesRef, filterRef, userWriteFilter])
+  }), [focusNodeById, handleFitToView, setRunning, requestSelect, simRef, filterRef, userWriteFilter])
 
   // Keyboard, scoped by `keyboard`: on the pane, the focusable root
   // handles the keys that reach it; globally, the window does — a tab shell
@@ -1019,7 +990,7 @@ export const GraphView = React.forwardRef<GraphViewHandle, GraphViewProps>(funct
       data-gv-theme={theme}
       tabIndex={keyboard === 'pane' ? 0 : undefined}
       onKeyDown={keyboard === 'pane' ? paneKeyDown : undefined}
-      style={{ ...schemeStyle, ...(toolbarHeight ? { ['--gv-toolbar-height' as string]: `${toolbarHeight}px` } : {}), ...style }}
+      style={{ ...schemeStyle, ...(overlayHeight ? { ['--gv-toolbar-height' as string]: `${overlayHeight}px` } : {}), ...style }}
     >
       {/* Canvas fills the full viewport beneath the floating overlay */}
       <div className="gv-graph-canvas-area">
@@ -1078,7 +1049,7 @@ export const GraphView = React.forwardRef<GraphViewHandle, GraphViewProps>(funct
       {/* Floating overlay: the shared filter bar (with the host's findings), the
           pane's own diagnostics, the search results. Measured whole: its height
           is `--gv-toolbar-height`, where a host control anchors. */}
-      <div className="gv-graph-overlay" ref={toolbarRef}>
+      <div className="gv-graph-overlay" ref={overlayRef}>
         <div className="gv-graph-toolbar">
           <FilterBar
             chrome={{ search: show.search, locks: show.locks }}
