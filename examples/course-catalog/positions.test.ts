@@ -50,4 +50,21 @@ describe('kept positions', () => {
     const reloaded = new Simulation(graph, layout, seeded(2), kept)
     for (const n of reloaded.nodes) expect({ x: n.x, y: n.y }).toEqual(rested.get(n.id))
   })
+
+  it('hold still through a reload: no node moves further than one tick at the threshold', () => {
+    const rested = settle(new Simulation(graph, layout, seeded(1)))
+    // Every force scales with alpha and a rebuilt node starts at rest, so one
+    // tick at the threshold moves a node the threshold times one tick at alpha 1.
+    const warm = new Simulation(graph, layout, seeded(2), rested)
+    warm.tick()
+    const reloaded = new Simulation(graph, layout, seeded(2), rested)
+    reloaded.cool()
+    const settled = settle(reloaded)
+    for (const n of warm.nodes) {
+      const from = rested.get(n.id)!
+      const to = settled.get(n.id)!
+      const bound = params.alphaMin * Math.hypot(n.x - from.x, n.y - from.y)
+      expect(Math.hypot(to.x - from.x, to.y - from.y)).toBeLessThanOrEqual(bound * (1 + 1e-6)) // within float error
+    }
+  })
 })

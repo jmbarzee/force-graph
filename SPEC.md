@@ -42,10 +42,13 @@ the energy (alpha) cools, and ticking pauses below a threshold.
 - **Seeding.** A node starts inside its bands, low in its Y band and at its
   parent's X (in radial, on its ring near its parent's angle). A node with a
   kept position (`defaultPositions`, or the last graph's layout) starts there.
-  A changed graph keeps the camera and the tuning.
+  A changed graph keeps the camera and the tuning. A first layout with every
+  node's position given starts cool, at the threshold: a reload of what
+  `onSettled` kept holds still.
 - **Reheat.** A changed graph, a filter change, a force edit, a changed
-  `groupCohesion` and a dragged node each re-energise the layout; there is no
-  Reheat button. A node scaling edit only redraws.
+  `groupCohesion` and a dragged node each re-energise the layout, whatever
+  positions it kept; there is no Reheat button. A node scaling edit only
+  redraws.
 
 ## Which nodes are visible
 

@@ -110,7 +110,11 @@ export function useSimulation(
     // simulation's, so a graph update keeps the layout the user has.
     const start = new Map<string, { x: number; y: number }>(positions ?? [])
     if (prev) for (const n of prev.nodes) start.set(n.id, { x: n.x, y: n.y })
-    simRef.current = new Simulation(graph, { params: forceParams, resolved, frame }, defaultRng, start.size > 0 ? start : undefined)
+    const sim = new Simulation(graph, { params: forceParams, resolved, frame }, defaultRng, start.size > 0 ? start : undefined)
+    // A first build told where every node is opens where they rest: a reload
+    // holds still. A later build reheats, whatever it kept.
+    if (!prev && graph.nodes.every(n => start.has(n.id))) sim.cool()
+    simRef.current = sim
     onRebuildRef.current?.()
     setRunning(true)
     setSimVersion(v => v + 1)

@@ -768,6 +768,12 @@ export class Simulation {
     this.reheatDecay = null
   }
 
+  // Start at the threshold, for nodes already where they rest: at most one
+  // tick there, and the next stops.
+  cool(): void {
+    this.alpha = this.params.alphaMin
+  }
+
   isStable(): boolean {
     return this.alpha < this.params.alphaMin || this.alpha === 0
   }
