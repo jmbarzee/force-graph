@@ -40,10 +40,8 @@ export function useSimulation(
   // simulation is built; the previous simulation's positions take precedence
   // on a rebuild, so a graph update keeps the layout the user has.
   positions: ReadonlyMap<string, { x: number; y: number }> | undefined,
-  // Called after each (re)creation with whether positions were carried over,
-  // so the camera can keep its place when the layout kept its. Held in a ref
-  // so its changing identity never re-triggers the rebuild.
-  onRebuild: ((continued: boolean) => void) | undefined,
+  // Held in a ref, so a new identity each render never rebuilds.
+  onRebuild: (() => void) | undefined,
   // The force parameters as the view's layout state holds them, and the
   // writer every change goes through — the host's, when it controls the layout.
   forces: ForceParams,
@@ -104,7 +102,7 @@ export function useSimulation(
     const start = new Map<string, { x: number; y: number }>(positions ?? [])
     if (prev) for (const n of prev.nodes) start.set(n.id, { x: n.x, y: n.y })
     simRef.current = new Simulation(graph, forceParams, defaultRng, taxonomy, start.size > 0 ? start : undefined)
-    onRebuildRef.current?.(prev !== null)
+    onRebuildRef.current?.()
     setRunning(true)
     setSimVersion(v => v + 1)
   }, [graph, taxonomy]) // eslint-disable-line react-hooks/exhaustive-deps
