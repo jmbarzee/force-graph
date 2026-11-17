@@ -1,6 +1,6 @@
 /* The group legend: anchored under the bar inside the pane, in the pane's theme.
-   It ends 48px above the pane's foot, clear of the counts there, and past
-   that its items scroll under the title and the host's controls. */
+   It ends clear of the counts at the pane's foot, and past that its items
+   scroll under the title and the host's controls. */
 @layer gv {
 .gv-group-legend {
   color: var(--gv-color-text);
