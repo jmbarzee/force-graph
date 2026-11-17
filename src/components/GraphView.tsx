@@ -13,7 +13,7 @@ import { NO_OVERRIDES } from '../filter/linked'
 import type { LinkedViewState } from '../filter/linked'
 import type { ForceParams, SimNode, Simulation } from '../graph/simulation'
 import { bandOverlay, resolvePhysics } from '../graph/forces'
-import { countsOn, isIdentityMapping, mappingKey, valuesOn } from '../graph/axis'
+import { countsOn, isIdentityMapping, labelled, labelledBy, mappingKey, valuesOn } from '../graph/axis'
 import type { AxisId, AxisLabels, AxisMapping } from '../graph/axis'
 import type { PresentSets } from './graph-view/present'
 import { presentSetsOf } from './graph-view/present'
@@ -140,7 +140,7 @@ export interface GraphViewProps {
   graph: Graph
   /** The taxonomy, when not supplied through `TaxonomyContext`. */
   taxonomy?: Taxonomy
-  /** Names for values, per axis, ahead of the descriptor's `labelFor`, on the chips and the controls. Keep one object until a name changes. */
+  /** Names for values, per axis, ahead of the descriptor's `labelFor`, on the chips, the controls and the search results. Keep one object until a name changes. */
   labels?: AxisLabels
   /**
    * Where the pane's shortcuts listen. `pane` (the default): the root is
@@ -534,6 +534,15 @@ export const GraphView = React.forwardRef<GraphViewHandle, GraphViewProps>(funct
 
   const namedParams = React.useMemo(() => labelledParams(forceParams, taxonomy, labels), [forceParams, taxonomy, labels])
   const namedResolved = React.useMemo(() => (namedParams === forceParams ? resolved : resolvePhysics(namedParams, taxonomy)), [namedParams, forceParams, resolved, taxonomy])
+  const styleLabelOf = React.useMemo(() => {
+    const style = taxonomy.styleAxis()
+    const engine = engineOf(taxonomy)
+    const labelFor = labelled(taxonomy.axisFor(style), labels)?.labelFor ?? labelledBy(labels, style, v => taxonomy.styleOf(v).label)
+    return (node: GraphNode) => {
+      const value = engine.styleValueOf(node)
+      return value === undefined ? engine.nodeStyleOf(node).label : labelFor(value)
+    }
+  }, [taxonomy, labels])
 
   // What the push/pull tab offers: every axis this graph admits with its
   // measured token cost, and the spring categories some edge falls in under
@@ -1131,7 +1140,7 @@ export const GraphView = React.forwardRef<GraphViewHandle, GraphViewProps>(funct
                 className="gv-graph-search-result"
                 onClick={() => handleSelectSearchResult(n.id)}
               >
-                <span className="gv-graph-search-result-type">{engineOf(taxonomy).nodeStyleOf(n).label}</span>
+                <span className="gv-graph-search-result-type">{styleLabelOf(n)}</span>
                 <span className="gv-graph-search-result-name">{n.name}</span>
               </button>
             ))}

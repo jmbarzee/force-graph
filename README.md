@@ -295,9 +295,9 @@ the console. Everything else is optional.
   <GraphView graph={graph} taxonomy={taxonomy} defaultFilter={saved} />
   ```
 - **Labels.** `labels` names values per axis, beside the graph, for names
-  that arrive with the data: a chip, a control's bucket and its abbreviation
-  read a value's label from `labels`, then from the descriptor's `labelFor`,
-  then the value. The value stays the filter's key, the chip's identity and
+  that arrive with the data: a chip, a control's bucket and its abbreviation,
+  and a search result's style read a value's label from `labels`, then from
+  the descriptor's `labelFor`, then the value. The value stays the filter's key, the chip's identity and
   what `filterToJSON` writes, so two values sharing a name stay two chips.
   Keep one object until a name changes.
 
