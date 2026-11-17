@@ -4,8 +4,8 @@
 // forces"), and `tuning.ts` — the public half — calls in by value only, so its
 // declaration reaches none of this.
 
-import type { AxisId } from './axis'
-import { identityMapping } from './axis'
+import type { AxisId, AxisMapping } from './axis'
+import { createAxisMapping, identityMapping } from './axis'
 import { isFiniteNumber, isPlainRecord } from '../json'
 import type { TuningJSON, Tuning, BandAxisJSON } from './tuning'
 import type { NodeScaleParams } from './node-scale'
@@ -55,7 +55,7 @@ export function forcesToJSON(forces: ForceParams): NonNullable<TuningJSON['force
       : { axis: t.mapping.axis, ...(t.overrides.size > 0 ? { overrides: Object.fromEntries(t.overrides) } : {}) }
   const out: NonNullable<TuningJSON['forces']> = {
     pair: {
-      axis: forces.pair.mapping.axis,
+      ...(forces.pair.mapping.declared ? { mapping: forces.pair.mapping.id } : { axis: forces.pair.mapping.axis }),
       ...(forces.pair.push.size > 0 ? { push: Object.fromEntries(forces.pair.push) } : {}),
       ...(forces.pair.spring.size > 0 ? { spring: Object.fromEntries(forces.pair.spring) } : {}),
     },
@@ -140,9 +140,19 @@ class Reader {
     return identityMapping(namerFor(this.taxonomy, value as AxisId), [])
   }
 
+  /** A host mapping by its id; one the taxonomy does not declare, read leniently, is a mapping of nothing, for the view to retune. */
+  declared(value: unknown, path: string): AxisMapping {
+    if (typeof value !== 'string') this.fail(path, 'not a mapping id')
+    const mapping = engineOf(this.taxonomy).pairMappings.find(m => m.id === value)
+    if (mapping) return mapping
+    if (this.strict) this.fail(path, `no mapping "${value}"`)
+    return { ...createAxisMapping({ id: value, label: value, axis: this.taxonomy.styleAxis(), buckets: [] }), declared: true }
+  }
+
   pair(value: unknown, path: string): PairTuning {
-    const json = this.record(value, path, ['axis', 'push', 'spring'])
-    const mapping = this.mapping(json.axis, at(path, 'axis'))
+    const json = this.record(value, path, ['axis', 'mapping', 'push', 'spring'])
+    if (json.axis !== undefined && json.mapping !== undefined) this.fail(path, 'names both an axis and a mapping')
+    const mapping = json.mapping === undefined ? this.mapping(json.axis, at(path, 'axis')) : this.declared(json.mapping, at(path, 'mapping'))
     const push = new Map<string, PushPhysics>()
     if (json.push !== undefined) {
       for (const [bucket, physics] of Object.entries(this.record(json.push, at(path, 'push')))) {

@@ -45,8 +45,8 @@ export type BandAxisJSON =
 export interface TuningJSON {
   /** The forces' tuning. */
   forces?: {
-    /** The axis push and pull key on, with the buckets the user changed: each bucket's charge and core radius, each edge type's spring. */
-    pair?: { axis: AxisId; push?: Record<string, { charge: number; coreRadius: number }>; spring?: Record<string, SpringPhysics> }
+    /** What push and pull key on — an axis, by its values, or one of the taxonomy's `pairMappings` by its id — with the buckets the user changed: each bucket's charge and core radius, each edge type's spring. */
+    pair?: ({ axis: AxisId; mapping?: never } | { mapping: string; axis?: never }) & { push?: Record<string, { charge: number; coreRadius: number }>; spring?: Record<string, SpringPhysics> }
     /** The horizontal layout axis. */
     bandX?: BandAxisJSON
     /** The vertical layout axis. */
@@ -99,7 +99,8 @@ export function tuningToJSON(tuning: Tuning): TuningJSON {
  * is the defaults themselves. Throws on a mistake, naming its path: a part
  * that is not its shape or a field the JSON has no place for
  * (`forces.bandy: no such field`), an axis the taxonomy does not declare
- * (`forces.pair.axis: no axis "teem"`), a scalar it does not know
+ * (`forces.pair.axis: no axis "teem"`), a mapping it does not declare
+ * (`forces.pair.mapping: no mapping "rol"`), a scalar it does not know
  * (`forces.bandY.scalar: no scalar "credit"`).
  */
 export function createTuning(json: TuningJSON, taxonomy: Taxonomy): Tuning {
@@ -110,8 +111,8 @@ export function createTuning(json: TuningJSON, taxonomy: Taxonomy): Tuning {
  * The tuning `tuningToJSON` wrote over the taxonomy's defaults, or undefined
  * when a part present is not its shape: stored data is not trusted to be,
  * and a host falls back to the default rather than to a tuning that means
- * something else. A field it has no place for is passed over, and an axis or
- * scalar the taxonomy no longer names is the view's to retune. A tuning on an
+ * something else. A field it has no place for is passed over, and an axis,
+ * mapping or scalar the taxonomy no longer names is the view's to retune. A tuning on an
  * axis other than the style axis is built without buckets and completed by
  * the view when the graph arrives, its overrides kept where their values
  * survive.

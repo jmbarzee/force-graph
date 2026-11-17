@@ -88,6 +88,25 @@ describe('filterAxes', () => {
   })
 })
 
+describe('pairMappings', () => {
+  const bucket = (id: string, values: string[]) => ({ id, label: id, abbreviation: id.slice(0, 1), values })
+  const mapping = (id: string, buckets: ReturnType<typeof bucket>[]) => ({ id, label: id, axis: 'kind', buckets })
+
+  it('builds each mapping in declaration order', () => {
+    const taxonomy = createTaxonomy({ styleAxis: 'kind', styles, pairMappings: [mapping('role', [bucket('control', ['service', 'queue']), bucket('work', ['store'])])] })
+    expect(engineOf(taxonomy).pairMappings.map(m => m.id)).toEqual(['role'])
+    expect(engineOf(taxonomy).pairMappings[0].bucketFor('queue')?.id).toBe('control')
+  })
+
+  it.each([
+    ['a value in two buckets', [mapping('role', [bucket('a', ['service']), bucket('b', ['service'])])], /"service" is in both a and b/],
+    ['an empty bucket', [mapping('role', [bucket('a', [])])], /bucket "a" has no values/],
+    ['one id twice', [mapping('role', []), mapping('role', [])], /pair mapping "role" is declared twice/],
+  ])('refuses %s', (_, pairMappings, message) => {
+    expect(() => createTaxonomy({ styleAxis: 'kind', styles, pairMappings })).toThrow(message)
+  })
+})
+
 describe('createTaxonomy', () => {
   it('refuses a ladder id that is empty or a value’s', () => {
     expect(() => createTaxonomy({ styleAxis: 'kind', styles: [{ ...style('service'), ladder: '' }] })).toThrow(/styles\.service\.ladder is empty/)

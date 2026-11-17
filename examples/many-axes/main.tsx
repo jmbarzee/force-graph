@@ -18,6 +18,18 @@ const taxonomy = createTaxonomy({
   }],
   // One axis wears tags, so both presentations are measured.
   filterAxes: AXES.map((id, k) => ({ id, emptyMeans: 'all', presentation: k === 0 ? 'tag' : 'chip' })),
+  // Thirty regions are past the push/pull ceiling; folded into three, they key the pair forces.
+  pairMappings: [{
+    id: 'thirds',
+    label: 'Region thirds',
+    axis: 'Region',
+    buckets: [1, 2, 3].map(third => ({
+      id: `third ${third}`,
+      label: `Regions ${10 * third - 9}–${10 * third}`,
+      abbreviation: `R${third}`,
+      values: Array.from({ length: 10 }, (_, i) => `Region ${10 * third - 9 + i}`),
+    })),
+  }],
 })
 
 // Every node takes a value on every axis, so each axis presents all thirty.

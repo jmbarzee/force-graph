@@ -18,8 +18,8 @@
 //     construction.
 
 import type { ReactNode } from 'react'
-import type { AxisDescriptor, AxisId, AxisValues, AxisValue, ResolvedAxisDescriptor } from './axis'
-import { hasOwn, resolveDescriptor } from './axis'
+import type { AxisDescriptor, AxisId, AxisMapping, AxisMappingSpec, AxisValues, AxisValue, ResolvedAxisDescriptor } from './axis'
+import { createAxisMapping, hasOwn, resolveDescriptor } from './axis'
 import type { GraphEdge, GraphNode } from './model'
 import type { EdgeType, EdgeTypeId, NodeStyle, ResolvedEdgeType, ResolvedNodeStyle } from './shapes'
 import { NEUTRAL_STROKE, edgePairs, endpointValues, resolveEdgeType as resolveEdgeTypeDefaults, resolveNodeStyle as resolveNodeStyleDefaults } from './shapes'
@@ -112,6 +112,8 @@ export interface Taxonomy {
 export interface TaxonomyEngine {
   /** Every computed scalar a layout axis may key on, its words filled in: the built-ins, then the host's. */
   readonly scalars: readonly ResolvedScalarAxis[]
+  /** The host's mappings push and pull may key on, built and marked `declared`, in declaration order. */
+  readonly pairMappings: readonly AxisMapping[]
   /** How the canvas strokes an edge of this type; the neutral stroke, said once, for an id the taxonomy does not declare. */
   edgeStrokeFor(id: EdgeTypeId): EdgeStroke
   /** The hover box's context line(s) for a node — the host's, or its parent's name. */
@@ -194,6 +196,12 @@ export interface TaxonomySpec {
    */
   scalars?: readonly ScalarAxis[]
   /**
+   * Coarsenings push and pull may key on: each folds the values of its `axis`
+   * into fewer buckets, seven node types into "control" and "work", say.
+   * `createTaxonomy` refuses an incoherent one. Absent, none.
+   */
+  pairMappings?: readonly AxisMappingSpec[]
+  /**
    * The hover box's context under the name: what a host wants said there —
    * addressing metadata from its own payload, a parent by another name, an
    * origin — as one line or several. Absent, the line is the parent's name.
@@ -235,7 +243,8 @@ const DEFAULT_FALLBACK: Omit<NodeStyle, 'id' | 'ladder'> = {
  * edge type declared twice, running between values nobody declared or naming
  * no value at an end, a ladder id empty or equal to a value's, a filter axis
  * declared twice, a colour no reader can parse, a band whose ends cross, a
- * policy outside its vocabulary, a scalar id already taken. Every problem is
+ * policy outside its vocabulary, a scalar id already taken, a pair mapping
+ * declared twice or whose buckets overlap or hold nothing. Every problem is
  * named at once, by its path in the spec.
  * To derive a variant, build one from a spec (`createTaxonomy({ ...spec, … })`);
  * spreading the built object copies closures that still read the original's
@@ -371,6 +380,17 @@ export function createTaxonomy(spec: TaxonomySpec): Taxonomy {
     if (scalarIds.has(sc.id)) problems.push(`scalar ${JSON.stringify(sc.id)} is declared twice (the built-ins are reach, degree and depth)`)
     scalarIds.add(sc.id)
   }
+  const pairMappings: AxisMapping[] = []
+  const mappingIds = new Set<string>()
+  for (const m of spec.pairMappings ?? []) {
+    if (mappingIds.has(m.id)) problems.push(`pair mapping ${JSON.stringify(m.id)} is declared twice`)
+    mappingIds.add(m.id)
+    try {
+      pairMappings.push({ ...createAxisMapping(m), declared: true })
+    } catch (e) {
+      problems.push((e as Error).message)
+    }
+  }
   if (problems.length > 0) throw new Error(`taxonomy is incoherent: ${problems.join('; ')}`)
 
   // Every default filled in once. The styles are one object per value for
@@ -469,6 +489,7 @@ export function createTaxonomy(spec: TaxonomySpec): Taxonomy {
   engines.set(taxonomy, {
     abbreviationFor,
     scalars,
+    pairMappings,
     edgeStrokeFor,
     styleValueOf,
     // Hot path: one property read, one record lookup, one branch. No allocation

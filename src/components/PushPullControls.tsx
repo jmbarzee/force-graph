@@ -9,6 +9,7 @@ import type { ForceParams, AxisOption } from '../graph/simulation'
 import { fitsCeiling, TOKEN_CEILING } from '../graph/simulation'
 import type { ResolvedPhysics } from '../graph/forces'
 import type { AxisMapping } from '../graph/axis'
+import { mappingKey } from '../graph/axis'
 import { ChargeMap, ChargeCurves } from './ChargeControls'
 import { SpringMap, SpringCurves } from './SpringControls'
 import { EquationSection } from './controls/EquationSection'
@@ -66,7 +67,7 @@ export function PushPullControls({
   hoveredPushBucket, onHoverPushBucket, hoveredEdge, onHoverEdge,
 }: PushPullProps) {
   const [sub, setSub] = React.useState<PairForce>('push')
-  const current = params.pair.mapping.axis
+  const current = mappingKey(params.pair.mapping)
   return (
     <div className="gv-pushpull-controls">
       {/* The axis both forces key on — above the sub-tabs so it stays visible
@@ -79,12 +80,12 @@ export function PushPullControls({
           value={current}
           title="The axis push and pull key on. Tokens are the visible set's: a push token per bucket some visible node falls in, a pull token per spring category some sprung edge falls in; the counts measure the whole graph"
           onChange={e => {
-            const option = axes.find(o => o.mapping.axis === e.target.value)
+            const option = axes.find(o => mappingKey(o.mapping) === e.target.value)
             if (option) onAxisChange(option.mapping)
           }}
         >
           {axes.map(o => (
-            <option key={o.mapping.axis} value={o.mapping.axis} disabled={!fitsCeiling(o)}>
+            <option key={mappingKey(o.mapping)} value={mappingKey(o.mapping)} disabled={!fitsCeiling(o)}>
               {optionLabel(o)}
             </option>
           ))}

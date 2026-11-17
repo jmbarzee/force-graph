@@ -23,11 +23,13 @@ the energy (alpha) cools, and ticking pauses below a threshold.
 | Center | every node | a pull to the origin, only while no band axis and no topological pull acts |
 
 - **Push and pull key on one axis**, the push axis: the style axis unless the
-  user picks another the nodes carry. On the style axis a bucket starts from
-  its value's declared physics and the spring categories are the declared edge
-  types; on any other axis every bucket starts from the taxonomy's typical
-  physics (the mean over its values) and there is one spring category per
-  unordered bucket pair per relation. A sprung edge is an original edge with
+  user picks another the nodes carry, or one of the host's `pairMappings`,
+  which buckets an axis's values as the host declares. On the style axis a
+  bucket starts from the mean of its values' declared physics, its own
+  value's when bucketed by identity; on any other axis, from the taxonomy's
+  typical physics. The spring categories are the declared edge types only on
+  the style axis bucketed by identity; otherwise there is one per unordered
+  bucket pair per relation. A sprung edge is an original edge with
   both ends visible; a graduated edge is drawn and never sprung.
 - **Two layout axes**, X and Y, each keyed on a node axis — every bucket rests
   in a band — or on a computed scalar, read across a span from where 0 rests to
@@ -149,10 +151,14 @@ filter.
 dropdown shows an axis's push and pull token counts beside its name, a layout
 axis dropdown its column count; an axis past the ceiling is listed
 disabled with the count that disqualifies it. Switching axes starts
-from the declared or typical physics on the new buckets. When the graph changes,
-an axis bucketed by observed values is rebuilt and keeps the tuning of the
-values that survive; an axis that vanishes or outgrows the ceiling returns the
-forces to the style axis, said once on the console.
+from the declared or typical physics on the new buckets. The push axis
+dropdown lists the style axis, then the host's pair mappings, then each axis
+bucketed by its observed values; the layout axis dropdowns list no host
+mapping. When the graph changes, an axis bucketed by observed values is
+rebuilt and keeps the tuning of the values that survive, and a host mapping
+keeps all of its; an axis that vanishes or outgrows the ceiling, or a mapping
+a new taxonomy drops, returns the forces to the style axis, said once on the
+console.
 
 ### Push/Pull
 
