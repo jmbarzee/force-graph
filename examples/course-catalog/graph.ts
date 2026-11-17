@@ -90,6 +90,7 @@ export function buildGraph(catalog: Catalog): Graph {
         },
         // A listing under a subject no department owns is set apart: the ring.
         ring: dept === undefined ? 'dashed' : undefined,
+        stack: (c.sections ?? 1) > 1,
       })
     }
     // Labs belong to the course, not to a listing: they sit under the first.
@@ -109,6 +110,7 @@ export function buildGraph(catalog: Catalog): Graph {
           level: levelOf(lab.code),
           programmes: [...new Set([...programmes, ...programmesOf(catalog, [lab.code])])],
         },
+        stack: (lab.sections ?? 1) > 1,
       })
     }
   }
