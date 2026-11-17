@@ -5,6 +5,8 @@ import { beforeEach, expect, it } from 'vitest'
 import { GraphView } from './GraphView'
 import type { GraphViewHandle } from './GraphView'
 import { createTaxonomy } from '../graph/taxonomy'
+import { createTuning } from '../graph/tuning'
+import type { Tuning } from '../graph/tuning'
 import type { Graph, GraphNode } from '../graph/model'
 import type { GraphDiagnostic } from '../graph/validate'
 import type { FilterState } from '../filter/types'
@@ -111,4 +113,21 @@ it('reports a group colour it cannot read once, and draws the group from the pal
   const view = await mountGroups({ groups: [{ ...groups[0]!, color: 'nope' }], onDiagnostics: d => { reported = d } })
   expect(reported.filter(d => d.code === 'key-color-invalid')).toHaveLength(1)
   expect(view.drawn()[0]!.color).toBe(PALETTE[0].light)
+})
+
+it("runs a layout scalar's compute once per edit, for the panel, the overlay and the simulation alike", async () => {
+  let computed = 0
+  const counted = createTaxonomy({
+    styleAxis: 'kind', styles: [],
+    scalars: [{ id: 'rank', compute: graph => { computed++; return new Map([...graph.nodes].map((n, i) => [n.id, i])) } }],
+  })
+  const tuningAt = (gravityY: number) => createTuning({ forces: { bandY: { scalar: 'rank' }, gravityY } }, counted)
+  const root = createRoot(document.createElement('div'))
+  const render = (tuning: Tuning) => act(async () => {
+    root.render(React.createElement(GraphView, { graph: first, taxonomy: counted, tuning, onTuningChange: () => {} }))
+  })
+  await render(tuningAt(1))
+  computed = 0
+  await render(tuningAt(2))
+  expect(computed).toBe(1)
 })

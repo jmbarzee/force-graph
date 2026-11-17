@@ -1,6 +1,9 @@
 import { describe, expect, it } from 'vitest'
-import { Simulation } from './simulation'
+import { Simulation, defaultParamsFor } from './simulation'
+import type { ForceParams, Layout } from './simulation'
+import { layoutFrame, resolvePhysics } from './forces'
 import { createTaxonomy } from './taxonomy'
+import { readableGraph } from './model'
 import type { Graph, GraphNode } from './model'
 
 const taxonomy = createTaxonomy({
@@ -12,11 +15,17 @@ const graph: Graph = {
   nodes: ['a', 'b', 'c', 'd'].map(node),
   edges: [{ id: 'ab', sourceId: 'a', targetId: 'b' }, { id: 'cd', sourceId: 'c', targetId: 'd' }],
 }
+// What the view's hook hands over: the taxonomy's defaults under a patch, resolved and framed over the graph.
+const layoutOf = (patch: Partial<ForceParams> = {}): Layout => {
+  const params = { ...defaultParamsFor(taxonomy), ...patch }
+  const resolved = resolvePhysics(params, taxonomy)
+  return { params, resolved, frame: layoutFrame(readableGraph(graph), resolved) }
+}
 const positions = new Map([['a', { x: 0, y: 0 }], ['b', { x: 150, y: 0 }], ['c', { x: 0, y: 400 }], ['d', { x: 150, y: 400 }]])
 
 // Each node's x velocity after one tick under the given cohesion.
 const pushed = (cohesion: ReadonlyMap<string, number>) => {
-  const sim = new Simulation(graph, undefined, () => 0.5, taxonomy, positions)
+  const sim = new Simulation(graph, layoutOf(), () => 0.5, positions)
   sim.setCohesion(cohesion)
   sim.tick()
   return new Map(sim.nodes.map(n => [n.id, n.vx]))
@@ -36,7 +45,7 @@ describe('Simulation.setCohesion', () => {
 
 // Ticks until the simulation reports stable, or -1 past 100.
 const ticksToStop = (alphaMin: number): number => {
-  const sim = new Simulation(graph, { alphaDecay: 0.25, alphaMin }, () => 0.5, taxonomy)
+  const sim = new Simulation(graph, layoutOf({ alphaDecay: 0.25, alphaMin }), () => 0.5)
   for (let n = 0; n <= 100; n++) {
     if (sim.isStable()) return n
     sim.tick()
