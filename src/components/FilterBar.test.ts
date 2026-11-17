@@ -90,6 +90,15 @@ describe('FilterBar', () => {
     expect(host.querySelector('.gv-header-search-badge')?.textContent).toBe('+1')
   })
 
+  it('shows a chip by its label and toggles it by its value', async () => {
+    const changes: FilterState[] = []
+    const { host } = await mount({ labels: { team: { a: 'Alpha', b: 'Alpha' } }, onFilterChange: next => { changes.push(next) } })
+    const chips = [...host.querySelectorAll<HTMLElement>('.gv-chip')]
+    expect(chips.map(c => c.querySelector('.gv-chip-label')?.textContent)).toEqual(['Alpha', 'Alpha'])
+    await act(async () => { chips[1].click() })
+    expect(changes.map(f => [...(f.get('team') as Set<string>)])).toEqual([['a', 'b']])
+  })
+
   it('badges chips with faceted counts: each axis under the other\'s selection', async () => {
     const faceted = createTaxonomy({ styleAxis: 'kind', styles: [], filterAxes: [{ id: 'team', emptyMeans: 'none' }, { id: 'site', emptyMeans: 'all' }] })
     const graph = { nodes: [['a', 'x'], ['a', 'y'], ['b', 'y']].map(([team, site], i) => ({ id: `${i}`, name: team, values: { team, site } })), edges: [] }

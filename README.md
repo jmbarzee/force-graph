@@ -138,7 +138,9 @@ never by spreading the built object.
   elsewhere, first encounter alone), `labelFor`,
   `abbreviationFor`, `iconFor` and `tooltipFor` name and adorn values
   (defaults: the style's names and icon on the style axis, the value itself
-  and no icon elsewhere, the abbreviation from the label, no tooltip),
+  and no icon elsewhere, the abbreviation from the label, no tooltip;
+  `labelFor` is the static fallback for names the view's
+  [`labels`](#the-view) give),
   `initialSelection(values)` is the first open's selection (default every
   value on an allow-list, none on a narrowing axis), `presentation` is
   `'chip'` or `'tag'`.
@@ -292,6 +294,17 @@ the console. Everything else is optional.
   const saved = filterFromJSON(JSON.parse(localStorage.getItem('filter') ?? 'null'))
   <GraphView graph={graph} taxonomy={taxonomy} defaultFilter={saved} />
   ```
+- **Labels.** `labels` names values per axis, beside the graph, for names
+  that arrive with the data: a chip, a control's bucket and its abbreviation
+  read a value's label from `labels`, then from the descriptor's `labelFor`,
+  then the value. The value stays the filter's key, the chip's identity and
+  what `filterToJSON` writes, so two values sharing a name stay two chips.
+  Keep one object until a name changes.
+
+  ```tsx
+  const labels = { login: { ada: 'Ada Lovelace', gh: 'Grace Hopper' } }
+  <GraphView graph={graph} labels={labels} />
+  ```
 - **Selection and focus.** `selectedId` controls the selection: while it is
   defined the view shows it and nothing else, `onSelectionChange` reports the
   selections the user makes (never one the host made), and the host answers
@@ -429,7 +442,8 @@ export function TwoViews({ taxonomy, graph }: { taxonomy: Taxonomy; graph: Graph
 ```
 
 `linked.of(view)` is the view's `filter`, `locks`, `axes`, their callbacks,
-`overriddenLocks`, the shared `search` with its callback, and the `focus` the
+`overriddenLocks`, the shared `search` with its callback, the `labels` the hook
+was given, and the `focus` the
 last `linked.focus` asked of it with `onFocusResult` (a `FilterBar` ignores
 those two); it throws for a view the hook was not given (`views` is read
 once). `linked.active` is the view shown.

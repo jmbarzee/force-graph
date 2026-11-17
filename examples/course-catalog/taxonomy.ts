@@ -7,7 +7,6 @@ import type {
   AxisDescriptor, EdgeType, FilterChip, GraphNode, Highlight, HighlightGraph,
   NodeStyle, TaxonomySpec, ReadableGraph, ScalarAxis,
 } from '@jmbarzee/force-graph'
-import type { Campus } from './data'
 
 /** Node axes. `entity` is both the style axis and the allow-list filter. */
 export const ENTITY = 'entity'
@@ -16,8 +15,6 @@ export const CAMPUS = 'campus'
 export const REQUIREMENT = 'requirement'
 
 export type Entity = 'faculty' | 'department' | 'course' | 'lab'
-
-export const CAMPUS_LABEL: Record<Campus, string> = { north: 'North campus', south: 'South campus', online: 'Online' }
 
 // The node styles, top of the hierarchy first. A value declares what it is
 // called, how it looks and how big it is; the rest is the library's — the
@@ -184,9 +181,8 @@ const FILTERS: readonly AxisDescriptor[] = [
     label: 'Campus',
     // Nothing selected shows every campus; faculties and departments have none
     // and always show. A narrowing axis, so the policies and the one chip per
-    // campus are the defaults.
+    // campus are the defaults. Its names arrive with the data, as `labels`.
     emptyMeans: 'all',
-    labelFor: v => CAMPUS_LABEL[v as Campus] ?? v,
   },
 ]
 

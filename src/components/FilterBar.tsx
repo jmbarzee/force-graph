@@ -8,8 +8,8 @@
 // matches its filter hides; a pane that computes its own passes them in.
 
 import { TaxonomyContext } from './graph-view/useTaxonomy'
-import type { AxisId, AxisValue, AxisValues } from '../graph/axis'
-import { countsOn, valuesOn } from '../graph/axis'
+import type { AxisId, AxisLabels, AxisValue, AxisValues } from '../graph/axis'
+import { countsOn, labelled, valuesOn } from '../graph/axis'
 import type { Graph } from '../graph/model'
 import type { Taxonomy } from '../graph/taxonomy'
 import { useControllable, useLatest, useStable } from './graph-view/useControllable'
@@ -88,6 +88,8 @@ type SearchRecord = { id: string; values?: AxisValues }
 interface FilterBarBaseProps<R extends SearchRecord> {
   /** The taxonomy, when not supplied through `TaxonomyContext`. */
   taxonomy?: Taxonomy
+  /** Names for values, per axis, ahead of the descriptor's `labelFor`; a chip stays its value. */
+  labels?: AxisLabels
   /** Which controls are offered. Default: the search; the lock toggles when the host controls `locks` with `onLocksChange`. */
   chrome?: FilterBarChrome
   /**
@@ -237,6 +239,7 @@ const LOOKS = {
  */
 export function FilterBar<R extends SearchRecord = SearchRecord>({
   taxonomy: taxonomyProp,
+  labels,
   chrome,
   theme: themeChoice = 'system',
   systemTheme,
@@ -403,7 +406,7 @@ export function FilterBar<R extends SearchRecord = SearchRecord>({
         // An axis the taxonomy does not declare filters nothing and offers no
         // chips; it renders as its header, a note and the remove control, so
         // an axis in the list is always visible and always removable.
-        const descriptor = taxonomy.axisFor(axis)
+        const descriptor = labelled(taxonomy.axisFor(axis), labels)
         const label = descriptor?.label ?? axis
         const look = lookFor(axis, descriptor)
         // A chip none of whose values the data presents is not offered, whoever built it.

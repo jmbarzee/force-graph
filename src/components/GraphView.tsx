@@ -12,9 +12,9 @@ import { toggleValue } from '../filter/toggle'
 import { NO_OVERRIDES } from '../filter/linked'
 import type { LinkedViewState } from '../filter/linked'
 import type { ForceParams, SimNode, Simulation } from '../graph/simulation'
-import { bandOverlay } from '../graph/forces'
+import { bandOverlay, resolvePhysics } from '../graph/forces'
 import { countsOn, isIdentityMapping, mappingKey, valuesOn } from '../graph/axis'
-import type { AxisId, AxisMapping } from '../graph/axis'
+import type { AxisId, AxisLabels, AxisMapping } from '../graph/axis'
 import type { PresentSets } from './graph-view/present'
 import { presentSetsOf } from './graph-view/present'
 import type { EdgeStroke, Theme } from '../graph/scheme'
@@ -22,7 +22,7 @@ import { scopeStyle } from '../styles/tokens'
 import type { ThemeTokens } from '../styles/tokens'
 import { useResolvedTheme, THEME_CHOICES } from './graph-view/useTheme'
 import type { ThemeChoice } from './graph-view/useTheme'
-import { axisOptions, layoutAxisOptions, pairTuning, sprungEdges } from '../graph/simulation'
+import { axisOptions, labelledParams, layoutAxisOptions, pairTuning, sprungEdges } from '../graph/simulation'
 import { copyGroups, copyKeyOf } from '../graph/model'
 import type { NodeScaleParams } from '../graph/node-scale'
 import { CONTAINMENT_STROKE, NEUTRAL_STROKE, played, weighted } from '../graph/shapes'
@@ -140,6 +140,8 @@ export interface GraphViewProps {
   graph: Graph
   /** The taxonomy, when not supplied through `TaxonomyContext`. */
   taxonomy?: Taxonomy
+  /** Names for values, per axis, ahead of the descriptor's `labelFor`, on the chips and the controls. Keep one object until a name changes. */
+  labels?: AxisLabels
   /**
    * Where the pane's shortcuts listen. `pane` (the default): the root is
    * focusable and handles the keys that reach it, so a host page keeps Tab
@@ -305,6 +307,7 @@ const NO_GROUPS: readonly NodeGroup[] = []
 export const GraphView = React.forwardRef<GraphViewHandle, GraphViewProps>(function GraphView({
   graph: hostGraph,
   taxonomy: taxonomyProp,
+  labels,
   keyboard = 'pane',
   defaultPositions,
   counts: hostCounts,
@@ -528,6 +531,9 @@ export const GraphView = React.forwardRef<GraphViewHandle, GraphViewProps>(funct
     releaseFrame()
     handleNodeDragStart(id, wx, wy)
   }, [releaseFrame, handleNodeDragStart])
+
+  const namedParams = React.useMemo(() => labelledParams(forceParams, taxonomy, labels), [forceParams, taxonomy, labels])
+  const namedResolved = React.useMemo(() => (namedParams === forceParams ? resolved : resolvePhysics(namedParams, taxonomy)), [namedParams, forceParams, resolved, taxonomy])
 
   // What the push/pull tab offers: every axis this graph admits with its
   // measured token cost, and the spring categories some edge falls in under
@@ -1091,6 +1097,7 @@ export const GraphView = React.forwardRef<GraphViewHandle, GraphViewProps>(funct
         <div className="gv-graph-toolbar">
           <FilterBar
             chrome={{ search: show.search, locks: show.locks }}
+            labels={labels}
             theme={theme}
             counts={counts}
             values={valuesByAxis}
@@ -1169,8 +1176,8 @@ export const GraphView = React.forwardRef<GraphViewHandle, GraphViewProps>(funct
 
       {/* Control panel */}
       {show.controls && <GraphControlPanel
-        params={forceParams}
-        resolved={resolved}
+        params={namedParams}
+        resolved={namedResolved}
         onParamChange={handleParamChange}
         onAdjust={handleForceAdjust}
         onRelayout={handleRelayout}

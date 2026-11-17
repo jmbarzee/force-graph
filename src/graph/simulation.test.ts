@@ -1,9 +1,9 @@
 import { describe, expect, it } from 'vitest'
-import { Simulation, axisOptions, defaultParamsFor, pairTuning, retunedFor, withPushOverride } from './simulation'
+import { Simulation, axisOptions, defaultParamsFor, labelledParams, pairTuning, retunedFor, withPushOverride } from './simulation'
 import type { ForceParams, Layout } from './simulation'
 import { layoutFrame, resolvePhysics } from './forces'
 import { createTaxonomy, engineOf } from './taxonomy'
-import { mappingKey } from './axis'
+import { identityMapping, mappingKey } from './axis'
 import { readableGraph } from './model'
 import type { Graph, GraphNode } from './model'
 
@@ -102,5 +102,25 @@ describe('a declared pair mapping', () => {
     const params = { ...defaultParamsFor(declaring), pair: withPushOverride(pairTuning(engineOf(declaring).pairMappings[0]), 'control', { charge: 1, coreRadius: 2 }) }
     const grown: Graph = { ...byKind, nodes: [...byKind.nodes, { id: 'w2', name: 'w2', values: { kind: 'worker', team: 'edge' } }] }
     expect(retunedFor(params, declaring, grown).pair).toBe(params.pair)
+  })
+})
+
+describe('labelledParams', () => {
+  const taxonomy = createTaxonomy({
+    styleAxis: 'kind',
+    styles: [{ id: 'svc', label: 'Service', color: { light: { fill: '#000000', border: '#000000' }, dark: { fill: '#ffffff', border: '#ffffff' } } }],
+    filterAxes: [{ id: 'login', emptyMeans: 'all' }],
+  })
+  const params = { ...defaultParamsFor(taxonomy), bandX: { mapping: identityMapping(taxonomy.axisFor('login')!, ['ada', 'grace']), overrides: new Map() } }
+
+  it('names the controls\' buckets by labels, keeping their ids', () => {
+    const named = labelledParams(params, taxonomy, { login: { ada: 'Ada Lovelace' }, kind: { svc: 'Backend' } })
+    const buckets = (named.bandX as typeof params.bandX).mapping.buckets
+    expect(buckets.map(b => [b.id, b.label, b.abbreviation])).toEqual([['ada', 'Ada Lovelace', 'Ad'], ['grace', 'grace', 'gr']])
+    expect(named.pair.mapping.buckets.map(b => [b.id, b.label])).toEqual([['svc', 'Backend']])
+  })
+
+  it('hands back the same parameters with no labels', () => {
+    expect(labelledParams(params, taxonomy, undefined)).toBe(params)
   })
 })
