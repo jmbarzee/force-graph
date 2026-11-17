@@ -112,7 +112,11 @@ never by spreading the built object.
   field by field to the relation's stroke (`NEUTRAL_STROKE`, a quiet solid
   grey; `CONTAINMENT_STROKE`, the same grey faint and dashed, for a
   containment type), `physics` (a spring's strength and rest length) to a
-  middling spring, `tooltip` to the label. Which type an edge is:
+  middling spring, `tooltip` to the label. Resolved, in `Taxonomy.edgeTypes`,
+  a type carries `sources` and `targets`, every value each end claims (every
+  declared value for an end left out), and `swatch`, the two halves of its
+  spring-control token: each end's first value, `null` for an end left out,
+  drawn as a neutral "any". Which type an edge is:
   [Classifying an edge](#classifying-an-edge).
 - **Filter axes.** `filterAxes` defaults to the style axis as an
   allow-list. Each `AxisDescriptor` is an `id`, a `label` (default the id)

@@ -11,9 +11,11 @@ import type { ForceParams } from '../graph/simulation'
 import { withSpringOverride } from '../graph/simulation'
 import type { ResolvedPhysics } from '../graph/forces'
 import type { EdgeCategoryDescription } from '../graph/forces'
+import type { AxisMapping, AxisValue } from '../graph/axis'
+import type { Taxonomy } from '../graph/taxonomy'
 
 import { useTaxonomy } from './graph-view/useTaxonomy'
-import { bucketColor } from './controls/bucketColor'
+import { NEUTRAL_BUCKET_COLOR, bucketColor } from './controls/bucketColor'
 import { ForceMap2D, ForceCurves, CURVE_W, CURVE_H, CURVE_SAMPLES } from './ForceMap'
 import type { MapToken, CurveItem } from './ForceMap'
 
@@ -27,6 +29,10 @@ export const EDGE_REST_MAX = 1000
 export const EDGE_REST_STEP = 10
 
 const clamp = (v: number, lo: number, hi: number) => Math.max(lo, Math.min(hi, v))
+
+/** One half of a split-colour token: its value's colour, or the neutral "any" for an end the type leaves out. */
+const swatchColor = (taxonomy: Taxonomy, mapping: AxisMapping, value: AxisValue | null): string =>
+  value === null ? NEUTRAL_BUCKET_COLOR : bucketColor(taxonomy, mapping, value)
 
 /** One token per category present in the graph, in first-seen order; ids the table cannot describe are skipped. */
 function describedCategories(spring: ResolvedPhysics['spring'], present: ReadonlySet<string>): EdgeCategoryDescription[] {
@@ -65,8 +71,8 @@ export function SpringMap({ params, resolved, present, onParamChange, hoveredEdg
       id: c.id,
       x: ph.distance,
       y: ph.strength,
-      colorA: bucketColor(taxonomy, spring.mapping, c.sourceValue),
-      colorB: bucketColor(taxonomy, spring.mapping, c.targetValue),
+      colorA: swatchColor(taxonomy, spring.mapping, c.swatch[0]),
+      colorB: swatchColor(taxonomy, spring.mapping, c.swatch[1]),
       outline: c.relation === 'containment' ? 'dashed' : 'solid',
       label: c.label,
       tooltip: c.tooltip,
@@ -155,7 +161,7 @@ export function SpringCurves({ params, resolved, present, onParamChange, hovered
 
     const built = sampled.map(({ edge, restEff, pts }) => ({
       id: edge.id,
-      color: bucketColor(taxonomy, spring.mapping, edge.sourceValue),
+      color: swatchColor(taxonomy, spring.mapping, edge.swatch[0]),
       markerX: xFor(restEff),
       points: pts.map(p => `${xFor(p.d).toFixed(1)},${yFor(p.v).toFixed(1)}`).join(' '),
     }))
