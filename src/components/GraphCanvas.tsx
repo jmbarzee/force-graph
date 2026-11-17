@@ -121,11 +121,11 @@ function badgeExtent(node: { badges?: readonly string[] }, mul: number): number 
 
 const ARROWHEAD_SIZE = 8
 const CULL_MARGIN = 100
+const FLASH_MS = 600
 
 // Zoom elision thresholds
 const LABEL_ELIDE_SCALE = 0.25    // hide name labels below this scale (except hovered/selected)
 const DETAIL_REDUCE_SCALE = 0.1   // drop decorative rings below this scale
-const FLASH_MS = 600
 
 interface GraphCanvasProps {
   nodes: SimNode[]
@@ -145,7 +145,7 @@ interface GraphCanvasProps {
   hoveredNodeId: string | null
   selectedNodeId: string | null
   focusedNodeId: string | null
-  /** A node to flash: a ring that widens and fades for `FLASH_MS` from `at`, a `performance.now()` time. */
+  /** Flashes `id` for `FLASH_MS` from `at`, a `performance.now()` time. */
   flashNode: { id: string; at: number } | null
   searchMatchIds: ReadonlySet<string> | null
   running: boolean

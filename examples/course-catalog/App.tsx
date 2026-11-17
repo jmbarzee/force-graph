@@ -55,7 +55,7 @@ export function App({ initialTheme = 'system' }: { initialTheme?: ThemeChoice })
   const [kept] = React.useState(() => loadPositions(localStorage))
 
 
-  /** Ask the view to reveal `node`: it widens the filter just enough, centres and selects. */
+  /** Ask the view to reveal `node`: it widens the filter just enough, frames and selects. */
   const reveal = (node: GraphNode) => requestFocus(node.id)
   const onlyCampus = (campus: string) => setFilter(f => withSelection(f, CAMPUS, new Set([campus])))
 

@@ -339,10 +339,9 @@ A host with a second view links them through `useLinkedViews`
 - **A lock** holds one view's axis against manual switches. Unlocking resumes
   adoption from the next switch.
 - **Focus into the graph** is `focusNode`
-  ([README § The view](README.md#the-view)). It frames the node and the
-  nodes one drawn edge from it, holds that frame as the first layout's is
-  held, and selects the node. When a settled layout, a pan, zoom or drag
-  lets the frame go, a ring round the node widens and fades over 600 ms; a
+  ([README § The view](README.md#the-view)). Its frame of the node and its
+  neighbours holds as the first layout's does; when a settled layout, a pan,
+  zoom or drag lets it go, a ring round the node fades over 600 ms, and a
   newer frame lets it go without one.
 
 ## Keyboard

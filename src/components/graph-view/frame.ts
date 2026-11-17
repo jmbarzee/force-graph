@@ -13,12 +13,12 @@ import type { SimNode } from '../../graph/simulation'
  *
  * It frames at once, or when `when` says: `'warm'`, the first loop tick the
  * layout has cooled below alpha 0.3; `'next'`, the loop's next tick after any
- * warm one. A waiting request replaces the one waiting for the same `when`,
- * and `then` runs when the owner acts on it. One that `hold`s re-frames each
- * tick after it acts, until a user's pan, zoom or drag, a newer request or a
- * settled layout releases it, and `released` runs then, unless for a newer
- * request. These release one waiting to hold, too, save a `'warm'` request
- * a waiting `'next'` one, which acts after it anyway.
+ * warm one. A waiting request replaces the one waiting for the same `when`.
+ * One that `hold`s re-frames each tick after it acts, until a user's pan,
+ * zoom or drag, a newer request or a settled layout releases it, and
+ * `released` runs then, unless for a newer request. A release, or a newer
+ * request, also drops a waiting `hold` request, which then never acts, but a
+ * `'warm'` request leaves a waiting `'next'` one, which acts after it.
  */
 export interface FrameRequest {
   ids: Iterable<string>
@@ -26,7 +26,6 @@ export interface FrameRequest {
   minScale?: number
   when?: 'warm' | 'next'
   hold?: boolean
-  then?: () => void
   released?: () => void
 }
 
@@ -39,7 +38,6 @@ export function frameQueue(apply: (request: FrameRequest) => boolean) {
   let warm: FrameRequest | undefined, next: FrameRequest | undefined, held: FrameRequest | undefined
   const act = (request: FrameRequest) => {
     held = request.hold ? request : undefined
-    request.then?.()
   }
   const drop = () => {
     if (warm?.hold) warm = undefined

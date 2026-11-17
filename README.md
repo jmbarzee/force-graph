@@ -559,9 +559,7 @@ What is not built is filed as issues:
 - **Interaction** — selecting several nodes
   ([#28](https://github.com/jmbarzee/force-graph/issues/28)), edge hover and
   its outputs ([#16](https://github.com/jmbarzee/force-graph/issues/16)), a
-  focus that frames the neighbourhood
-  ([#21](https://github.com/jmbarzee/force-graph/issues/21)), a neighbourhood
-  frame that leaves hidden neighbours out
+  neighbourhood frame that leaves hidden neighbours out
   ([#26](https://github.com/jmbarzee/force-graph/issues/26)), the keyboard and
   accessibility model ([#7](https://github.com/jmbarzee/force-graph/issues/7)),
   animated reveals ([#8](https://github.com/jmbarzee/force-graph/issues/8)), an empty state

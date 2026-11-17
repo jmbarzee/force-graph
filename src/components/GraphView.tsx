@@ -735,8 +735,8 @@ export const GraphView = React.forwardRef<GraphViewHandle, GraphViewProps>(funct
   const handleDoubleClickNode = React.useCallback((id: string) => {
     const hostNode = hostIndex.get(id)
     if (hostNode) onNodeActivateRef.current?.(hostNode)
-    if (show.activateZoom) requestFrame({ ids: neighborhoodOf(id, visibleNodes, visibleEdges).map(n => n.id), padding: 80 })
-  }, [requestFrame, hostIndex, show.activateZoom, visibleNodes, visibleEdges])
+    if (show.activateZoom) requestFrame({ ids: neighborhoodOf(id, visibleEdges), padding: 80 })
+  }, [requestFrame, hostIndex, show.activateZoom, visibleEdges])
 
   // Fit-to-view
   const handleFitToView = React.useCallback(() => {
@@ -785,10 +785,6 @@ export const GraphView = React.forwardRef<GraphViewHandle, GraphViewProps>(funct
   }
 
   const [flashNode, setFlashNode] = React.useState<{ id: string; at: number } | null>(null)
-  // What a host may ask of the mounted view. `focusNode` is the whole focus
-  // recipe: widen the filter just enough on the axes shown (a lock it
-  // overrides flashes), then frame the node and its neighbors until the
-  // layout settles, select it, and flash it when the frame lets go.
   const focusNodeById = React.useCallback((id: string): boolean => {
     const node = graphIndex.get(id)
     if (!node) return false
@@ -806,13 +802,10 @@ export const GraphView = React.forwardRef<GraphViewHandle, GraphViewProps>(funct
     // cannot be revealed by widening, and the host should know.
     const shown = passesFilter(node, applied, taxonomy, filterAxes, groupsOf)
     if (!shown) return false
+    requestSelect(id)
     // Read at each frame, so the neighbors the widened filter draws count.
-    const neighborhood = { *[Symbol.iterator]() { for (const n of neighborhoodOf(id, visibleNodesRef.current, visibleEdgesRef.current)) yield n.id } }
-    requestFrame({
-      ids: neighborhood, when: 'next', hold: true,
-      then: () => requestSelect(id),
-      released: () => setFlashNode({ id, at: performance.now() }),
-    })
+    const neighborhood = { [Symbol.iterator]: () => neighborhoodOf(id, visibleEdgesRef.current).values() }
+    requestFrame({ ids: neighborhood, when: 'next', hold: true, released: () => setFlashNode({ id, at: performance.now() }) })
     if (!running) {
       simRef.current?.reheat(0.1)
       setRunning(true)
