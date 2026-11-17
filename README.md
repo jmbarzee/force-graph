@@ -178,10 +178,10 @@ engine compares them and never parses one.
 - **Containment is a tree.** A node's `parentId` names its container; the view
   derives the containment edge from it. `validateGraph` names a cycle of
   parents (`parent-cycle`), and the view clears the parent of its first node
-  in graph order. An entity that sits in two containers
-  is two nodes sharing a `copyKey`: the library indexes the copies
-  (`copyGroups`), draws their halo and counts them in the hover box. A host may
-  list containment edges of its own between any two nodes.
+  in graph order. An entity that sits in two containers is two nodes sharing
+  a `copyKey`: the library indexes the copies (`copyGroups`), draws their halo
+  and counts them in the hover box. A host may list containment edges of its
+  own between any two nodes.
 - **An edge's `relation`** is `'containment'` or `'dependency'` (the default;
   `isContainment(edge)` reads it). A containment edge from a node to its
   `parentId` is derived; one a host lists itself, to any node, is drawn in

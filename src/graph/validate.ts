@@ -59,8 +59,8 @@ const RELATIONS = new Set(['containment', 'dependency'])
  * relation, a type whose relation is not the edge's, a parent not in the
  * graph, a cycle of parents) and warnings for what it draws but the host
  * should know (an unclassified edge, an undeclared style value, containment
- * edges that contradict `parentId`). Pure; the same graph and taxonomy give the same
- * list, in graph order.
+ * edges that contradict `parentId`). Pure; the same graph and taxonomy give
+ * the same list, in graph order.
  */
 export function validateGraph(graph: Graph, taxonomy: Taxonomy): GraphDiagnostic[] {
   const out: GraphDiagnostic[] = []
@@ -154,13 +154,15 @@ function parentCycles(byId: ReadonlyMap<string, GraphNode>): GraphDiagnostic[] {
   const onCycle = new Set<string>()
   for (const start of byId.keys()) {
     const path: string[] = []
+    const pos = new Map<string, number>()
     let id: string | undefined = start
     while (id !== undefined && byId.has(id) && !done.has(id)) {
-      const at = path.indexOf(id)
-      if (at >= 0) {
+      const at = pos.get(id)
+      if (at !== undefined) {
         for (const c of path.slice(at)) onCycle.add(c)
         break
       }
+      pos.set(id, path.length)
       path.push(id)
       id = byId.get(id)!.parentId
     }
