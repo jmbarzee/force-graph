@@ -13,6 +13,10 @@
 // crash. Anything that would be composite has to be interned to a stable string
 // before it reaches this type; `internValue` is that step.
 
+import type { FilterState } from '../filter/types'
+import { passesDescriptors } from '../filter/types'
+import type { Taxonomy } from './taxonomy'
+
 /** A named axis of node identity, e.g. the type axis or the source-file axis. */
 export type AxisId = string
 
@@ -141,8 +145,15 @@ export interface AxisDescriptor {
    * rather than reading a declared list, because an axis's values are
    * derived from the graph. Absent, one chip per value, labelled by
    * `labelFor` and, on the style axis, wearing the value's icon and tint.
+   * The values arrive in `order`.
    */
   chipsFor?(values: readonly AxisValue[]): readonly FilterChip[]
+  /**
+   * The order chips take: listed values first, in this order, the rest after
+   * them in first-encounter order. Default: the taxonomy's `styles` order on
+   * the style axis, none elsewhere.
+   */
+  order?: readonly AxisValue[]
   /** A value's display name. Absent: the style's label on the style axis, else the value itself. */
   labelFor?(value: AxisValue): string
   /** One or two characters for a token. Absent: the style's abbreviation on the style axis, else the first two characters of `labelFor`'s answer. */
@@ -194,6 +205,8 @@ export interface ResolvedAxisDescriptor extends AxisNamer {
 export interface StyleNamer {
   /** The style axis: a descriptor on it takes these names by default. */
   axis: AxisId
+  /** The style values, in declaration order. */
+  values: readonly AxisValue[]
   /** A style value's label. */
   labelFor(value: AxisValue): string
   /** A style value's abbreviation. */
@@ -214,6 +227,15 @@ export function resolveDescriptor(d: AxisDescriptor, style: StyleNamer): Resolve
   const abbreviationFor = d.abbreviationFor ?? (onStyle ? style.abbreviationFor : (v: AxisValue) => labelFor(v).slice(0, 2))
   const keepCamera = d.keepCamera ?? !allow
   const iconFor = d.iconFor ?? (onStyle ? style.iconFor : () => '')
+  const order = new Set(d.order ?? (onStyle ? style.values : []))
+  const chipsFor = d.chipsFor ?? (values => values.map(v => ({
+    id: v,
+    label: labelFor(v),
+    icon: iconFor(v) || undefined,
+    tint: onStyle ? v : undefined,
+    tooltip: d.tooltipFor?.(v),
+    values: [v],
+  })))
   return {
     id: d.id,
     label: d.label ?? d.id,
@@ -225,14 +247,10 @@ export function resolveDescriptor(d: AxisDescriptor, style: StyleNamer): Resolve
     abbreviationFor,
     tooltipFor: d.tooltipFor,
     iconFor,
-    chipsFor: d.chipsFor ?? (values => values.map(v => ({
-      id: v,
-      label: labelFor(v),
-      icon: iconFor(v) || undefined,
-      tint: onStyle ? v : undefined,
-      tooltip: d.tooltipFor?.(v),
-      values: [v],
-    }))),
+    chipsFor: values => {
+      const present = new Set(values)
+      return chipsFor([...[...order].filter(v => present.has(v)), ...values.filter(v => !order.has(v))])
+    },
     initialSelection: d.initialSelection ?? (values => (allow ? values : [])),
     presentation: d.presentation ?? 'chip',
   }
@@ -413,20 +431,24 @@ export function valuesOn(
  * badges' numbers when a host does not supply its own reading. The copies of
  * one entity (`copyKey`) count once; a subject with neither key nor id counts
  * as itself. An axis no subject has a value on gets an empty map, never a
- * missing one.
+ * missing one. Given `facets`, a subject counts on an axis only when the
+ * filter's selections on the other axes pass it.
  */
 export function countsOn(
   subjects: Iterable<{ values: AxisValues; id?: string; copyKey?: string }>,
   axes: readonly AxisId[],
+  facets?: { filter: FilterState; taxonomy: Pick<Taxonomy, 'axisFor'> },
 ): ReadonlyMap<AxisId, ReadonlyMap<AxisValue, number>> {
   const counted = new Map<AxisId, Map<AxisValue, Set<string>>>(axes.map(d => [d, new Map()]))
   const out = new Map<AxisId, Map<AxisValue, number>>(axes.map(d => [d, new Map()]))
+  const descriptors = facets ? axes.flatMap(id => facets.taxonomy.axisFor(id) ?? []) : []
   let anonymous = 0
   for (const s of subjects) {
     const key = s.copyKey ?? s.id ?? `\u0000${anonymous++}`
+    const failing = descriptors.filter(x => !passesDescriptors(facets!.filter, [x], axis => s.values[axis])).map(x => x.id)
     for (const d of axes) {
       const v = s.values[d]
-      if (v === undefined) continue
+      if (v === undefined || failing.some(f => f !== d)) continue
       const keys = counted.get(d)!
       let seen = keys.get(v)
       if (!seen) { seen = new Set(); keys.set(v, seen) }

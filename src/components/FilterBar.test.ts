@@ -90,6 +90,18 @@ describe('FilterBar', () => {
     expect(host.querySelector('.gv-header-search-badge')?.textContent).toBe('+1')
   })
 
+  it('badges chips with faceted counts: each axis under the other\'s selection', async () => {
+    const faceted = createTaxonomy({ styleAxis: 'kind', styles: [], filterAxes: [{ id: 'team', emptyMeans: 'none' }, { id: 'site', emptyMeans: 'all' }] })
+    const graph = { nodes: [['a', 'x'], ['a', 'y'], ['b', 'y']].map(([team, site], i) => ({ id: `${i}`, name: team, values: { team, site } })), edges: [] }
+    const host = document.body.appendChild(document.createElement('div'))
+    const filter: FilterState = new Map([['team', new Set(['a'])], ['site', new Set(['y'])]])
+    await act(async () => {
+      createRoot(host).render(React.createElement(FilterBar, { taxonomy: faceted, axes: ['team', 'site'], graph, counts: 'faceted', filter, onFilterChange: () => {} }))
+    })
+    const badges = [...host.querySelectorAll('.gv-chip')].map(c => `${c.querySelector('.gv-chip-label')?.textContent}:${c.querySelector('.gv-header-chip-count')?.textContent}`)
+    expect(badges).toEqual(['a:1', 'b:1', 'x:1', 'y:1'])
+  })
+
   it('opens its search on / when shown, and says so', async () => {
     const { host } = await mount({})
     expect(host.querySelector('.gv-header-search-toggle')?.getAttribute('title')).toBe('Search (/)')
