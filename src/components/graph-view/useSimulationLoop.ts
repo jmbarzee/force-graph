@@ -31,7 +31,6 @@ export interface SimulationLoopParams {
   /** Each node's group ids, by `groupsByNode`. */
   groupsOf: ReadonlyMap<string, readonly string[]>
   hoveredNodeId: string | null
-  selectedNodeId: string | null
   requestFrame: (request: FrameRequest) => void
   tickFrame: (alpha: number) => void
   releaseFrame: () => void
@@ -42,7 +41,7 @@ export function useSimulationLoop({
   simRef, running, setRunning, onSettled,
   visibleIds, downstreamScores,
   filter, axes, groupsOf,
-  hoveredNodeId, selectedNodeId,
+  hoveredNodeId,
   requestFrame, tickFrame, releaseFrame, taxonomy,
 }: SimulationLoopParams): { fps: number } {
   // Frame-rate indicator. Updated ~2×/sec from the loop.
@@ -92,7 +91,7 @@ export function useSimulationLoop({
 
     frameId = requestAnimationFrame(loop)
     return () => { if (frameId) cancelAnimationFrame(frameId) }
-  }, [running, visibleIds, selectedNodeId]) // eslint-disable-line react-hooks/exhaustive-deps
+  }, [running, visibleIds]) // eslint-disable-line react-hooks/exhaustive-deps
 
   // While hovering a node during a running sim, re-render at ~10fps so the DOM
   // tooltip tracks the moving node (canvas nodes update at 60fps via refs).

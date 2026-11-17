@@ -57,7 +57,7 @@ export function App({ initialTheme = 'system', initialFocus }: { initialTheme?: 
   const [themeChoice, setThemeChoice] = React.useState<ThemeChoice>(initialTheme)
   const [details, setDetails] = React.useState<GraphNode | null>(null)
   // Controlled: the panel's close clears it, and the view selects what it says.
-  const [selected, setSelected] = React.useState<GraphNode | null>(null)
+  const [selected, setSelected] = React.useState<readonly GraphNode[]>([])
   // A request, not a state: the view applies it when it changes, and each ask
   // is a fresh one, so asking again for the same node asks again.
   const [focus, requestFocus] = useFocusRequest()
@@ -102,7 +102,7 @@ export function App({ initialTheme = 'system', initialFocus }: { initialTheme?: 
             onThemeChange={setThemeChoice}
             filter={filter}
             onFilterChange={setFilter}
-            selectedId={selected?.id ?? null}
+            selectedIds={new Set(selected.map(n => n.id))}
             onSelectionChange={setSelected}
             focus={focus}
             defaultPositions={kept}
@@ -115,7 +115,7 @@ export function App({ initialTheme = 'system', initialFocus }: { initialTheme?: 
             themeChoice={themeChoice}
             onReveal={reveal}
             onOnlyCampus={onlyCampus}
-            onClose={() => { setDetails(null); setSelected(null) }}
+            onClose={() => { setDetails(null); setSelected([]) }}
           />
         )}
       </div>

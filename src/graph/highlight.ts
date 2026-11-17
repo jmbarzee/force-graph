@@ -61,21 +61,28 @@ export function getHighlightedEdgeIds(
 }
 
 /**
- * The highlight for an active node: the library's directional walk
- * from it, both ways along an `undirected` edge, handed to the taxonomy's
- * hook to widen or replace, with the lit edges derived from the lit nodes
- * when the hook names none.
+ * The highlight for the active nodes: the union, over each, of the library's
+ * directional walk from it, both ways along an `undirected` edge, handed to
+ * the taxonomy's hook to widen or replace, with the lit edges derived from
+ * the lit nodes when the hook names none.
  */
 export function highlightOf(
   taxonomy: Taxonomy,
-  active: GraphNode,
+  active: readonly GraphNode[],
   direction: HighlightDirection,
   graph: HighlightGraph,
   undirected: ReadonlySet<string>,
 ): { nodes: Set<string>; edges: Set<string> } {
-  const walked = getTransitiveDeps(active.id, [...graph.visibleEdges], new Set(graph.visibleIds), direction, undirected)
-  const lit: Highlight = engineOf(taxonomy).highlight(active, { nodes: walked }, graph, direction)
-  const nodes = new Set(lit.nodes)
-  const edges = lit.edges ? new Set(lit.edges) : getHighlightedEdgeIds(nodes, [...graph.visibleEdges])
+  const edgeList = [...graph.visibleEdges]
+  const visible = new Set(graph.visibleIds)
+  const nodes = new Set<string>()
+  const edges = new Set<string>()
+  for (const node of active) {
+    const walked = getTransitiveDeps(node.id, edgeList, visible, direction, undirected)
+    const lit: Highlight = engineOf(taxonomy).highlight(node, { nodes: walked }, graph, direction)
+    const litNodes = new Set(lit.nodes)
+    for (const id of litNodes) nodes.add(id)
+    for (const id of lit.edges ?? getHighlightedEdgeIds(litNodes, edgeList)) edges.add(id)
+  }
   return { nodes, edges }
 }

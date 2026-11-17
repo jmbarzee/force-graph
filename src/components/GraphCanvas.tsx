@@ -22,6 +22,7 @@ import { useLatest } from './graph-view/useControllable'
 import { usePalette } from './graph-view/usePalette'
 import type { Palette } from './graph-view/usePalette'
 import { listenWheelZoom } from './graph-view/wheelZoom'
+import { lassoed, type Point } from './graph-view/lasso'
 import type { EdgeStroke, Theme } from '../graph/scheme'
 import { NEUTRAL_STROKE } from '../graph/shapes'
 import { withAlpha } from '../graph/scheme'
@@ -144,13 +145,16 @@ interface GraphCanvasProps {
   // Frame every visible node (a double-click on the background).
   onFitView: () => void
   onHoverNode: (id: string | null) => void
-  onSelectNode: (id: string | null) => void
+  /** A click: on a node, `additive` (Ctrl/Meta) toggling it; on the background, null. */
+  onSelectNode: (id: string | null, additive: boolean) => void
+  /** A Ctrl/Meta+drag from the background released: the nodes it encloses. */
+  onLassoSelect: (ids: string[]) => void
   highlightedNodes: Set<string> | null
   highlightedEdges: Set<string> | null
   hoveredNodeId: string | null
   hoveredEdgeId: string | null
   onHoverEdge: (hover: EdgeHover | null) => void
-  selectedNodeId: string | null
+  selectedNodeIds: ReadonlySet<string>
   focusedNodeId: string | null
   /** Flashes `id` for `FLASH_MS` from `at`, a `performance.now()` time. */
   flashNode: { id: string; at: number } | null
@@ -197,8 +201,6 @@ function laneOffset(
   const ny = (dx / len) * offset
   return [sx + nx, sy + ny, tx + nx, ty + ny]
 }
-
-type Point = { x: number; y: number }
 
 /** An edge's stroke on screen, source to target, in its lane. */
 function segmentOf(
@@ -255,7 +257,7 @@ interface DrawData {
   highlightedEdges: Set<string> | null
   hoveredNodeId: string | null
   hoveredEdgeId: string | null
-  selectedNodeId: string | null
+  selectedNodeIds: ReadonlySet<string>
   focusedNodeId: string | null
   flashNode: { id: string; at: number } | null
   searchMatchIds: ReadonlySet<string> | null
@@ -275,10 +277,9 @@ interface DrawData {
   // Set of node ids where the same underlying definition appears more than
   // once in the visible set (on different hosts). Drawn with a colored halo.
   dupNodeIds: Set<string>
-  // The definitionKey of the currently hovered or selected node, when that
-  // node belongs to a duplicate group. All visible nodes sharing this key
-  // receive the duplicate halo. Null when no dup node is active.
-  activeDupDefKey: string | null
+  // The copy keys of the hovered and selected nodes that have copies. All
+  // visible nodes sharing one receive the duplicate halo.
+  activeDupDefKeys: ReadonlySet<string>
   // The tokens the frame draws in; undefined until the canvas mounts.
   palette: Palette | undefined
 }
@@ -286,18 +287,20 @@ interface DrawData {
 export function GraphCanvas({
   nodes, edges, viewport, onViewportChange,
   onNodeDragStart, onNodeDragMove, onNodeDragEnd,
-  onDoubleClickNode, onFitView, onHoverNode, onSelectNode,
+  onDoubleClickNode, onFitView, onHoverNode, onSelectNode, onLassoSelect,
   highlightedNodes, highlightedEdges,
-  hoveredNodeId, hoveredEdgeId, onHoverEdge, selectedNodeId, focusedNodeId, flashNode, searchMatchIds,
+  hoveredNodeId, hoveredEdgeId, onHoverEdge, selectedNodeIds, focusedNodeId, flashNode, searchMatchIds,
   running, forceParams, resolved, overlay, theme, edgeStrokes, edgeOffsets, undirectedEdges, activeSection, activePushBucket,
   activeGravityBucket, activePullEdge, nodeScale, groupGlows, markedEdges,
 }: GraphCanvasProps) {
   const canvasRef = React.useRef<HTMLCanvasElement>(null)
   const containerRef = React.useRef<HTMLDivElement>(null)
   const [size, setSize] = React.useState({ w: 0, h: 0 })
-  const dragState = React.useRef<{
-    type: 'pan' | 'node'
-    startVp?: Viewport
+  const dragState = React.useRef<(
+    | { type: 'pan' | 'node'; startVp?: Viewport }
+    /** `path` is the lasso so far, in screen pixels. */
+    | { type: 'lasso'; path: Point[] }
+  ) & {
     sx: number
     sy: number
     moved: boolean
@@ -322,16 +325,9 @@ export function GraphCanvas({
     return result
   }, [nodes])
 
-  // The copy key of the currently active (hovered or selected) node, when
-  // that node has copies. Used by the draw loop to light up every copy with
-  // the halo, not just the active node itself.
-  const activeDupDefKey = React.useMemo(() => {
-    const activeId = hoveredNodeId ?? selectedNodeId
-    if (!activeId) return null
-    const activeNode = nodeMap.get(activeId)
-    if (!activeNode || !dupNodeIds.has(activeId)) return null
-    return copyKeyOf(activeNode)
-  }, [hoveredNodeId, selectedNodeId, nodeMap, dupNodeIds])
+  const activeDupDefKeys = React.useMemo(() => new Set(nodes
+    .filter(n => dupNodeIds.has(n.id) && (n.id === hoveredNodeId || selectedNodeIds.has(n.id)))
+    .map(copyKeyOf)), [nodes, hoveredNodeId, selectedNodeIds, dupNodeIds])
 
   const taxonomy = useTaxonomy()
   const fill = useFill(taxonomy)
@@ -341,16 +337,16 @@ export function GraphCanvas({
   const drawData = React.useRef<DrawData>({
     taxonomy, fill,
     nodes, edges, nodeMap, viewport, groupGlows, markedEdges, highlightedNodes, highlightedEdges,
-    hoveredNodeId, hoveredEdgeId, selectedNodeId, focusedNodeId, flashNode, searchMatchIds,
+    hoveredNodeId, hoveredEdgeId, selectedNodeIds, focusedNodeId, flashNode, searchMatchIds,
     forceParams, resolved, overlay, theme, edgeStrokes, edgeOffsets, undirectedEdges, activeSection, activePushBucket, activeGravityBucket, activePullEdge, nodeScale, running,
-    dupNodeIds, activeDupDefKey, palette,
+    dupNodeIds, activeDupDefKeys, palette,
   })
   drawData.current = {
     taxonomy, fill,
     nodes, edges, nodeMap, viewport, groupGlows, markedEdges, highlightedNodes, highlightedEdges,
-    hoveredNodeId, hoveredEdgeId, selectedNodeId, focusedNodeId, flashNode, searchMatchIds,
+    hoveredNodeId, hoveredEdgeId, selectedNodeIds, focusedNodeId, flashNode, searchMatchIds,
     forceParams, resolved, overlay, theme, edgeStrokes, edgeOffsets, undirectedEdges, activeSection, activePushBucket, activeGravityBucket, activePullEdge, nodeScale, running,
-    dupNodeIds, activeDupDefKey, palette,
+    dupNodeIds, activeDupDefKeys, palette,
   }
 
   // Resize observer
@@ -402,6 +398,9 @@ export function GraphCanvas({
       dragState.current = { type: 'node', sx, sy, moved: false }
       const [wx, wy] = screenToWorld(viewport, sx, sy)
       onNodeDragStart(node.id, wx, wy)
+    } else if (e.ctrlKey || e.metaKey) {
+      dragState.current = { type: 'lasso', path: [{ x: sx, y: sy }], sx, sy, moved: false }
+      onHoverEdge(null)
     } else {
       dragState.current = { type: 'pan', startVp: { ...viewport }, sx, sy, moved: false }
       onHoverEdge(null)
@@ -436,6 +435,9 @@ export function GraphCanvas({
     } else if (dragState.current.type === 'node') {
       const [wx, wy] = screenToWorld(viewport, cx, cy)
       onNodeDragMove(wx, wy)
+    } else if (dragState.current.type === 'lasso') {
+      dragState.current.path.push({ x: cx, y: cy })
+      dirtyRef.current = true
     }
   }, [viewport, hitTest, onViewportChange, onNodeDragMove, onHoverNode, onHoverEdge, edges, nodeMap, edgeOffsets, edgeStrokes])
 
@@ -449,15 +451,24 @@ export function GraphCanvas({
         const sx = e.clientX - rect.left
         const sy = e.clientY - rect.top
         const node = hitTest(sx, sy)
-        if (node) onSelectNode(node.id)
+        if (node) onSelectNode(node.id, e.ctrlKey || e.metaKey)
       }
     } else if (ds?.type === 'pan' && !ds.moved) {
       // Click on background → deselect
-      onSelectNode(null)
+      onSelectNode(null, false)
+    } else if (ds?.type === 'lasso' && ds.moved) {
+      onLassoSelect(lassoed(ds.path, nodes, viewport))
+      dirtyRef.current = true
     }
     dragState.current = null
     canvasRef.current?.releasePointerCapture(e.pointerId)
-  }, [onNodeDragEnd, onSelectNode, hitTest])
+  }, [onNodeDragEnd, onSelectNode, onLassoSelect, hitTest, nodes, viewport])
+
+  const handlePointerCancel = React.useCallback(() => {
+    if (dragState.current?.type === 'node') onNodeDragEnd()
+    dragState.current = null
+    dirtyRef.current = true
+  }, [onNodeDragEnd])
 
   const handleDoubleClick = React.useCallback((e: React.MouseEvent) => {
     const rect = e.currentTarget.getBoundingClientRect()
@@ -982,8 +993,7 @@ export function GraphCanvas({
         // Sits at r + 5 (same gap from the node edge as the default
         // selection ring) and uses a slightly thinner stroke so the two rings
         // read as distinct even when they appear together.
-        const dupHaloActive = d.activeDupDefKey !== null &&
-          copyKeyOf(node) === d.activeDupDefKey &&
+        const dupHaloActive = d.activeDupDefKeys.has(copyKeyOf(node)) &&
           vp.scale >= DETAIL_REDUCE_SCALE
         if (dupHaloActive) {
           ctx.save()
@@ -999,7 +1009,7 @@ export function GraphCanvas({
 
         // Selection ring — a solid ring. Expands to r + 10 when the
         // duplicate halo is also active, keeping the two rings clearly apart.
-        if (node.id === d.selectedNodeId) {
+        if (d.selectedNodeIds.has(node.id)) {
           const selR = dupHaloActive ? r + 10 : r + 5
           ctx.save()
           ctx.strokeStyle = p.selectionRingColor
@@ -1083,7 +1093,7 @@ export function GraphCanvas({
         // always win). Greedy in node order — which is stable — so the set of
         // shown labels doesn't flicker once the layout settles. O(n²) worst
         // case, fine at this scale.
-        const isActiveNode = node.id === d.hoveredNodeId || node.id === d.selectedNodeId
+        const isActiveNode = node.id === d.hoveredNodeId || d.selectedNodeIds.has(node.id)
         if (vp.scale >= LABEL_ELIDE_SCALE || isActiveNode) {
           // Active nodes (hovered/selected) keep a readable floor size even when
           // zoomed out, since they're deliberately surfaced; others scale freely.
@@ -1111,6 +1121,19 @@ export function GraphCanvas({
             ctx.globalAlpha = 1
           }
         }
+      }
+
+      const lasso = dragState.current?.type === 'lasso' && dragState.current.path
+      if (lasso) {
+        ctx.save()
+        ctx.strokeStyle = p.selectionRingColor
+        ctx.lineWidth = 1.5
+        ctx.setLineDash([4, 4])
+        ctx.beginPath()
+        for (const pt of lasso) ctx.lineTo(pt.x, pt.y)
+        ctx.closePath()
+        ctx.stroke()
+        ctx.restore()
       }
     }
 
@@ -1141,7 +1164,10 @@ export function GraphCanvas({
         onPointerMove={handlePointerMove}
         onPointerUp={handlePointerUp}
         onPointerLeave={() => { onHoverNode(null); onHoverEdge(null) }}
+        onPointerCancel={handlePointerCancel}
         onDoubleClick={handleDoubleClick}
+        // macOS raises the context menu on Ctrl+click, the selection's toggle.
+        onContextMenu={e => { if (e.ctrlKey) e.preventDefault() }}
       />
     </div>
   )

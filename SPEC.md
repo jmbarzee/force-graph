@@ -84,8 +84,10 @@ that would animate a reveal or a hide are
 |---|---|
 | Scroll or pinch | Zoom about the pointer, 0.1× to 40×; the page behind never scrolls |
 | Drag the background | Pan |
+| Ctrl/Meta+drag the background | Lasso: add every node whose centre it encloses to the selection |
 | Drag a node | Move it, held in place until release; the layout reheats around it |
-| Click a node / the background | Select it / clear the selection |
+| Click a node / the background | Select it alone / clear the selection |
+| Ctrl/Meta+click a node | Add it to the selection, or remove it |
 | Double-click a node | Frame it and its neighbours (`chrome.activateZoom`), and `onNodeActivate` |
 | Double-click the background | Frame the visible set |
 
@@ -262,12 +264,12 @@ A query matches, case-insensitively, the text `searchText` gives — the name
 by default. Matching visible nodes stay at full opacity and the rest dim to
 20%. A match a filter hides badges the chip hiding it, on the first axis shown that it fails, and the
 search control carries the total (`+N`). The dropdown lists the visible
-matches; picking one centres on it and selects it.
+matches; picking one centres on it and selects it alone.
 
 ## Hover and selection
 
-The active node — the hovered one, else the selected one — highlights its
-transitive chain over visible dependency edges, graduated ones included:
+The active nodes — the hovered one, else every selected one — highlight the
+union of their transitive chains over visible dependency edges, graduated ones included:
 downstream by default, upstream while Shift is held. Containment is never
 walked. The chain stays at full opacity, its edges and arrowheads reinforced;
 everything else dims to 20% (50% while groups glow). `highlight` may widen or
@@ -297,14 +299,15 @@ holds the original's ends (`source → target`, `↔` for an undirected type),
 its type's tooltip, and the lines `edgeContextLine` answers. A hovered node
 wins over an edge, through its grace period too.
 
-The selected node wears a ring. A graph that no longer holds the view's own selection
-clears it.
+Every selected node wears a ring. A graph that no longer holds some of the
+view's own selection drops them.
 
 ## Copies
 
-When the active node has sister copies — nodes sharing its `copyKey` — every
-visible one wears a halo in its own colour. A sister is not added to the
-highlight: one off the chain dims with the rest, and the halo marks it.
+When a hovered or selected node has sister copies — nodes sharing its
+`copyKey` — every visible one wears a halo in its own colour. A sister is not
+added to the highlight: one off the chain dims with the rest, and the halo
+marks it.
 Hovering one listing of a cross-listed course (Biochemistry, CHEM 310 and
 BIOL 310) halos every listing.
 
@@ -326,8 +329,9 @@ group joined to it by an edge holds — so touching groups differ in hue while
 the palette has a slot free, and hiding one group recolours no other. A
 group's `weight` (0..1) swells its halo and corridor, up to double; hue and
 brightness stay. A focused group — the one `emphasize` names, or the one
-holding the active node — brightens and swells. In the catalog each degree
-programme is a group, and its legend's checkboxes write the group filter.
+holding a hovered or selected node — brightens and swells. In the catalog
+each degree programme is a group, and its legend's checkboxes write the group
+filter.
 
 ## Appearance
 
@@ -337,9 +341,10 @@ programme is a group, and its legend's checkboxes write the group filter.
   characters show 12 and an ellipsis. Badges sit above the node; a `dashed`
   ring circles it. Size follows Node scaling.
 - **Labels by density.** Below a zoom of 0.25 labels and icons hide, except
-  the active node's. Above it, a label is drawn only where it overlaps no
-  label already placed and no node body, greedily in node order, so a settled
-  layout does not flicker; the active node always wins.
+  the hovered and selected nodes'. Above it, a label is drawn only where it
+  overlaps no label already placed and no node body, greedily in node order,
+  so a settled layout does not flicker; the hovered and selected nodes always
+  win.
 - **Detail by zoom.** Below a zoom of 0.1 the decorative rings drop. A node
   stays hoverable and clickable at every zoom.
 - **Edges.** Stroked by their resolved type (`EdgeType.style`), widened by
@@ -384,7 +389,7 @@ keeps its own keys, Escape aside.
 | Key | Action |
 |---|---|
 | Tab / Shift+Tab | Move the focus ring to the next or previous visible node, in graph order, while the pane itself has focus |
-| Enter | Select the focused node |
+| Enter | Select the focused node alone |
 | Escape | Close the shortcuts panel, else the search, else clear the selection, else (on the pane) give focus back |
 | Arrows | Pan |
 | `+` / `-` | Zoom about the centre |
