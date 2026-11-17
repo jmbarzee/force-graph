@@ -4,6 +4,7 @@
 // carries for the resolved theme, and a colour normaliser for the canvas,
 // which cannot throw and so reads only the forms the taxonomy admits.
 
+import type React from 'react'
 import type { AxisValue } from './axis'
 import type { Taxonomy } from './taxonomy'
 
@@ -59,7 +60,7 @@ export function cssSuffix(value: AxisValue): string {
  * tints and typed rows read, and they follow the resolved theme by being
  * recomputed, not overridden.
  */
-export function schemeVars(taxonomy: Taxonomy, theme: Theme): Record<string, string> {
+export function schemeVars(taxonomy: Taxonomy, theme: Theme): React.CSSProperties {
   const vars: Record<string, string> = {}
   for (const key of taxonomy.styleValues) {
     const c = taxonomy.styleOf(key).color[theme]

@@ -449,15 +449,37 @@ naming its `data-gv-theme`:
 | `--gv-font-mono` | Mono font | `inherit` | `inherit` |
 | `--gv-radius` | Corner radius | `6px` | `6px` |
 
+The typed path produces the same variables: `createTheme({ light, dark })`
+takes, per theme, the tokens to override, each by its role — the token
+without `--gv-`, camel-cased (`--gv-focus-ring-color` → `focusRingColor`) —
+and refuses an unknown role at compile time. `GraphView` and `FilterBar` take
+its result as `tokens` and carry the resolved theme's on their roots:
+
+```tsx
+const tokens = createTheme({ light: { accent: '#0f766e' }, dark: { colorSurface: '#111' } })
+<GraphView graph={graph} tokens={tokens} />
+```
+
+A host's own chrome takes the same scope from `useScheme(taxonomy, { choice?,
+systemTheme?, tokens? })`: its `theme`, and `scopeProps` — `data-gv-theme`
+and a `style` with the scheme's colours and `tokens` — to spread on the
+chrome's root, which then reads the tokens above. `system` resolves from
+`systemTheme`, else `<html>`'s `data-theme`, else the OS, in a layout effect,
+so a dark host's chrome never paints light:
+
+```tsx
+const { scopeProps } = useScheme(taxonomy, { choice, tokens })
+<aside {...scopeProps}>…</aside>
+```
+
 Every class is `gv-*`. Each style value's fill and border are
 published on the pane under the name `taxonomy.colorVar(value)` answers —
 `--gv-node-` and the value id in kebab case (a value id such as
 `teachingLab` → `--gv-node-teaching-lab`), or a numbered name when the id kebab-cases to
 nothing or to another value's — and `-border` for the border. A host's own
-chrome beside the pane reads the same tints through `schemeVars(taxonomy,
-theme)` inline, or `schemeStylesheet(taxonomy, darkSelector?)` mounted once
-(its dark block under `[data-theme="dark"]`, or the host's own selector), with
-the theme `onThemeResolved` hands it. Default rest
+chrome beside the pane reads the same tints through `useScheme`, or
+`schemeStylesheet(taxonomy, darkSelector?)` mounted once (its dark block under
+`[data-theme="dark"]`, or the host's own selector). Default rest
 bands are laid in `BAND_FRAME` (world units: the hierarchy axis from −300 to
 400, x from 0 to 380); a band a host declares is read in the same units.
 
