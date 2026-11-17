@@ -307,6 +307,11 @@ export function createTaxonomy(spec: TaxonomySpec): Taxonomy {
     if (e.relation !== 'containment' && e.relation !== 'dependency') {
       problems.push(`edgeTypes.${e.id}.relation is ${JSON.stringify(e.relation)}, not 'containment' or 'dependency'`)
     }
+    if (e.direction !== undefined && e.relation === 'containment') {
+      problems.push(`edgeTypes.${e.id}.direction is declared on a containment type, which runs from child to container; leave it out`)
+    } else if (e.direction !== undefined && e.direction !== 'directed' && e.direction !== 'undirected') {
+      problems.push(`edgeTypes.${e.id}.direction is ${JSON.stringify(e.direction)}, not 'directed' or 'undirected'`)
+    }
     if (e.match !== undefined) {
       // An empty match would be "specific" and win every edge on its pair,
       // leaving a type without one unreachable; it is refused, not read as absent.

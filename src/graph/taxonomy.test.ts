@@ -48,6 +48,20 @@ describe('edgeTypeOf', () => {
     })).toThrow(/"fromService" and "toQueue"/)
   })
 
+  it('refuses a direction on a containment type, even directed', () => {
+    for (const direction of ['undirected', 'directed'] as const) {
+      expect(() => createTaxonomy({
+        styleAxis: 'kind', styles, edgeTypes: [{ id: 'in', relation: 'containment', direction }],
+      })).toThrow(/edgeTypes\.in\.direction is declared on a containment type/)
+    }
+  })
+
+  it('refuses a direction that is neither directed nor undirected', () => {
+    expect(() => createTaxonomy({
+      styleAxis: 'kind', styles, edgeTypes: [{ ...dependency('calls', {}), direction: 'both' as never }],
+    })).toThrow(/edgeTypes\.calls\.direction is "both"/)
+  })
+
   it('leaves an edge untyped when classifyEdge answers null, and keeps the declared type on undefined', () => {
     const taxonomy = createTaxonomy({
       styleAxis: 'kind', styles, edgeTypes: [dependency('calls', { sourceValue: 'service', targetValue: 'queue' })],

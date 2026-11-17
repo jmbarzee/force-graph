@@ -40,6 +40,7 @@ export function useHighlight(
   visibleNodes: SimNode[],
   visibleEdges: GraphEdge[],
   visibleIds: Set<string>,
+  undirected: ReadonlySet<string>,
   getNode: (id: string) => SimNode | undefined,
   // Changes whenever the underlying graph is rebuilt; clears the hover and
   // the keyboard focus so a stale id never lingers across graphs.
@@ -99,9 +100,9 @@ export function useHighlight(
       visibleNodes: visibleNodes.map(n => hostNode(n.id) ?? n),
       visibleEdges, visibleIds,
       getNode: id => hostNode(id) ?? getNode(id),
-    })
+    }, undirected)
     return { highlightedNodes: nodes, highlightedEdges: edges }
-  }, [hoveredNodeId, selectedNodeId, shiftHeld, visibleEdges, visibleIds, visibleNodes, getNode, taxonomy, hostIndex])
+  }, [hoveredNodeId, selectedNodeId, shiftHeld, visibleEdges, visibleIds, undirected, visibleNodes, getNode, taxonomy, hostIndex])
 
   return {
     hoveredNodeId, setHoveredNodeId,

@@ -562,7 +562,7 @@ export const GraphView = React.forwardRef<GraphViewHandle, GraphViewProps>(funct
 
   // Visible subgraph derived from the live sim (filter + edge graduation +
   // summaries + downstream-depth scores), recomputed on filter / sim-rebuild.
-  const { visibleNodes, visibleEdges, visibleIds, edgeTypes, origins, nodeSummaries, downstreamScores } =
+  const { visibleNodes, visibleEdges, visibleIds, edgeTypes, undirected, origins, nodeSummaries, downstreamScores } =
     useVisibleGraph(simRef, simVersion, filter, filterAxes, taxonomy, groupsOf)
   visibleNodesRef.current = visibleNodes
 
@@ -662,7 +662,7 @@ export const GraphView = React.forwardRef<GraphViewHandle, GraphViewProps>(funct
     activePushBucket, setActivePushBucket,
     activeGravityBucket, setActiveGravityBucket,
     activePullEdge, setActivePullEdge,
-  } = useHighlight(visibleNodes, visibleEdges, visibleIds, getSimNode, graph, taxonomy, selectedNodeId, hostIndex)
+  } = useHighlight(visibleNodes, visibleEdges, visibleIds, undirected, getSimNode, graph, taxonomy, selectedNodeId, hostIndex)
 
   // The groups as drawn: the ones the filter shows, restricted to the visible
   // set and coloured by slot, the one its control emphasises glowing stronger.
@@ -1023,6 +1023,7 @@ export const GraphView = React.forwardRef<GraphViewHandle, GraphViewProps>(funct
             theme={theme}
             edgeStrokes={edgeStrokes}
             edgeOffsets={edgeOffsets}
+            undirectedEdges={undirected}
             activeSection={activeSection}
             activePushBucket={activePushBucket}
             activeGravityBucket={activeGravityBucket}
@@ -1036,6 +1037,7 @@ export const GraphView = React.forwardRef<GraphViewHandle, GraphViewProps>(funct
           hoveredNodeId={hoveredNodeId}
           simRef={simRef}
           visibleEdges={visibleEdges}
+          undirected={undirected}
           visibleIds={visibleIds}
           viewport={viewport}
           shiftHeld={shiftHeld}
@@ -1202,6 +1204,7 @@ interface GraphHoverTooltipProps {
   hoveredNodeId: string | null
   simRef: React.RefObject<Simulation | null>
   visibleEdges: GraphEdge[]
+  undirected: ReadonlySet<string>
   visibleIds: Set<string>
   viewport: Viewport
   shiftHeld: boolean
@@ -1220,7 +1223,7 @@ interface GraphHoverTooltipProps {
   onMouseLeave: () => void
 }
 
-function GraphHoverTooltip({ hoveredNodeId, simRef, visibleEdges, visibleIds, viewport, shiftHeld, directionLine, copies, nodeSummaries, nodeAction, hostNodeOf, onMouseEnter, onMouseLeave }: GraphHoverTooltipProps) {
+function GraphHoverTooltip({ hoveredNodeId, simRef, visibleEdges, undirected, visibleIds, viewport, shiftHeld, directionLine, copies, nodeSummaries, nodeAction, hostNodeOf, onMouseEnter, onMouseLeave }: GraphHoverTooltipProps) {
   // Before the early returns: this is a hook, and the component bails out four
   // different ways below.
   const taxonomy = useTaxonomy()
@@ -1253,9 +1256,13 @@ function GraphHoverTooltip({ hoveredNodeId, simRef, visibleEdges, visibleIds, vi
   // The node's badges, as the canvas draws them above it, in one line.
   const badgesLine = node.badges && node.badges.length > 0 ? node.badges.join(' ') : undefined
 
-  let outgoing = 0, incoming = 0
+  let outgoing = 0, incoming = 0, both = 0
   for (const e of visibleEdges) {
     if (isContainment(e)) continue
+    if (undirected.has(e.id)) {
+      if (e.sourceId === hoveredNodeId || e.targetId === hoveredNodeId) both++
+      continue
+    }
     if (e.sourceId === hoveredNodeId) outgoing++
     if (e.targetId === hoveredNodeId) incoming++
   }
@@ -1292,10 +1299,11 @@ function GraphHoverTooltip({ hoveredNodeId, simRef, visibleEdges, visibleIds, vi
           copy {copyIndex} of {copyCount}
         </div>
       )}
-      {summaryKind !== 'none' && (outgoing > 0 || incoming > 0) && (
+      {summaryKind !== 'none' && (outgoing > 0 || incoming > 0 || both > 0) && (
         <div className="gv-tooltip-connections">
           {outgoing > 0 && <span className="gv-tooltip-conn-out">→{outgoing}</span>}
           {incoming > 0 && <span className="gv-tooltip-conn-in">←{incoming}</span>}
+          {both > 0 && <span className="gv-tooltip-conn-both">↔{both}</span>}
         </div>
       )}
       {directionLine && <div className="gv-tooltip-direction">{shiftHeld ? 'dependents' : 'dependencies'}</div>}

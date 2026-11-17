@@ -156,6 +156,7 @@ interface GraphCanvasProps {
   edgeStrokes: ReadonlyMap<GraphEdge, EdgeStroke>
   /** Lane offsets in screen pixels for edges that share a pair of endpoints, by edge id; absent means on the line. */
   edgeOffsets: ReadonlyMap<string, number>
+  undirectedEdges: ReadonlySet<string>
   activeSection: ForceSection
   activePushBucket: string | null
   activeGravityBucket: GravityHover | null
@@ -210,6 +211,7 @@ interface DrawData {
   theme: Theme
   edgeStrokes: ReadonlyMap<GraphEdge, EdgeStroke>
   edgeOffsets: ReadonlyMap<string, number>
+  undirectedEdges: ReadonlySet<string>
   activeSection: ForceSection
   activePushBucket: string | null
   activeGravityBucket: GravityHover | null
@@ -233,7 +235,7 @@ export function GraphCanvas({
   onDoubleClickNode, onFitView, onHoverNode, onSelectNode,
   highlightedNodes, highlightedEdges,
   hoveredNodeId, selectedNodeId, focusedNodeId, searchMatchIds,
-  running, forceParams, resolved, overlay, theme, edgeStrokes, edgeOffsets, activeSection, activePushBucket,
+  running, forceParams, resolved, overlay, theme, edgeStrokes, edgeOffsets, undirectedEdges, activeSection, activePushBucket,
   activeGravityBucket, activePullEdge, nodeScale, groupGlows, markedEdges,
 }: GraphCanvasProps) {
   const canvasRef = React.useRef<HTMLCanvasElement>(null)
@@ -285,14 +287,14 @@ export function GraphCanvas({
     taxonomy,
     nodes, edges, nodeMap, viewport, groupGlows, markedEdges, highlightedNodes, highlightedEdges,
     hoveredNodeId, selectedNodeId, focusedNodeId, searchMatchIds,
-    forceParams, resolved, overlay, theme, edgeStrokes, edgeOffsets, activeSection, activePushBucket, activeGravityBucket, activePullEdge, nodeScale, running,
+    forceParams, resolved, overlay, theme, edgeStrokes, edgeOffsets, undirectedEdges, activeSection, activePushBucket, activeGravityBucket, activePullEdge, nodeScale, running,
     dupNodeIds, activeDupDefKey, palette,
   })
   drawData.current = {
     taxonomy,
     nodes, edges, nodeMap, viewport, groupGlows, markedEdges, highlightedNodes, highlightedEdges,
     hoveredNodeId, selectedNodeId, focusedNodeId, searchMatchIds,
-    forceParams, resolved, overlay, theme, edgeStrokes, edgeOffsets, activeSection, activePushBucket, activeGravityBucket, activePullEdge, nodeScale, running,
+    forceParams, resolved, overlay, theme, edgeStrokes, edgeOffsets, undirectedEdges, activeSection, activePushBucket, activeGravityBucket, activePullEdge, nodeScale, running,
     dupNodeIds, activeDupDefKey, palette,
   }
 
@@ -561,9 +563,9 @@ export function GraphCanvas({
         ctx.stroke()
         ctx.setLineDash([])
 
-        // Arrowhead for dependency edges (containment is hierarchical, no
-        // direction is interesting to show).
-        if (!isContainment(edge)) {
+        // Arrowhead for directed dependency edges (containment is
+        // hierarchical, no direction is interesting to show).
+        if (!isContainment(edge) && !d.undirectedEdges.has(edge.id)) {
           const angle = Math.atan2(ty - sy, tx - sx)
           // Stop the arrowhead at the target's on-screen edge (screen radius =
           // def.r × nodeSizeMul(scale)) so it tracks the zoom-scaled node body.
