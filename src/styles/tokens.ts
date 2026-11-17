@@ -3,7 +3,9 @@
 // produces the variables its CSS would declare.
 
 import type React from 'react'
-import type { Fill } from '../graph/coloring'
+import { fillOf } from '../graph/coloring'
+import type { Coloring, Fill } from '../graph/coloring'
+import type { Graph } from '../graph/model'
 import { cssSuffix, keyVars, schemeVars } from '../graph/scheme'
 import type { Theme } from '../graph/scheme'
 import type { Taxonomy } from '../graph/taxonomy'
@@ -40,4 +42,27 @@ export function createTheme(themes: { readonly [T in Theme]?: { readonly [R in T
 /** A themed root's inline style for one theme: the scheme's colours, the fill's over them, then the host's tokens. */
 export function scopeStyle(taxonomy: Taxonomy, theme: Theme, tokens?: ThemeTokens, fill?: Fill): React.CSSProperties {
   return { ...schemeVars(taxonomy, theme), ...(fill && keyVars(fill, theme)), ...tokens?.[theme] }
+}
+
+/**
+ * A stylesheet for a host's own CSS: every style value's fill and border on
+ * `:root`, and the dark values that differ under `darkSelector` — by default
+ * `[data-theme="dark"]`, the attribute the pane reads a host's theme from; a
+ * host that marks its theme another way names its own selector. Given the
+ * `coloring` and `graph` the pane takes, it carries the fill's keys too,
+ * under the names the pane gives them. The pane does not read this — it
+ * carries the same inline — so a host that styles nothing of its own by node
+ * colour never needs it.
+ */
+export function schemeStylesheet(
+  taxonomy: Taxonomy,
+  darkSelector = '[data-theme="dark"]',
+  view?: { coloring?: { fill?: Coloring }; graph: Graph },
+): string {
+  const fill = view && fillOf(view.coloring?.fill, view.graph, taxonomy)
+  const light = Object.entries(scopeStyle(taxonomy, 'light', undefined, fill))
+  const lit = new Map(light)
+  const dark = Object.entries(scopeStyle(taxonomy, 'dark', undefined, fill)).filter(([v, value]) => value !== lit.get(v))
+  const block = (selector: string, vars: [string, unknown][]) => `${selector} {\n${vars.map(([v, value]) => `  ${v}: ${value};`).join('\n')}\n}`
+  return dark.length > 0 ? `${block(':root', light)}\n${block(darkSelector, dark)}` : block(':root', light)
 }

@@ -189,26 +189,3 @@ export function withAlpha(color: string, alpha: number): string {
   return `rgba(${rgb[0]}, ${rgb[1]}, ${rgb[2]}, ${alpha})`
 }
 
-/**
- * A stylesheet for a host's own CSS: every style value's fill and border on
- * `:root`, and the dark values that differ under `darkSelector` — by default
- * `[data-theme="dark"]`, the attribute the pane reads a host's theme from; a
- * host that marks its theme another way names its own selector. The pane
- * does not read this — it carries `schemeVars` inline — so a host that
- * styles nothing of its own by node value never needs it.
- */
-export function schemeStylesheet(taxonomy: Taxonomy, darkSelector = '[data-theme="dark"]'): string {
-  const lightVars: string[] = []
-  const darkVars: string[] = []
-  for (const key of taxonomy.styleValues) {
-    const { light, dark } = taxonomy.styleOf(key).color
-    const v = taxonomy.colorVar(key)
-    lightVars.push(`  ${v}: ${light.fill};`)
-    lightVars.push(`  ${v}-border: ${light.border};`)
-    if (dark.fill !== light.fill) darkVars.push(`  ${v}: ${dark.fill};`)
-    if (dark.border !== light.border) darkVars.push(`  ${v}-border: ${dark.border};`)
-  }
-  const parts: string[] = [`:root {\n${lightVars.join('\n')}\n}`]
-  if (darkVars.length > 0) parts.push(`${darkSelector} {\n${darkVars.join('\n')}\n}`)
-  return parts.join('\n')
-}

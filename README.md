@@ -575,14 +575,16 @@ const tokens = createTheme({ light: { accent: '#0f766e' }, dark: { colorSurface:
 ```
 
 A host's own chrome takes the same scope from `useScheme(taxonomy, { choice?,
-systemTheme?, tokens? })`: its `theme`, and `scopeProps` — `data-gv-theme`
+systemTheme?, tokens?, view? })`: its `theme`, and `scopeProps` — `data-gv-theme`
 and a `style` with the scheme's colours and `tokens` — to spread on the
-chrome's root, which then reads the tokens above. `system` resolves from
+chrome's root, which then reads the tokens above. Given as `view` the
+`coloring` and `graph` the pane takes, the style carries the fill's keys too,
+under the names the pane gives them. `system` resolves from
 `systemTheme`, else `<html>`'s `data-theme`, else the OS, in a layout effect,
 so a dark host's chrome never paints light:
 
 ```tsx
-const { scopeProps } = useScheme(taxonomy, { choice, tokens })
+const { scopeProps } = useScheme(taxonomy, { choice, tokens, view: { coloring, graph } })
 <aside {...scopeProps}>…</aside>
 ```
 
@@ -594,9 +596,10 @@ nothing or to another value's — and `-border` for the border. Inside the
 pane the fill's keys publish as `--gv-node-` and the key in kebab case,
 numbered where two keys kebab-case alike (`c`, `c-2`) or one kebab-cases to
 nothing, a key's colour winning over a style value it shares a name with. A
-host's own chrome beside the pane reads the styles' tints through
-`useScheme`, or `schemeStylesheet(taxonomy, darkSelector?)` mounted once (its
-dark block under `[data-theme="dark"]`, or the host's own selector). Default
+host's own chrome beside the pane reads both through `useScheme`, or
+`schemeStylesheet(taxonomy, darkSelector?, view?)` mounted once (its dark
+block under `[data-theme="dark"]`, or the host's own selector); without
+`view`, the styles' alone. Default
 rest bands are laid in `BAND_FRAME` (world units: the hierarchy axis from
 −300 to 400, x from 0 to 380); a band a host declares is read in the same
 units.

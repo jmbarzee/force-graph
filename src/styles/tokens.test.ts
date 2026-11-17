@@ -6,10 +6,13 @@ import { createRoot } from 'react-dom/client'
 import { beforeEach, expect, it } from 'vitest'
 import css from './tokens.css?raw'
 import readme from '../../README.md?raw'
-import { TOKEN_ROLES, createTheme, tokenVar } from './tokens'
+import { TOKEN_ROLES, createTheme, schemeStylesheet, tokenVar } from './tokens'
 import { FilterBar } from '../components/FilterBar'
 import { GraphView } from '../components/GraphView'
 import { useScheme } from '../components/graph-view/useScheme'
+import { fillOf } from '../graph/coloring'
+import type { Coloring } from '../graph/coloring'
+import type { GraphNode } from '../graph/model'
 import { createTaxonomy } from '../graph/taxonomy'
 
 const taxonomy = createTaxonomy({ styleAxis: 'kind', styles: [] })
@@ -79,4 +82,50 @@ it("resolves a host's chrome in a layout effect, so it never paints light under 
   const aside = host.querySelector('aside')!
   expect(aside.getAttribute('data-gv-theme')).toBe('dark')
   expect(aside.style.getPropertyValue('--gv-accent')).toBe('#0f766e')
+})
+
+const notes = { nodes: ['C', 'C#'].map((note): GraphNode => ({ id: note, name: note, values: { note } })), edges: [] }
+const byNote: Coloring = { by: 'axis', axis: 'note' }
+
+it("pins a host's stylesheet without a view to the style values' alone", () => {
+  const styled = createTaxonomy({ styleAxis: 'kind', styles: [
+    { id: 'teachingLab', label: 'Lab', color: { light: { fill: '#0f766e', border: '#094740' }, dark: { fill: '#2dd4bf', border: '#094740' } } },
+    { id: 'office', label: 'Office', color: { light: { fill: '#64748b', border: '#3c4653' }, dark: { fill: '#64748b', border: '#3c4653' } } },
+  ] })
+  expect(schemeStylesheet(styled, '.dark')).toBe(
+    ':root {\n  --gv-node-teaching-lab: #0f766e;\n  --gv-node-teaching-lab-border: #094740;\n  --gv-node-office: #64748b;\n  --gv-node-office-border: #3c4653;\n}\n.dark {\n  --gv-node-teaching-lab: #2dd4bf;\n}',
+  )
+})
+
+it("carries the fill's keys in a host's stylesheet, in both themes, under the pane's names", () => {
+  const [light, dark] = schemeStylesheet(taxonomy, '.dark', { coloring: { fill: byNote }, graph: notes }).split('.dark')
+  const keys = [...fillOf(byNote, notes, taxonomy).keys.values()]
+  expect(keys.map(k => k.cssVar)).toEqual(['--gv-node-c', '--gv-node-c-2'])
+  for (const { cssVar, color } of keys) {
+    for (const [block, theme] of [[light, 'light'], [dark, 'dark']] as const) {
+      expect(block).toContain(`${cssVar}: ${color[theme].fill};`)
+      expect(block).toContain(`${cssVar}-border: ${color[theme].border};`)
+    }
+  }
+})
+
+it("carries the fill's keys on a host's chrome, resolving an equal colouring once", async () => {
+  const host = mount()
+  let asked = 0
+  const of = (node: GraphNode) => (asked++, node.values.note)
+  const keys = [{ id: 'C', label: 'C' }, { id: 'C#', label: 'C#' }]
+  function Chrome() {
+    const view = { coloring: { fill: { by: 'node', keys: [...keys], of } as const }, graph: notes }
+    return React.createElement('aside', useScheme(taxonomy, { view }).scopeProps)
+  }
+  const root = createRoot(host)
+  await act(async () => root.render(React.createElement(Chrome)))
+  await act(async () => root.render(React.createElement(Chrome)))
+  expect(asked).toBe(notes.nodes.length)
+  const aside = host.querySelector('aside')!
+  expect(aside.getAttribute('data-gv-theme')).toBe('dark')
+  for (const { cssVar, color } of fillOf({ by: 'node', keys, of }, notes, taxonomy).keys.values()) {
+    expect(aside.style.getPropertyValue(cssVar)).toBe(color.dark.fill)
+    expect(aside.style.getPropertyValue(`${cssVar}-border`)).toBe(color.dark.border)
+  }
 })
