@@ -80,11 +80,7 @@ export function useHighlight(
     ? visibleNodes[focusedIndex].id
     : null
 
-  // Transitive dependency highlighting: a directional walk from each active
-  // node — the hovered one, else every selected one — which the host may
-  // widen or replace through its taxonomy: a value that relates to others by
-  // its own metadata says so there, not here. Sister copies are intentionally
-  // NOT added (the canvas draws their duplicate halo separately).
+  // Sister copies are not added: the canvas halos them.
   const { highlightedNodes, highlightedEdges } = React.useMemo(() => {
     // The host's hook sees the host's own nodes: the active ones, the visible
     // ones and any it looks up — the simulation's copies stay the view's.

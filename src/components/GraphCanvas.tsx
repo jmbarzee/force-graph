@@ -22,7 +22,7 @@ import { useLatest } from './graph-view/useControllable'
 import { usePalette } from './graph-view/usePalette'
 import type { Palette } from './graph-view/usePalette'
 import { listenWheelZoom } from './graph-view/wheelZoom'
-import { lassoed } from './graph-view/lasso'
+import { lassoed, type Point } from './graph-view/lasso'
 import type { EdgeStroke, Theme } from '../graph/scheme'
 import { NEUTRAL_STROKE } from '../graph/shapes'
 import { withAlpha } from '../graph/scheme'
@@ -202,8 +202,6 @@ function laneOffset(
   return [sx + nx, sy + ny, tx + nx, ty + ny]
 }
 
-type Point = { x: number; y: number }
-
 /** An edge's stroke on screen, source to target, in its lane. */
 function segmentOf(
   edge: GraphEdge, src: Point, tgt: Point, vp: Viewport, offsets: ReadonlyMap<string, number>,
@@ -298,11 +296,11 @@ export function GraphCanvas({
   const canvasRef = React.useRef<HTMLCanvasElement>(null)
   const containerRef = React.useRef<HTMLDivElement>(null)
   const [size, setSize] = React.useState({ w: 0, h: 0 })
-  const dragState = React.useRef<{
-    type: 'pan' | 'node' | 'lasso'
-    startVp?: Viewport
-    /** The lasso's path so far, in screen pixels. */
-    path?: Point[]
+  const dragState = React.useRef<(
+    | { type: 'pan' | 'node'; startVp?: Viewport }
+    /** `path` is the lasso so far, in screen pixels. */
+    | { type: 'lasso'; path: Point[] }
+  ) & {
     sx: number
     sy: number
     moved: boolean
@@ -327,14 +325,9 @@ export function GraphCanvas({
     return result
   }, [nodes])
 
-  // The copy keys of the active (hovered or selected) nodes that have
-  // copies. Used by the draw loop to light up every copy with the halo, not
-  // just the active nodes themselves.
-  const activeDupDefKeys = React.useMemo(() => new Set(
-    [...(hoveredNodeId === null ? [] : [hoveredNodeId]), ...selectedNodeIds]
-      .filter(id => dupNodeIds.has(id))
-      .flatMap(id => { const n = nodeMap.get(id); return n ? [copyKeyOf(n)] : [] }),
-  ), [hoveredNodeId, selectedNodeIds, nodeMap, dupNodeIds])
+  const activeDupDefKeys = React.useMemo(() => new Set(nodes
+    .filter(n => dupNodeIds.has(n.id) && (n.id === hoveredNodeId || selectedNodeIds.has(n.id)))
+    .map(copyKeyOf)), [nodes, hoveredNodeId, selectedNodeIds, dupNodeIds])
 
   const taxonomy = useTaxonomy()
   const fill = useFill(taxonomy)
@@ -442,7 +435,7 @@ export function GraphCanvas({
     } else if (dragState.current.type === 'node') {
       const [wx, wy] = screenToWorld(viewport, cx, cy)
       onNodeDragMove(wx, wy)
-    } else if (dragState.current.path) {
+    } else if (dragState.current.type === 'lasso') {
       dragState.current.path.push({ x: cx, y: cy })
       dirtyRef.current = true
     }
@@ -463,13 +456,19 @@ export function GraphCanvas({
     } else if (ds?.type === 'pan' && !ds.moved) {
       // Click on background → deselect
       onSelectNode(null, false)
-    } else if (ds?.path && ds.moved) {
+    } else if (ds?.type === 'lasso' && ds.moved) {
       onLassoSelect(lassoed(ds.path, nodes, viewport))
       dirtyRef.current = true
     }
     dragState.current = null
     canvasRef.current?.releasePointerCapture(e.pointerId)
   }, [onNodeDragEnd, onSelectNode, onLassoSelect, hitTest, nodes, viewport])
+
+  const handlePointerCancel = React.useCallback(() => {
+    if (dragState.current?.type === 'node') onNodeDragEnd()
+    dragState.current = null
+    dirtyRef.current = true
+  }, [onNodeDragEnd])
 
   const handleDoubleClick = React.useCallback((e: React.MouseEvent) => {
     const rect = e.currentTarget.getBoundingClientRect()
@@ -1124,7 +1123,7 @@ export function GraphCanvas({
         }
       }
 
-      const lasso = dragState.current?.path
+      const lasso = dragState.current?.type === 'lasso' && dragState.current.path
       if (lasso) {
         ctx.save()
         ctx.strokeStyle = p.selectionRingColor
@@ -1165,6 +1164,7 @@ export function GraphCanvas({
         onPointerMove={handlePointerMove}
         onPointerUp={handlePointerUp}
         onPointerLeave={() => { onHoverNode(null); onHoverEdge(null) }}
+        onPointerCancel={handlePointerCancel}
         onDoubleClick={handleDoubleClick}
         // macOS raises the context menu on Ctrl+click, the selection's toggle.
         onContextMenu={e => { if (e.ctrlKey) e.preventDefault() }}

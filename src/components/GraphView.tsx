@@ -714,14 +714,6 @@ export const GraphView = React.forwardRef<GraphViewHandle, GraphViewProps>(funct
     [visibleNodes, sprung, resolved, taxonomy, getSimNode],
   )
 
-  // The selection: the host's while `selectedIds` is defined, the view's own
-  // otherwise, in the order its nodes were selected. An id the graph does not
-  // hold is not selected, so what the view shows and what it reports never
-  // disagree. Everything the user does to it — a click, a lasso, Enter,
-  // Escape, a search pick, a focus landing, the handle — goes through
-  // `requestSelect`, which tells the host of a change and, when the view owns
-  // the state, applies it; a host that controls the selection answers by
-  // setting the prop, or does not.
   const controlledSelection = selectedIds !== undefined
   useControlledWarning('selectedIds', controlledSelection)
   const [ownSelected, setOwnSelected] = React.useState(defaultSelectedIds)
@@ -738,8 +730,6 @@ export const GraphView = React.forwardRef<GraphViewHandle, GraphViewProps>(funct
     if (!controlledSelection) setOwnSelected(held)
     if (!selectionsEqual(held, selectedRef.current)) onSelectionChangeRef.current?.([...held].map(id => hostIndexRef.current.get(id)!))
   }, [controlledSelection, hostIndexRef, selectedRef, onSelectionChangeRef])
-  // A plain click: that node alone, or none with null. An id the graph does
-  // not hold is ignored.
   const selectOnly = React.useCallback((id: string | null) => {
     if (id === null) requestSelect(NO_SELECTION)
     else if (hostIndexRef.current.has(id)) requestSelect(new Set([id]))

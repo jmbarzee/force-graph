@@ -299,12 +299,12 @@ holds the original's ends (`source → target`, `↔` for an undirected type),
 its type's tooltip, and the lines `edgeContextLine` answers. A hovered node
 wins over an edge, through its grace period too.
 
-Every selected node wears a ring and keeps its label when zoomed out. A graph
-that no longer holds some of the view's own selection drops them.
+Every selected node wears a ring. A graph that no longer holds some of the
+view's own selection drops them.
 
 ## Copies
 
-When an active node has sister copies — nodes sharing its `copyKey` — every
+When a hovered or selected node has sister copies — nodes sharing its `copyKey` — every
 visible one wears a halo in its own colour. A sister is not added to the
 highlight: one off the chain dims with the rest, and the halo marks it.
 Hovering one listing of a cross-listed course (Biochemistry, CHEM 310 and
@@ -328,7 +328,7 @@ group joined to it by an edge holds — so touching groups differ in hue while
 the palette has a slot free, and hiding one group recolours no other. A
 group's `weight` (0..1) swells its halo and corridor, up to double; hue and
 brightness stay. A focused group — the one `emphasize` names, or the one
-holding the active node — brightens and swells. In the catalog each degree
+holding a hovered or selected node — brightens and swells. In the catalog each degree
 programme is a group, and its legend's checkboxes write the group filter.
 
 ## Appearance
@@ -339,9 +339,10 @@ programme is a group, and its legend's checkboxes write the group filter.
   characters show 12 and an ellipsis. Badges sit above the node; a `dashed`
   ring circles it. Size follows Node scaling.
 - **Labels by density.** Below a zoom of 0.25 labels and icons hide, except
-  the active node's. Above it, a label is drawn only where it overlaps no
-  label already placed and no node body, greedily in node order, so a settled
-  layout does not flicker; the active node always wins.
+  the hovered and selected nodes'. Above it, a label is drawn only where it
+  overlaps no label already placed and no node body, greedily in node order,
+  so a settled layout does not flicker; the hovered and selected nodes always
+  win.
 - **Detail by zoom.** Below a zoom of 0.1 the decorative rings drop. A node
   stays hoverable and clickable at every zoom.
 - **Edges.** Stroked by their resolved type (`EdgeType.style`), widened by

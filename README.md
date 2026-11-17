@@ -319,8 +319,9 @@ the console. Everything else is optional.
   frames and selects a node — the declarative form of the handle's
   `focusNode`, for a pane that mounts lazily or whose data arrives late. It
   is compared by value, so a new `id` or `key` is a new request; it waits
-  until its node is in the graph, and, when the filter must widen, until the filter the host passes back shows the node;
-  and `onFocusResult(request, shown)` says whether it did. Null, or a newer
+  until its node is in the graph, and, when the filter must widen, until
+  the filter the host passes back shows the node; and
+  `onFocusResult(request, shown)` says whether it did. Null, or a newer
   request, withdraws a waiting one unreported.
   `useFocusRequest()` gives a host the request and a `requestFocus(id)` that
   makes each ask new.
@@ -405,8 +406,9 @@ the console. Everything else is optional.
   hand back what `onSettled` kept, or call `setPositions` to settle from
   rough positions).
 - **Outputs.** `onSelectionChange(nodes)` in the order they were selected,
-  `onNodeActivate(node)` on a double-click, `onHover(node | null)`, `onEdgeHover(edge | null)` for the
-  edge under the pointer while no node is, `onThemeResolved(theme)`,
+  `onNodeActivate(node)` on a double-click, `onHover(node | null)`,
+  `onEdgeHover(edge | null)` for the edge under the pointer while no node is,
+  `onThemeResolved(theme)`,
   `onDiagnostics(diagnostics)` whenever the graph's defects are recomputed
   (the first graph's included), `onTuningChange(tuning)`,
   `onPlayheadChange(playhead)`,
@@ -423,8 +425,9 @@ the console. Everything else is optional.
   whether a filter can show the node (a value absent on a hiding axis cannot
   be revealed); a widening frames and selects once the filter shows it;
   `select(id | null)` selects a node alone, or clears the selection; `fit()`
-  frames the visible set; `getPositions()` and `setPositions()` carry a layout out
-  and back in, as `onSettled` and `defaultPositions` do across a reload;
+  frames the visible set; `getPositions()` and `setPositions()` carry a
+  layout out and back in, as `onSettled` and `defaultPositions` do across a
+  reload;
   `updateFilter(fn)` rewrites the filter, the axes `fn` changes counting as
   the user's.
 - **What to know.** The view's own filter re-seeds on a graph change for

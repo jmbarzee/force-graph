@@ -1,9 +1,7 @@
-// The lasso: the nodes a path drawn on the canvas encloses.
-
 import { worldToScreen } from '../../graph/viewport'
 import type { Viewport } from '../../graph/viewport'
 
-type Point = { x: number; y: number }
+export type Point = { x: number; y: number }
 
 /** The ids of the nodes whose centres the closed screen polygon `path` encloses, in node order. */
 export function lassoed(path: readonly Point[], nodes: readonly (Point & { id: string })[], vp: Viewport): string[] {
