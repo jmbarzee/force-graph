@@ -135,6 +135,17 @@ switching never resizes the panel. A force tab shows its equation in a card,
 then the controls for every term in it; hovering a symbol in the equation
 lights the global slider it names. Every control is live.
 
+**Presets** sit above the tabs, a dropdown styled as the axis dropdowns:
+the library's `TUNING_PRESETS` (Balanced, Tight clusters, Spread out, Free
+form, Rings), or a host's own through `presets` — beside them, in place of
+them, or `[]` for no row. Choosing one carries every control to its values
+over 400 ms, ease-out (at once under `prefers-reduced-motion`), the axes
+and switches on the first frame; any other edit stops it. What a preset
+leaves out returns to its default, except the node scale, kept unless it
+names one. The dropdown shows the preset the tuning is, else `custom`. A
+preset naming an axis or scalar the taxonomy lacks is listed disabled with
+why, as an axis past the ceiling is, and said once on the console.
+
 **A control offers what the visible set holds**: a push token per bucket a
 visible node falls in, a pull token per spring category a sprung edge falls in,
 a column per bucket on each layout axis. Hiding a chip removes its tokens and

@@ -3,15 +3,15 @@
 // clears), hands the theme choice in from the URL, asks the view to reveal a
 // node by naming it (`focus`), keeps where the nodes came to rest across a
 // reload, and leaves the axes, the locks and the search to the view. It
-// supplies what only the host can know — findings, programme groups, and what
-// "Open details" does.
+// supplies what only the host can know — findings, programme groups, a preset
+// of its own, and what "Open details" does.
 
 import React from 'react'
 import {
-  GraphView, GroupLegend, TaxonomyContext, copyGroups, copyKeyOf, initialFilter, nodesById, payloadNumber, payloadString, useFocusRequest, useScheme, withSelection,
+  GraphView, GroupLegend, TUNING_PRESETS, TaxonomyContext, copyGroups, copyKeyOf, initialFilter, nodesById, payloadNumber, payloadString, useFocusRequest, useScheme, withSelection,
 } from '@jmbarzee/force-graph'
 import type {
-  FilterState, GraphNode, ThemeChoice,
+  FilterState, GraphNode, ThemeChoice, TuningPreset,
 } from '@jmbarzee/force-graph'
 import { catalog } from './data'
 import type { Campus, Catalog } from './data'
@@ -40,6 +40,12 @@ function findingsOf(data: Catalog): string[] {
   return out
 }
 const FINDINGS = findingsOf(catalog)
+
+/** The library's presets, and the catalog's own: courses in rows by level. */
+export const PRESETS: readonly TuningPreset[] = [
+  ...TUNING_PRESETS,
+  { label: 'By level', tuning: { forces: { bandY: { scalar: 'level' } } } },
+]
 
 export function App({ initialTheme = 'system' }: { initialTheme?: ThemeChoice }) {
   // Controlled: the details panel's "Show only <campus>" writes the filter.
@@ -71,6 +77,7 @@ export function App({ initialTheme = 'system' }: { initialTheme?: ThemeChoice })
             groupsControl={(active, control) => (
               <GroupLegend title="Degree programmes" items={groups.keys} active={active} control={control} />
             )}
+            presets={PRESETS}
             nodeAction={{ label: 'Open details', onSelect: setDetails }}
             onNodeActivate={setDetails}
             theme={themeChoice}

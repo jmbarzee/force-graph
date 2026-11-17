@@ -391,6 +391,7 @@
 .gv-pushpull-controls { display: flex; flex-direction: column; gap: 6px; }
 .gv-axis-row { display: flex; justify-content: center; align-items: center; gap: 6px; }
 .gv-axis-label { font-size: 12px; color: var(--gv-color-text-muted); font-family: var(--gv-font-sans); }
+.gv-preset-row { margin-top: 8px; }
 .gv-axis-select {
   font-size: 12px;
   font-family: var(--gv-font-sans);

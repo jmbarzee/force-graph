@@ -28,6 +28,9 @@ import type { NodeScaleParams } from '../graph/node-scale'
 import { CONTAINMENT_STROKE, NEUTRAL_STROKE, played, weighted } from '../graph/shapes'
 import { defaultTuningFor, tuningsEqual, makeTuning, openTuning } from '../graph/tuning-internal'
 import type { Tuning } from '../graph/tuning'
+import { TUNING_PRESETS } from '../graph/presets'
+import type { TuningPreset } from '../graph/presets'
+import { usePresets } from './graph-view/usePresets'
 import { TaxonomyContext, useTaxonomy } from './graph-view/useTaxonomy'
 import type { Taxonomy } from '../graph/taxonomy'
 import { engineOf } from '../graph/taxonomy'
@@ -263,6 +266,13 @@ export interface GraphViewProps {
   /** Where the view's own tuning starts when the host does not control it — `createTuning`'s or `tuningFromJSON`'s answer, say. Read once. */
   defaultTuning?: Tuning
   /**
+   * The named tunings the control panel offers. Default `TUNING_PRESETS`;
+   * `[...TUNING_PRESETS, mine]` adds a host's, `[mine]` replaces them, `[]`
+   * hides the row. A preset naming an axis or scalar the taxonomy lacks is
+   * listed disabled with why, and said once on the console.
+   */
+  presets?: readonly TuningPreset[]
+  /**
    * Where in the graph's `window` the edges are drawn: a fractional bucket
    * index, clamped to `[0, buckets − 1]`, at which each edge with a `series`
    * strokes its count there. Null, the whole window: every edge draws its
@@ -327,7 +337,7 @@ export const GraphView = React.forwardRef<GraphViewHandle, GraphViewProps>(funct
   axes: hostAxes, onAxesChange, defaultAxes,
   search: searchProp, onSearchChange, defaultSearch,
   theme: themeProp, onThemeChange, defaultTheme, systemTheme, tokens,
-  tuning: tuningProp, onTuningChange, defaultTuning,
+  tuning: tuningProp, onTuningChange, defaultTuning, presets = TUNING_PRESETS,
   playhead: playheadProp, onPlayheadChange, defaultPlayhead,
   onSelectionChange, onNodeActivate, onHover, onThemeResolved, onDiagnostics, onSettled,
 }: GraphViewProps, ref) {
@@ -495,14 +505,15 @@ export const GraphView = React.forwardRef<GraphViewHandle, GraphViewProps>(funct
   // write back every render.
   const tuning = openTuning(useStable(rawTuning, tuningsEqual))
   const tuningRef = useLatest(tuning)
+  const writeTuning = React.useCallback((next: Tuning) => {
+    tuningRef.current = openTuning(next)
+    setTuning(next)
+  }, [tuningRef, setTuning])
   const updateForces = React.useCallback((fn: (prev: ForceParams) => ForceParams) => {
     const prev = tuningRef.current
     const forces = fn(prev.forces)
-    if (forces === prev.forces) return
-    const next = makeTuning(forces, prev.nodeScale)
-    tuningRef.current = next
-    setTuning(next)
-  }, [tuningRef, setTuning])
+    if (forces !== prev.forces) writeTuning(makeTuning(forces, prev.nodeScale))
+  }, [tuningRef, writeTuning])
 
   // Simulation spine: the instance, version signal, running flag, the force
   // parameters as retuned for this graph and taxonomy, and every
@@ -559,10 +570,12 @@ export const GraphView = React.forwardRef<GraphViewHandle, GraphViewProps>(funct
   const nodeScale = tuning.nodeScale
   const handleNodeScaleChange = React.useCallback((patch: Partial<NodeScaleParams>) => {
     const prev = tuningRef.current
-    const next = makeTuning(prev.forces, { ...prev.nodeScale, ...patch })
-    tuningRef.current = next
-    setTuning(next)
-  }, [tuningRef, setTuning])
+    writeTuning(makeTuning(prev.forces, { ...prev.nodeScale, ...patch }))
+  }, [tuningRef, writeTuning])
+
+  // The preset row, read against the tuning as the panel shows it.
+  const shownTuning = React.useMemo(() => makeTuning(forceParams, nodeScale), [forceParams, nodeScale])
+  const { menu: presetMenu, choose: choosePreset } = usePresets(presets, taxonomy, graph, shownTuning, tuningRef, writeTuning, handleRelayout)
 
   // The locks a focus overrode — the view's own, or a host's under a new
   // key — go to the bar under a key of the view's, which it flashes once.
@@ -1185,6 +1198,8 @@ export const GraphView = React.forwardRef<GraphViewHandle, GraphViewProps>(funct
         onActivePullEdge={setActivePullEdge}
         nodeScale={nodeScale}
         onNodeScaleChange={handleNodeScaleChange}
+        presets={presetMenu}
+        onPreset={choosePreset}
       />}
 
       {/* The host's control for its groups (top-left), handed the groups as drawn. */}

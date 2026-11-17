@@ -19,6 +19,7 @@ import { Curve } from './controls/Curve'
 import type { Span } from './controls/Curve'
 import type { AxisOption, LayoutAxisOption } from '../graph/simulation'
 import type { AxisMapping } from '../graph/axis'
+import type { PresetMenu } from './graph-view/usePresets'
 
 export type ForceSection = 'push' | 'pull' | 'gravity' | 'dynamics' | null
 
@@ -74,6 +75,8 @@ interface GraphControlPanelProps {
   // are drawn at a given zoom.
   nodeScale: NodeScaleParams
   onNodeScaleChange: (patch: Partial<NodeScaleParams>) => void
+  presets: PresetMenu
+  onPreset: (index: number) => void
 }
 
 // Keys of ForceParams whose value is a number (ForceParams now also has the
@@ -159,7 +162,7 @@ export function GraphControlPanel({
   params, resolved, onParamChange, onAdjust, onRelayout, axes, layoutAxes, present, hiddenBy, onAxisChange,
   onActiveSection,
   onActivePushBucket, onActiveGravityBucket, onActivePullEdge,
-  nodeScale, onNodeScaleChange,
+  nodeScale, onNodeScaleChange, presets, onPreset,
 }: GraphControlPanelProps) {
   const [open, setOpen] = React.useState(false)
   const [activeTab, setActiveTab] = React.useState<ControlTab>('forces')
@@ -214,6 +217,8 @@ export function GraphControlPanel({
         <PopProvider>
         <HiddenByContext.Provider value={hiddenBy}>
         <div className="gv-graph-control-panel-body">
+          <PresetRow menu={presets} onPreset={onPreset} />
+
           {/* Control tabs — only one section is shown at a time. */}
           <div className="gv-graph-control-tabs" role="tablist">
             {CONTROL_TABS.map(t => (
@@ -285,6 +290,29 @@ export function GraphControlPanel({
         </HiddenByContext.Provider>
         </PopProvider>
       )}
+    </div>
+  )
+}
+
+/** The preset row: every preset, one this taxonomy refuses listed disabled with why, and `custom` while the tuning is none of them. No presets, no row. */
+export function PresetRow({ menu, onPreset }: { menu: PresetMenu; onPreset: (index: number) => void }) {
+  const id = React.useId()
+  if (menu.choices.length === 0) return null
+  return (
+    <div className="gv-axis-row gv-preset-row">
+      <label className="gv-axis-label" htmlFor={id}>preset</label>
+      <select
+        id={id}
+        className="gv-axis-select"
+        value={menu.selected}
+        title="A named tuning: choosing one carries every control to its values"
+        onChange={e => onPreset(Number(e.target.value))}
+      >
+        {menu.selected < 0 && <option value={-1} disabled>custom</option>}
+        {menu.choices.map((c, i) => 'reason' in c
+          ? <option key={i} value={i} disabled title={c.reason}>{`${c.label} — ${c.reason}`}</option>
+          : <option key={i} value={i}>{c.label}</option>)}
+      </select>
     </div>
   )
 }
