@@ -127,7 +127,7 @@ interface FilterBarBaseProps<R extends SearchRecord> {
   records?: readonly R[]
   /** Whether a record matches the search's query. */
   matches?: (record: R, query: string) => boolean
-  /** The search matches the view hides — the search's "+N" and each chip's badge — for a host whose visible set is not `passesSelection`'s. Default: read off `records`. */
+  /** A host's own `hiddenMatchesOf` result, which sets every badge. Default: read off `records`. */
   hiddenMatches?: Pick<HiddenMatches, 'hiddenCount' | 'hiddenByAxis'>
   /** The axes shown, in order; may be empty. Default: every declared axis, editable in place. */
   axes?: readonly string[]
@@ -348,6 +348,7 @@ export function FilterBar<R extends SearchRecord = SearchRecord>({
     const visibleIds = new Set(records.filter(node => passesSelection({ filter, taxonomy, axes, node })).map(r => r.id))
     return hiddenMatchesOf({ nodes: records, filter, taxonomy, axes, visibleIds, matches: r => matches(r, searchQuery) })
   }, [hiddenMatches, records, matches, searchQuery, filter, taxonomy, axes])
+  const hiddenCount = hidden?.hiddenCount ?? 0
 
   // What a section is made of: the values the host read off its data, their
   // counts and hidden matches, and the classes its declared presentation
@@ -531,9 +532,9 @@ export function FilterBar<R extends SearchRecord = SearchRecord>({
               onKeyDown={e => { if (e.key === 'Escape') toggleSearch() }}
             />
           )}
-          {!!hidden?.hiddenCount && (
-            <span className="gv-header-search-badge" title={`${hidden.hiddenCount} match${hidden.hiddenCount !== 1 ? 'es' : ''} hidden by filters`}>
-              +{hidden.hiddenCount}
+          {hiddenCount > 0 && (
+            <span className="gv-header-search-badge" title={`${hiddenCount} match${hiddenCount !== 1 ? 'es' : ''} hidden by filters`}>
+              +{hiddenCount}
             </span>
           )}
         </div>
