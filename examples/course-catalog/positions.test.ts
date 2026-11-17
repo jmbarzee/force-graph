@@ -28,6 +28,12 @@ describe('kept positions', () => {
     expect(loadPositions(memoryStore())).toBeUndefined()
   })
 
+  it('are none when what was kept does not parse', () => {
+    const store = memoryStore()
+    store.setItem('course-catalog.positions', '{')
+    expect(loadPositions(store)).toBeUndefined()
+  })
+
   it('open a reload with every node where it came to rest', () => {
     const store = memoryStore()
     const rested = settle(new Simulation(graph, undefined, seeded(1), taxonomy))

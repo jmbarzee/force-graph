@@ -12,8 +12,13 @@ export function savePositions(store: Store, positions: ReadonlyMap<string, Posit
   store.setItem(KEY, JSON.stringify([...positions]))
 }
 
-/** The positions kept last, or undefined when none were. */
+/** The positions kept last, or undefined when none were or they do not parse. */
 export function loadPositions(store: Store): Map<string, Position> | undefined {
   const kept = store.getItem(KEY)
-  return kept === null ? undefined : new Map(JSON.parse(kept) as [string, Position][])
+  if (kept === null) return undefined
+  try {
+    return new Map(JSON.parse(kept) as [string, Position][])
+  } catch {
+    return undefined
+  }
 }

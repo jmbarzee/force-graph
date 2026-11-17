@@ -46,6 +46,7 @@ describe('createTuning', () => {
     ['forces.bandX.axis: not an axis id', { forces: { bandX: {} } }],
     ['forces.bandX.overrides.a.max: not a finite number', { forces: { bandX: { axis: 'kind', overrides: { a: { min: 0 } } } } }],
     ['forces.bandY.scalar: no scalar "credit"', { forces: { bandY: { scalar: 'credit' } } }],
+    ['forces.bandY.scalar: not a scalar id', { forces: { bandY: { scalar: 3 } } }],
     ['forces.bandY.span.one: not a finite number', { forces: { bandY: { scalar: 'depth', span: { zero: 0 } } } }],
     ['nodeScale.baseMul: not a finite number', { nodeScale: { baseMul: Infinity } }],
   ])('throws "%s"', (message, json) => {

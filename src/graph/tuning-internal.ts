@@ -163,6 +163,7 @@ class Reader {
 
   band(value: unknown, path: string): LayoutTuning {
     const json = this.record(value, path)
+    if (this.strict && json.scalar !== undefined && typeof json.scalar !== 'string') this.fail(at(path, 'scalar'), 'not a scalar id')
     if (typeof json.scalar === 'string') {
       this.record(json, path, ['scalar', 'span'])
       const scalar = json.scalar
