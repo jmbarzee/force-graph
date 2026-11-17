@@ -13,6 +13,7 @@ import { bandRangeFor, isScalarAxis } from '../graph/forces'
 import { useTaxonomy } from './graph-view/useTaxonomy'
 import { bucketColor } from './controls/bucketColor'
 import { Plot } from './controls/Plot'
+import { NothingVisible } from './controls/NothingVisible'
 import { Slider } from './controls/Slider'
 import { Equation } from './controls/Equation'
 import { FormulaValue } from './controls/PopContext'
@@ -326,7 +327,7 @@ function AxisPlot({ axis, radial, tuning, table, present, strength, onStrength, 
         <div className="gv-ctl-plot-xlabel">{radial && axis === 'y' ? 'ring: the band centre, innermost first' : `${label} position`}</div>
       }
     >
-      <svg
+      {buckets.length === 0 ? <NothingVisible /> : <svg
         ref={svgRef}
         className="gv-gravity-band-svg"
         viewBox={`0 0 ${AP_W} ${AP_H}`}
@@ -374,7 +375,7 @@ function AxisPlot({ axis, radial, tuning, table, present, strength, onStrength, 
             </g>
           )
         })}
-      </svg>
+      </svg>}
     </Plot>
   )
 }

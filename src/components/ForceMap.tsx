@@ -17,6 +17,7 @@ import React from 'react'
 import './ForceMap.css'
 import { Plot } from './controls/Plot'
 import { Slider } from './controls/Slider'
+import { NothingVisible } from './controls/NothingVisible'
 
 const clamp = (v: number, lo: number, hi: number) => Math.max(lo, Math.min(hi, v))
 const snap = (v: number, step: number) => Math.round(v / step) * step
@@ -167,7 +168,7 @@ export function ForceMap2D({
         </>
       }
     >
-      <svg
+      {tokens.length === 0 ? <NothingVisible /> : <svg
         ref={svgRef}
         className="gv-spring-map-svg"
         viewBox={`0 0 ${MAP_W} ${MAP_H}`}
@@ -216,7 +217,7 @@ export function ForceMap2D({
             </g>
           )
         })}
-      </svg>
+      </svg>}
     </Plot>
   )
 }
@@ -304,63 +305,65 @@ export function ForceCurves({
   }
   return (
     <div className="gv-spring-curves">
-      <div className="gv-spring-axis-label gv-spring-curves-axis-y">{yLabel}</div>
+      {curves.length > 0 && <>
+        <div className="gv-spring-axis-label gv-spring-curves-axis-y">{yLabel}</div>
 
-      <svg
-        className="gv-spring-curves-svg"
-        viewBox={`0 0 ${CURVE_W} ${CURVE_H}`}
-        role="img"
-        aria-label={ariaLabel}
-      >
-        <rect x={0} y={0} width={CURVE_W} height={CURVE_H} className="gv-spring-curve-frame" />
-        {gridXs.map((px, i) => (
-          <line key={`g${i}`} x1={px.toFixed(1)} y1={0} x2={px.toFixed(1)} y2={CURVE_H} className="gv-ctl-grid-line" />
-        ))}
-        {baselineY !== undefined && (
-          <line x1={0} y1={baselineY} x2={CURVE_W} y2={baselineY} className="gv-spring-curve-baseline" />
-        )}
+        <svg
+          className="gv-spring-curves-svg"
+          viewBox={`0 0 ${CURVE_W} ${CURVE_H}`}
+          role="img"
+          aria-label={ariaLabel}
+        >
+          <rect x={0} y={0} width={CURVE_W} height={CURVE_H} className="gv-spring-curve-frame" />
+          {gridXs.map((px, i) => (
+            <line key={`g${i}`} x1={px.toFixed(1)} y1={0} x2={px.toFixed(1)} y2={CURVE_H} className="gv-ctl-grid-line" />
+          ))}
+          {baselineY !== undefined && (
+            <line x1={0} y1={baselineY} x2={CURVE_W} y2={baselineY} className="gv-spring-curve-baseline" />
+          )}
 
-        {curves.filter(c => c.id === hoveredId && c.markerX !== undefined).map(c => (
-          <line key={`m${c.id}`} x1={c.markerX} y1={0} x2={c.markerX} y2={CURVE_H} className="gv-spring-curve-restmark" />
-        ))}
+          {curves.filter(c => c.id === hoveredId && c.markerX !== undefined).map(c => (
+            <line key={`m${c.id}`} x1={c.markerX} y1={0} x2={c.markerX} y2={CURVE_H} className="gv-spring-curve-restmark" />
+          ))}
 
-        {curves.map(c => {
-          const dim = hoveredId !== null && hoveredId !== c.id
-          const active = hoveredId === c.id
-          return (
-            <g key={c.id} className={`gv-spring-curve${dim ? ' dim' : ''}${active ? ' active' : ''}`}>
-              <polyline
-                points={c.points}
-                className="gv-spring-curve-hit"
-                onPointerEnter={() => onHover(c.id)}
-                onPointerLeave={() => onHover(null)}
-              />
-              <polyline
-                points={c.points}
-                className="gv-spring-curve-line"
-                style={{ stroke: c.color }}
-              />
-              {c.label && (() => {
-                const p = lastPoint(c.points)
-                if (!p) return null
-                return (
-                  <text
-                    x={Math.min(p.x + 4, CURVE_W - 2)}
-                    y={clamp(p.y, 9, CURVE_H - 2)}
-                    className="gv-spring-curve-label"
-                    style={{ fill: c.color }}
-                    textAnchor="end"
-                  >
-                    {c.label}
-                  </text>
-                )
-              })()}
-            </g>
-          )
-        })}
-      </svg>
+          {curves.map(c => {
+            const dim = hoveredId !== null && hoveredId !== c.id
+            const active = hoveredId === c.id
+            return (
+              <g key={c.id} className={`gv-spring-curve${dim ? ' dim' : ''}${active ? ' active' : ''}`}>
+                <polyline
+                  points={c.points}
+                  className="gv-spring-curve-hit"
+                  onPointerEnter={() => onHover(c.id)}
+                  onPointerLeave={() => onHover(null)}
+                />
+                <polyline
+                  points={c.points}
+                  className="gv-spring-curve-line"
+                  style={{ stroke: c.color }}
+                />
+                {c.label && (() => {
+                  const p = lastPoint(c.points)
+                  if (!p) return null
+                  return (
+                    <text
+                      x={Math.min(p.x + 4, CURVE_W - 2)}
+                      y={clamp(p.y, 9, CURVE_H - 2)}
+                      className="gv-spring-curve-label"
+                      style={{ fill: c.color }}
+                      textAnchor="end"
+                    >
+                      {c.label}
+                    </text>
+                  )
+                })()}
+              </g>
+            )
+          })}
+        </svg>
 
-      <div className="gv-spring-axis-label gv-spring-curves-axis-x">{xLabel}</div>
+        <div className="gv-spring-axis-label gv-spring-curves-axis-x">{xLabel}</div>
+      </>}
 
       <div className="gv-spring-curves-exp" title={exp.title}>
         <span className="gv-spring-exp-label">{exp.label ?? 'exp'}</span>
