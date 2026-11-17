@@ -29,10 +29,18 @@ export interface ThemedColor {
   readonly dark: ColorPair
 }
 
+/** One colour per theme: hex, `rgb()` or `hsl()` in each. */
+export interface ThemedHue {
+  /** The colour in the light theme. */
+  readonly light: string
+  /** The colour in the dark theme. */
+  readonly dark: string
+}
+
 /** How an edge type is stroked. */
 export interface EdgeStroke {
   /** The stroke's colour per theme. */
-  readonly color: { readonly light: string; readonly dark: string }
+  readonly color: ThemedHue
   /** The stroke's base opacity, 0 to 1. */
   readonly alpha: number
   /** The canvas dash pattern; empty is solid. */
@@ -68,6 +76,41 @@ export function schemeVars(taxonomy: Taxonomy, theme: Theme): React.CSSPropertie
     vars[`${taxonomy.colorVar(key)}-border`] = c.border
   }
   return vars
+}
+
+/**
+ * The cycling palette a key with no colour of its own takes a slot in. Keys
+ * are told apart by a legend, so the ten hues only separate the handful shown
+ * at once; the light half is each hue a few stops deeper, to read on a pale
+ * canvas.
+ */
+export const PALETTE: readonly ThemedHue[] = [
+  { light: '#0F766E', dark: '#2DD4BF' }, // teal
+  { light: '#B45309', dark: '#F59E0B' }, // amber
+  { light: '#6D28D9', dark: '#A78BFA' }, // violet
+  { light: '#BE185D', dark: '#F472B6' }, // rose
+  { light: '#047857', dark: '#34D399' }, // green
+  { light: '#1D4ED8', dark: '#60A5FA' }, // blue
+  { light: '#C2410C', dark: '#FB923C' }, // orange
+  { light: '#4D7C0F', dark: '#A3E635' }, // lime
+  { light: '#0E7490', dark: '#22D3EE' }, // cyan
+  { light: '#A21CAF', dark: '#E879F9' }, // fuchsia
+]
+
+/** A key's hue: a string serves both themes; absent, the palette's at `slot`. */
+export function hueOf(color: string | ThemedHue | undefined, slot: number): ThemedHue {
+  if (color === undefined) return PALETTE[slot % PALETTE.length]
+  return typeof color === 'string' ? { light: color, dark: color } : color
+}
+
+/** A hue as a body's fill, with a border of its RGB × 0.6. */
+export function pairOf(hue: ThemedHue): ThemedColor {
+  const border = (color: string): string =>
+    `#${(rgbOf(color) ?? NEUTRAL).map(c => Math.round(c * 0.6).toString(16).padStart(2, '0')).join('')}`
+  return {
+    light: { fill: hue.light, border: border(hue.light) },
+    dark: { fill: hue.dark, border: border(hue.dark) },
+  }
 }
 
 const HEX3 = /^#([0-9a-f])([0-9a-f])([0-9a-f])$/i
@@ -109,8 +152,9 @@ export function rgbOf(color: string): readonly [number, number, number] | undefi
   return undefined
 }
 
-/** Whether a colour is one every reader parses: hex, `rgb()` or `hsl()`. */
-export const isSchemeColor = (color: string): boolean => rgbOf(color) !== undefined
+/** Whether a colour, or each half of a hue, is one every reader parses: hex, `rgb()` or `hsl()`. */
+export const isSchemeColor = (color: string | ThemedHue): boolean =>
+  typeof color === 'string' ? rgbOf(color) !== undefined : isSchemeColor(color.light) && isSchemeColor(color.dark)
 
 const NEUTRAL: readonly [number, number, number] = [148, 163, 184]
 const REFUSED = new Set<string>()

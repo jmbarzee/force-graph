@@ -19,9 +19,10 @@ import type { Taxonomy } from './taxonomy'
  * graph, a cycle of parents. Warnings: an edge no type claims, a style value
  * the taxonomy does not declare, containment edges that contradict
  * `parentId`, derived containment edges no type claims
- * (`containment-untyped`, from `derivedContainmentDiagnostics`), a group key
- * the groups do not declare (`group-key-undeclared`) and a group colour
- * outside the scheme's forms (`group-color-invalid`), both from `nodeGroupsOf`.
+ * (`containment-untyped`, from `derivedContainmentDiagnostics`), a key a
+ * colouring or the groups do not declare (`key-undeclared`) and a key or group
+ * colour outside the scheme's forms (`key-color-invalid`), both from
+ * `nodeGroupsOf` and `resolveColoring`.
  */
 export type GraphDiagnosticCode =
   | 'edge-id-duplicate'
@@ -36,8 +37,8 @@ export type GraphDiagnosticCode =
   | 'node-value-undeclared'
   | 'node-id-duplicate'
   | 'containment-untyped'
-  | 'group-key-undeclared'
-  | 'group-color-invalid'
+  | 'key-undeclared'
+  | 'key-color-invalid'
 
 /** One defect in a host's graph, as data. */
 export interface GraphDiagnostic {
