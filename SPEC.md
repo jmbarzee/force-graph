@@ -256,11 +256,14 @@ BIOL 310) halos every listing.
 
 ## Group glow
 
-`groups` glow behind everything else on the canvas. Each visible member gets a
-radial halo in its group's colour that fuses with its neighbours' into one
+`groups` glow behind everything else on the canvas: derived, as keys the host
+declares and a function answering each node's keys, or listed, as node ids per
+group. Membership is settled once per graph and groups; a key the function
+answers that the keys do not declare is ignored and reported.
+Each visible member gets a radial halo in its group's colour that fuses with its neighbours' into one
 blob; an edge glows when both ends are in one group. A group without a
 `color` takes a small cycling palette's slot for its place in the host's
-list, so hiding one group recolours no other. A focused group — the one
+list or keys, so hiding one group recolours no other. A focused group — the one
 `emphasize` names, or the one holding the active node — brightens and swells. In the catalog each degree programme is a
 group.
 

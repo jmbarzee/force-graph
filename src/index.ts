@@ -24,7 +24,7 @@ export { initialFilter, filterFromJSON, filterStatesEqual, filterToJSON, hiddenM
 export type { FilterState, FocusTarget, HiddenMatches, HiddenMatchesInput, AxisLocks, PassesSelectionInput, ReconcileResult, AxisSelection, ViewTransition } from './filter/types'
 export { countsOn, valuesOn } from './graph/axis'
 export type { AxisDescriptor, AxisId, AxisNamer, AxisValues, AxisValue, FilterChip, Relation, ResolvedAxisDescriptor } from './graph/axis'
-export type { ActiveGroup, NodeGroup } from './graph/groups'
+export type { ActiveGroup, DerivedGroups, Groups, LegendKey, NodeGroup } from './graph/groups'
 export { copyGroups, isContainment, nodesById, payloadNumber, payloadString } from './graph/model'
 export type { Graph, GraphEdge, GraphNode, ReadableGraph } from './graph/model'
 export { createTaxonomy } from './graph/taxonomy'

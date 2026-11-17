@@ -1,14 +1,15 @@
 // Group overlay — the glow groups the Graph view draws. A host hands the view
-// groups over the WHOLE graph (an id, the node ids the group covers, whether it
-// is emphasised); the view restricts each to the visible set, drops the
-// empty, and colours each by its place in the host's list — so a group keeps
-// its colour when a filter hides the groups before it. Membership is
-// derived on every render, never baked into the static graph, exactly like
-// the hover and search highlight sets. What a group IS — the host's chunking,
-// what the user has drilled into — is the host's; the host turns its own
-// structure into `NodeGroup`s.
+// groups over the WHOLE graph: either derived, keys it declares and a function
+// answering each node's keys, or listed, an id and the node ids each covers.
+// The view settles membership once per graph and groups, then restricts each
+// group to the visible set on every render, drops the empty, and colours each
+// by its place in the host's list — so a group keeps its colour when a filter
+// hides the groups before it. What a group IS — the host's chunking, what the
+// user has drilled into — is the host's.
 
+import type { GraphNode } from './model'
 import type { Theme } from './scheme'
+import type { GraphDiagnostic } from './validate'
 
 // A small cycling palette per theme. Identity is carried by the host's legend,
 // so colours only need to separate the handful of sibling groups shown at
@@ -64,6 +65,51 @@ export interface NodeGroup {
   emphasized?: boolean
   /** The glow's colour, hex or rgb(); absent, the palette's slot for this group's place in the list. */
   color?: string
+}
+
+/** One key of a set-shaped channel, in the order its palette slots follow. */
+export interface LegendKey {
+  id: string
+  label: string
+  /** The key's colour, hex or rgb(); absent, the palette's slot for its place in `keys`. */
+  color?: string
+}
+
+/**
+ * Groups derived from the data: the keys the host declares, and the keys each
+ * node belongs to. Slots follow `keys`, never the visible set; a key `of`
+ * answers that `keys` does not declare is ignored and reported.
+ */
+export interface DerivedGroups {
+  keys: readonly LegendKey[]
+  of: (node: GraphNode) => readonly string[]
+}
+
+/** The groups a host hands the view: derived from the data, or listed. */
+export type Groups = readonly NodeGroup[] | DerivedGroups
+
+/**
+ * The listed form of `groups` over `nodes`, and a `group-key-undeclared`
+ * warning per key `of` answers that `keys` does not declare. A listed form
+ * comes back as given.
+ */
+export function nodeGroupsOf(groups: Groups, nodes: readonly GraphNode[]): { groups: readonly NodeGroup[]; diagnostics: GraphDiagnostic[] } {
+  if (!('of' in groups)) return { groups, diagnostics: [] }
+  const listed = groups.keys.map(k => ({ id: k.id, nodeIds: new Set<string>(), color: k.color }))
+  const members = new Map(listed.map(g => [g.id, g.nodeIds]))
+  const diagnostics: GraphDiagnostic[] = []
+  const undeclared = new Set<string>()
+  for (const node of nodes) {
+    for (const key of groups.of(node)) {
+      const ids = members.get(key)
+      if (ids) ids.add(node.id)
+      else if (!undeclared.has(key)) {
+        undeclared.add(key)
+        diagnostics.push({ severity: 'warning', code: 'group-key-undeclared', nodeId: node.id, message: `node ${JSON.stringify(node.id)} belongs to group ${JSON.stringify(key)}, which the groups' keys do not declare; the view ignores it` })
+      }
+    }
+  }
+  return { groups: listed, diagnostics }
 }
 
 /** A group as drawn: the visible node ids it covers and its palette colour. */
