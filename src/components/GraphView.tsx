@@ -847,7 +847,9 @@ export const GraphView = React.forwardRef<GraphViewHandle, GraphViewProps>(funct
 
   const [flashNode, setFlashNode] = React.useState<{ id: string; at: number } | null>(null)
   const onFocusResultRef = useLatest(onFocusResult)
-  const landFocus = React.useCallback((id: string) => {
+  const settle = React.useCallback((id: string, request: FocusRequest | undefined, shown: boolean) => {
+    if (request) onFocusResultRef.current?.(request, shown)
+    if (!shown) return
     requestSelect(id)
     // Read at each frame, so the neighbors the widened filter draws count.
     const neighborhood = { [Symbol.iterator]: () => neighborhoodOf(id, visibleEdgesRef.current).values() }
@@ -856,47 +858,26 @@ export const GraphView = React.forwardRef<GraphViewHandle, GraphViewProps>(funct
       simRef.current?.reheat(0.1)
       setRunning(true)
     }
-  }, [running, setRunning, simRef, requestFrame, requestSelect, visibleEdgesRef])
-  // A focus that widened the filter waits for the next filter that differs
-  // from the one it built on — the host's answer, or the view's own write —
-  // and lands only if that filter shows its node. One focus waits at a time.
+  }, [onFocusResultRef, running, setRunning, simRef, requestFrame, requestSelect, visibleEdgesRef])
   const waitRef = React.useRef<{ id: string; request?: FocusRequest; from: FilterState } | null>(null)
-  // `request` is the `focus` prop's, reported; the handle's is not.
   const focusNodeById = React.useCallback((id: string, request?: FocusRequest): boolean => {
+    const waiting = waitRef.current
     waitRef.current = null
-    const report = (shown: boolean) => {
-      if (request) onFocusResultRef.current?.(request, shown)
-      return shown
-    }
     const node = graphIndex.get(id)
-    if (!node) return report(false)
-    const base = filterRef.current
+    if (!node) { settle(id, request, false); return false }
+    // A waiting widening is not the host's filter until the host passes it back.
+    const base = waiting?.from ?? filterRef.current
     // Widened by whole chips: the graph says which values each chip holds.
     const result = reconcileFilter({ destination: base, source: base, locks, transition: { kind: 'focus', target: { values: node.values, groups: groupsOf.get(id) } }, taxonomy, axes, graph })
-    // A read-only filter (controlled, no callback) cannot be widened.
     const applied = filterWritable ? result.filter : base
-    // A value absent on a hiding axis cannot be revealed by widening, and the
-    // host should know; a widening that cannot show the node is not written.
-    if (!passesFilter(node, applied, taxonomy, filterAxes, groupsOf)) return report(false)
-    if (filterStatesEqual(applied, base)) {
-      report(true)
-      landFocus(id)
-      return true
-    }
+    // A widening that cannot show the node is not written.
+    const shown = passesFilter(node, applied, taxonomy, filterAxes, groupsOf)
+    if (!shown || filterStatesEqual(applied, base)) { settle(id, request, shown); return shown }
     writeFilter(applied, [], request ?? { id })
     if (result.overriddenLocks.size > 0) flash(result.overriddenLocks)
     waitRef.current = { id, request, from: base }
     return true
-  }, [graphIndex, graph, groupsOf, filterRef, filterWritable, writeFilter, flash, locks, axes, filterAxes, landFocus, taxonomy, onFocusResultRef])
-  React.useEffect(() => {
-    const wait = waitRef.current
-    if (!wait || filterStatesEqual(filter, wait.from)) return
-    waitRef.current = null
-    const node = graphIndex.get(wait.id)
-    const shown = node !== undefined && passesFilter(node, filter, taxonomy, filterAxes, groupsOf)
-    if (wait.request) onFocusResultRef.current?.(wait.request, shown)
-    if (shown) landFocus(wait.id)
-  }, [filter]) // eslint-disable-line react-hooks/exhaustive-deps
+  }, [graphIndex, graph, groupsOf, filterRef, filterWritable, writeFilter, flash, locks, axes, filterAxes, settle, taxonomy])
   // The declarative focus. A request is new when its id or key differs from
   // the last one; it waits until its node is in the graph, then runs the
   // focus recipe once and reports whether the node could be shown. A null
@@ -915,6 +896,15 @@ export const GraphView = React.forwardRef<GraphViewHandle, GraphViewProps>(funct
     pendingFocusRef.current = focus
     waitRef.current = null
   }, [focus])
+  // The first filter that differs from the one a waiting focus built on
+  // decides it; below the withdrawals, so one in the same commit wins.
+  React.useEffect(() => {
+    const wait = waitRef.current
+    if (!wait || filterStatesEqual(filter, wait.from)) return
+    waitRef.current = null
+    const node = graphIndex.get(wait.id)
+    settle(wait.id, wait.request, node !== undefined && passesFilter(node, filter, taxonomy, filterAxes, groupsOf))
+  }, [filter]) // eslint-disable-line react-hooks/exhaustive-deps
   // A request whose node is in the graph lands on the NEXT commit, not this
   // one: a write the host or its hook queued in this same commit — the
   // re-seed for the graph that brought the node — has reached a controlled

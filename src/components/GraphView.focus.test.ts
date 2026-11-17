@@ -151,6 +151,30 @@ it('never reports a waiting focus that a newer one replaced', async () => {
   expect(view.events).toEqual(['2:true', 'select:n1'])
 })
 
+it('withdraws a waiting focus that null replaces in the commit that brings the widened filter', async () => {
+  const view = await host()
+  await view.render(hidesN0, { id: 'n0', key: 1 })
+  await view.render(view.asks[0]![0], null)
+  expect(view.events).toEqual([])
+})
+
+it('withdraws a waiting focus that a newer one replaces in the commit that brings the widened filter', async () => {
+  const view = await host()
+  await view.render(hidesN0, { id: 'n0', key: 1 })
+  await view.render(view.asks[0]![0], { id: 'n1', key: 2 })
+  expect(view.events).toEqual(['2:true', 'select:n1'])
+})
+
+it('builds a second handle focus on the host filter, not the widening still waiting', async () => {
+  const view = await host()
+  await act(async () => {
+    view.ref.current!.focusNode('n0')
+    view.ref.current!.focusNode('n0')
+  })
+  expect(view.asks).toHaveLength(2)
+  expect(view.events).toEqual([])
+})
+
 it("marks the handle's widening with the node's id", async () => {
   const view = await host()
   await act(async () => { expect(view.ref.current!.focusNode('n0')).toBe(true) })

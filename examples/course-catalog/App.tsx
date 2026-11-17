@@ -48,7 +48,7 @@ export const PRESETS: readonly TuningPreset[] = [
   { label: 'By level', tuning: { forces: { bandY: { scalar: 'level' } } } },
 ]
 
-export function App({ initialTheme = 'system', initialFocus }: { initialTheme?: ThemeChoice; initialFocus?: string }) {
+export function App({ initialTheme = 'system', initialFocus }: { initialTheme?: ThemeChoice; initialFocus?: string | null }) {
   // Controlled: the details panel's "Show only <campus>" writes the filter.
   const [filter, setFilter] = React.useState<FilterState>(() => initialFilter(taxonomy, graph))
   const [themeChoice, setThemeChoice] = React.useState<ThemeChoice>(initialTheme)
