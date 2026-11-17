@@ -285,7 +285,7 @@ export interface AxisMapping {
   bucketFor(value: AxisValue | undefined): MappingBucket | undefined
 }
 
-/** What `createAxisMapping` is given: the mapping's id, label, axis and buckets, before the buckets are checked for overlap. */
+/** What `createAxisMapping` is given, before the buckets are checked for overlap. */
 export interface AxisMappingSpec {
   /** Unique among mappings. */
   id: string

@@ -43,7 +43,7 @@ export interface LinkedViewProps {
   onFocusResult: (request: FocusRequest, shown: boolean) => void
 }
 
-/** What `useLinkedViews` is given: the taxonomy, the views by name, where each starts, the graph the default filter is seeded from, and the view shown first. */
+/** What `useLinkedViews` is given. */
 export interface LinkedViewsOptions<V extends string> {
   /** The taxonomy every view shares. */
   taxonomy: Taxonomy

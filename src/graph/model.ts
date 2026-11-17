@@ -107,7 +107,7 @@ export function payloadNumber(
   return typeof value === 'number' ? value : undefined
 }
 
-/** An edge of the host's graph: two node ids, a relation, the edge's own axis values and an opaque payload. */
+/** An edge of the host's graph. */
 export interface GraphEdge {
   /** Stable identity, opaque like a node's. */
   id: string

@@ -28,7 +28,7 @@ import type { EdgeStroke } from './scheme'
 import { cssSuffix, isSchemeColor } from './scheme'
 import { BUILT_IN_SCALARS, resolveScalarAxis } from './scalar'
 
-/** A highlight: the node ids lit and the edge ids lit. */
+/** A highlight. */
 export interface Highlight {
   /** The node ids lit. */
   readonly nodes: ReadonlySet<string>

@@ -29,7 +29,7 @@ import { valuesOn } from '../graph/axis'
 import type { Graph } from '../graph/model'
 import type { Taxonomy } from '../graph/taxonomy'
 
-/** What a reconciliation reads: the destination view's filter, locks and the axes it shows, the source view's filter, the transition, and the graph when a focus should widen by whole chips. */
+/** What a reconciliation reads. */
 export interface ReconcileInput {
   /** The view being switched to: its filter as it stands. */
   destination: FilterState
