@@ -1,7 +1,7 @@
 import { describe, expect, it } from 'vitest'
-import { resolveSprings, springFor } from './forces'
+import { ABSENT_EDGE_PHYSICS, resolveSprings, springFor } from './forces'
 import { identityMapping } from './axis'
-import { pairTuning } from './simulation'
+import { pairTuning, withSpringOverride } from './simulation'
 import { createTaxonomy } from './taxonomy'
 import { MIDDLING_SPRING } from './shapes'
 import type { NodeStyle } from './shapes'
@@ -12,11 +12,35 @@ const style = (id: string): NodeStyle => ({
 })
 
 describe('springFor', () => {
-  it('pulls the ends of an edge no declared type claims together, on the style axis', () => {
-    const taxonomy = createTaxonomy({ styleAxis: 'kind', styles: [style('service'), style('queue')] })
-    const spring = resolveSprings(pairTuning(identityMapping(taxonomy.axisFor('kind')!, taxonomy.styleValues)), taxonomy)
-    const category = springFor(spring, { id: 'e', sourceId: 'a', targetId: 'b' }, { values: { kind: 'service' } }, { values: { kind: 'queue' } })
-    expect(category.key).toBeUndefined()
+  const taxonomy = createTaxonomy({
+    styleAxis: 'kind', styles: [style('service'), style('queue')],
+    edgeTypes: [{ id: 'calls', relation: 'dependency', sourceValue: 'service', targetValue: 'service' }],
+  })
+  const pair = pairTuning(identityMapping(taxonomy.axisFor('kind')!, taxonomy.styleValues))
+  const edge = { id: 'e', sourceId: 'a', targetId: 'b' }
+  const service = { values: { kind: 'service' } }
+  const queue = { values: { kind: 'queue' } }
+  const untyped = JSON.stringify(['untyped', 'dependency'])
+
+  it('springs an edge no declared type claims in its relation\'s untyped category, from the middling spring', () => {
+    const category = springFor(resolveSprings(pair, taxonomy), edge, service, queue)
+    expect(category.key).toBe(untyped)
     expect(category).toMatchObject(MIDDLING_SPRING)
+  })
+
+  it('describes the untyped category as a token with no end named', () => {
+    expect(resolveSprings(pair, taxonomy).describe(untyped)).toMatchObject({ label: 'untyped', swatch: [null, null], relation: 'dependency' })
+  })
+
+  it('moves an untyped edge, and not a typed one, when the untyped category is tuned', () => {
+    const tuned = resolveSprings(withSpringOverride(pair, untyped, { strength: 1.5, distance: 400 }), taxonomy)
+    expect(springFor(tuned, edge, service, queue)).toMatchObject({ strength: 1.5, distance: 400 })
+    expect(springFor(tuned, edge, service, service)).toMatchObject({ key: 'calls', ...MIDDLING_SPRING })
+  })
+
+  it('leaves an edge with an unbucketed end no category and no pull', () => {
+    const category = springFor(resolveSprings(pair, taxonomy), edge, service, { values: {} })
+    expect(category.key).toBeUndefined()
+    expect(category).toMatchObject(ABSENT_EDGE_PHYSICS)
   })
 })
