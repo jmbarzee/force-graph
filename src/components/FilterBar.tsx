@@ -148,7 +148,6 @@ export function hiddenMatchBadge(count: number): React.ReactNode {
   ) : null
 }
 
-/** Whether an element renders: neither it nor an ancestor is `display: none`. */
 function rendered(element: HTMLElement): boolean {
   for (let e: HTMLElement | null = element; e; e = e.parentElement) if (getComputedStyle(e).display === 'none') return false
   return true
@@ -351,7 +350,6 @@ export function FilterBar<R extends SearchRecord = SearchRecord>({
     () => hostCounts ?? (graph ? countsOn(graph.nodes, axes) : undefined),
     [hostCounts, graph, axes],
   )
-  // The search's matches the filter hides, read off the host's records.
   const hidden = React.useMemo(() => {
     if (!records || !matches || !searchQuery) return undefined
     const visibleIds = new Set(records.filter(node => passesSelection({ filter, taxonomy, axes, node })).map(r => r.id))
@@ -383,15 +381,13 @@ export function FilterBar<R extends SearchRecord = SearchRecord>({
   }
   const toggleSearch = () => (searchActive ? setSearch({ query: '', active: false }) : openSearch())
 
-  // `/` opens the search of the bar on screen, unless the host focuses the
-  // input from its own shortcut or focus is in a field the key types into.
   const bindsSlash = showSearch && hostInputRef === undefined
   const openSearchRef = useLatest(openSearch)
   React.useEffect(() => {
     if (!bindsSlash) return
     const onKey = (e: KeyboardEvent) => {
       if (e.key !== '/' || e.defaultPrevented || e.metaKey || e.ctrlKey || e.altKey) return
-      if (e.target instanceof Element && e.target.closest('input, textarea, select, [contenteditable]')) return
+      if (e.target instanceof HTMLElement && (e.target.isContentEditable || e.target.closest('input, textarea, select'))) return
       if (!rootRef.current || !rendered(rootRef.current)) return
       e.preventDefault()
       openSearchRef.current()

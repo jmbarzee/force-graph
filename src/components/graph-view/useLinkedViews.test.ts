@@ -48,6 +48,14 @@ it('focuses a second view by a FocusTarget, widening it and carrying the target'
   expect(selectionFor(list.filter, 'team')).toEqual(new Set(['a', 'b']))
 })
 
+it('clears a FocusTarget focus when the host\'s view reports it', async () => {
+  const hook = await mount({ graph: { list: first } })
+  await act(async () => { hook.linked().focus('list', { values: { team: 'b' } }) })
+  const list = hook.linked().of('list')
+  await act(async () => { list.onFocusResult(list.focus!, true) })
+  expect(hook.linked().of('list').focus).toBeNull()
+})
+
 it('re-seeds each view from its own graph', async () => {
   const hook = await mount({ graph: { list: first, graph: first } })
   await hook.render({ graph: { list: first, graph: grown } })

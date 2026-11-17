@@ -19,7 +19,7 @@ export interface LinkedViewState {
   overriddenLocks: { axes: ReadonlySet<AxisId>; key: number }
 }
 
-/** The overrides every view starts from, so an unchanged state keeps its identity. */
+/** The overrides every view starts from. */
 export const NO_OVERRIDES: LinkedViewState['overriddenLocks'] = { axes: new Set(), key: 0 }
 
 /**

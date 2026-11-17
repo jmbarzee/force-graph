@@ -40,7 +40,7 @@ export interface LinkedViewProps {
   /** The focus `linked.focus` asked of this view, until the pane reports it: its `target`, and the node's `id` when it was a node. A `FilterBar` ignores it; a host's own view reveals the record the target names. */
   focus: { id?: string; key: number; target: FocusTarget } | null
   /** The pane's report on `focus`, which clears it. */
-  onFocusResult: (request: FocusRequest, shown: boolean) => void
+  onFocusResult: (request: Partial<FocusRequest>, shown: boolean) => void
 }
 
 /** What `useLinkedViews` is given. */

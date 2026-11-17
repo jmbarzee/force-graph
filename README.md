@@ -371,23 +371,19 @@ export function TwoViews({ taxonomy, graph }: { taxonomy: Taxonomy; graph: Graph
 ```
 
 `linked.of(view)` is the view's `filter`, `locks`, `axes`, their callbacks,
-`overriddenLocks` (the locks the last focus overrode, under a `key` the bar
-flashes once per), the shared `search` with its callback, and the `focus` the
-last `linked.focus` asked of it — its `target`, and the node's `id` when it
-was a node — with `onFocusResult` (a `FilterBar` ignores those two); it throws
-for a view the hook was not given (`views` is read once). `linked.active` is
-the view shown. `graph` is each view's own: it seeds the view's filter, a
-later one re-seeds that view, and a focus into it widens by whole chips.
+`overriddenLocks`, the shared `search` with its callback, and the `focus` the
+last `linked.focus` asked of it with `onFocusResult` (a `FilterBar` ignores
+those two); it throws for a view the hook was not given (`views` is read
+once). `linked.active` is the view shown.
 `linked.switchTo(to, transition?)` switches from the active view and makes
 `to` active, reconciling as [SPEC § Linked views](SPEC.md#linked-views) says
 (a manual switch is the default). `linked.focus(view, target)` is the focus
 switch and the request in one, for a node or a `FocusTarget` — the values a
 record of the host's names, which `matchesFocus(record, target)` finds.
-`linked.updateFilter(view, fn)` rewrites one view's filter, the axes `fn`
-changes counting as the user's, and `linked.updateFilters(fn)` every view's (a
-stale value pruned when the data changes — `reseedFilter` is the rule the hook
-itself applies to a view when its `graph` changes, on the axes the user has
-not touched); `linked.state`,
+`linked.updateFilter(view, fn)` rewrites one view's filter and
+`linked.updateFilters(fn)` every view's (a stale value pruned when the data
+changes — `reseedFilter` is the rule the hook itself applies to a view when
+its `graph` changes, on the axes the user has not touched); `linked.state`,
 `linked.active` and `linked.search` are everything,
 for a host that persists them. The bar carries its own theme and scheme
 (`theme`, default `'system'`; `systemTheme` says what that means), so it needs
