@@ -138,7 +138,9 @@ a column per bucket on each layout axis. Hiding a chip removes its tokens and
 keeps their tuning for when they return. A push or pull map, or a layout axis's
 band plot, that the visible set leaves empty gives way to one line, "Nothing
 visible on this axis — turn a chip on.", and a push or pull map's curves to
-their `exp` slider; the equation and every slider stay. The axis dropdowns
+their `exp` slider; the equation and every slider stay. When the legend's
+groups hide every node, chips or no, the line is "Nothing visible — turn a
+group on in the legend." instead. The axis dropdowns
 alone measure the whole graph, so an axis's availability never flips with a
 filter.
 
