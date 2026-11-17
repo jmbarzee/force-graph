@@ -19,6 +19,7 @@ export interface GraphNode {
    * one axis each and read it from here; nothing composes across axes.
    */
   values: AxisValues
+  /** The node's display name. */
   name: string
   /**
    * Metadata the host owns and the library does not interpret.
@@ -106,10 +107,13 @@ export function payloadNumber(
   return typeof value === 'number' ? value : undefined
 }
 
-/** An edge of the host's graph: two node ids, a relation, the edge's own axis values and an opaque payload. */
+/** An edge of the host's graph. */
 export interface GraphEdge {
+  /** Stable identity, opaque like a node's. */
   id: string
+  /** The node the edge runs from. */
   sourceId: string
+  /** The node the edge runs to. */
   targetId: string
   /**
    * What the edge means to the engine: a `containment` edge runs from a node
@@ -179,13 +183,16 @@ export function withContainmentEdges(graph: Graph): Graph {
 }
 
 /**
- * A graph as a reader sees it — its nodes, its edges, and a lookup by id —
- * the shape a computed scalar, the layout frame and the view's visible-graph
- * derivation all read. A `Simulation` satisfies it structurally.
+ * A graph as a reader sees it: the shape a computed scalar, the layout frame
+ * and the view's visible-graph derivation all read. A `Simulation` satisfies
+ * it structurally.
  */
 export interface ReadableGraph {
+  /** The nodes, in the graph's order. */
   readonly nodes: readonly GraphNode[]
+  /** The edges, each naming its two nodes by id. */
   readonly edges: readonly GraphEdge[]
+  /** The node with this id, if any — a lookup, not a scan of `nodes`. */
   getNode(id: string): GraphNode | undefined
 }
 
@@ -196,11 +203,13 @@ export function readableGraph(graph: Graph): ReadableGraph {
 }
 
 /**
- * The host's graph: its nodes, in the order they are laid out, and its edges.
- * Read, never written, by the view, which indexes the nodes itself.
+ * The host's graph. Read, never written, by the view, which indexes the
+ * nodes itself.
  */
 export interface Graph {
+  /** The nodes, in the order they are laid out. */
   readonly nodes: readonly GraphNode[]
+  /** The edges, each naming its two nodes by id. */
   readonly edges: readonly GraphEdge[]
 }
 

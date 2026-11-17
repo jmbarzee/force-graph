@@ -23,6 +23,7 @@ export function themeChoiceOf(value: unknown): ThemeChoice {
 
 /** What an element that marks a theme says: its `data-theme`. */
 export interface ThemeMarker {
+  /** The element's attribute, as the DOM's `getAttribute`. */
   getAttribute(name: string): string | null
 }
 

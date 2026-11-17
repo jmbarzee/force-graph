@@ -27,6 +27,7 @@ declare const LAYOUT_STATE: unique symbol
  * longer carries returns to the style axis — and reports the result.
  */
 export interface LayoutState {
+  /** Brands the state as the view's: a host keeps one, never builds one. */
   readonly [LAYOUT_STATE]: true
 }
 
@@ -43,6 +44,7 @@ export type LayoutTuningJSON =
  * else.
  */
 export interface LayoutJSON {
+  /** The forces' tuning. */
   forces?: {
     /** The axis push and pull key on, with the buckets the user changed: each bucket's charge and core radius, each edge type's spring. */
     pair?: { axis: AxisId; push?: Record<string, { charge: number; coreRadius: number }>; spring?: Record<string, SpringPhysics> }

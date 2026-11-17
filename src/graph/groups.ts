@@ -59,7 +59,9 @@ export const NODE_FOCUS_STRENGTH = 2.2
 
 /** A group as the host asks for it: over the whole graph, visible or not. */
 export interface NodeGroup {
+  /** Unique among the host's groups. */
   id: string
+  /** The nodes in the group, visible or not. */
   nodeIds: ReadonlySet<string>
   /** Whether the host emphasises this group; the view glows it stronger. A host's legend inside the pane uses `groupsControl`'s `emphasize` instead and leaves this out. */
   emphasized?: boolean
@@ -69,7 +71,9 @@ export interface NodeGroup {
 
 /** One key of a set-shaped channel, in the order its palette slots follow. */
 export interface LegendKey {
+  /** What `of` answers for a node in this key's group. */
   id: string
+  /** The key's name in a legend. */
   label: string
   /** The key's colour, hex or rgb(); absent, the palette's slot for its place in `keys`. */
   color?: string
@@ -81,7 +85,9 @@ export interface LegendKey {
  * answers that `keys` does not declare is ignored and reported.
  */
 export interface DerivedGroups {
+  /** Every key, in palette order. */
   keys: readonly LegendKey[]
+  /** The keys a node belongs to, by `id`. */
   of: (node: GraphNode) => readonly string[]
 }
 
@@ -114,12 +120,15 @@ export function nodeGroupsOf(groups: Groups, nodes: readonly GraphNode[]): { gro
   return { groups: listed, diagnostics: diagnostics.length ? diagnostics : NO_DIAGNOSTICS }
 }
 
-/** A group as drawn: the visible node ids it covers and its palette colour. */
+/** A group as drawn. */
 export interface ActiveGroup {
+  /** The host's group id. */
   id: string
+  /** The glow's colour: the host's, else the palette's. */
   color: string
   /** The glow's intensity: 1, or more for a group that is emphasised or holds the hovered or selected node. */
   strength: number
+  /** The group's visible nodes. */
   nodeIds: ReadonlySet<string>
 }
 

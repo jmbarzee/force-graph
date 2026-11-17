@@ -19,25 +19,33 @@ export type { LinkedViewState } from '../../filter/linked'
 
 /** The state props of one linked view — spread onto its `GraphView` or `FilterBar`. */
 export interface LinkedViewProps {
+  /** The view's selections. */
   filter: FilterState
   /** A change to the filter; `touched` names the axes the user changed (the bar's and the pane's writes name them), which a later graph then leaves alone. */
   onFilterChange: (next: FilterState, touched?: readonly AxisId[]) => void
+  /** The axes the view holds against adoption. */
   locks: AxisLocks
+  /** A change to the locks. */
   onLocksChange: (next: AxisLocks) => void
+  /** The axes the view shows, in order. */
   axes: readonly AxisId[]
+  /** A change to the axes shown. */
   onAxesChange: (next: readonly AxisId[]) => void
   /** The locks the last switch into this view overrode — a focus's, which the bar flashes once per set; a manual switch clears it. */
   overriddenLocks: ReadonlySet<AxisId>
   /** The search the views share: the same value and callback in every view's props. */
   search: SearchState
+  /** A change to the shared search. */
   onSearchChange: (next: SearchState) => void
   /** The focus `linked.focus` asked of this view, until the pane reports it; a `FilterBar` ignores it. */
   focus: FocusRequest | null
+  /** The pane's report on `focus`, which clears it. */
   onFocusResult: (request: FocusRequest, shown: boolean) => void
 }
 
-/** What `useLinkedViews` is given: the taxonomy, the views by name, where each starts, the graph the default filter is seeded from, and the view shown first. */
+/** What `useLinkedViews` is given. */
 export interface LinkedViewsOptions<V extends string> {
+  /** The taxonomy every view shares. */
   taxonomy: Taxonomy
   /** The views, by the names the host switches between. Read once. */
   views: readonly V[]

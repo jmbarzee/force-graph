@@ -11,7 +11,9 @@
  * withdraws a waiting one; a withdrawn request is not reported.
  */
 export interface FocusRequest {
+  /** The node to focus. */
   id: string
+  /** Changed to repeat a request for the same node. */
   key?: number | string
 }
 

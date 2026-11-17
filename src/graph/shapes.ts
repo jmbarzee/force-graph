@@ -17,7 +17,12 @@ import type { EdgeStroke, ThemedColor } from './scheme'
 // ── Node styles ─────────────────────────────────────────────────────────────
 
 /** A rest band on one layout axis: the range inside which a value feels no gravity. */
-export interface Band { min: number; max: number }
+export interface Band {
+  /** The band's low edge, in world units. */
+  min: number
+  /** The band's high edge, in world units. */
+  max: number
+}
 
 /**
  * How one value on the style axis is drawn, sized, and physically weighted,
@@ -51,12 +56,14 @@ export interface NodeStyle {
   icon?: string
   /** Fill and border in both themes; the canvas reads `color[theme]`. */
   color: ThemedColor
+  /** The node's drawn size. */
   size?: {
     /** Circle radius in world units. Hit-test radius = r + 4. */
     r?: number
     /** Font size for the icon glyph (px). */
     iconSize?: number
   }
+  /** The node's weight in the simulation. */
   physics?: {
     /**
      * Repulsion charge. Negative = repulsion. The starting point for the
@@ -103,15 +110,23 @@ export interface NodeStyle {
  * exception stops the canvas repainting for good.
  */
 export interface ResolvedNodeStyle {
+  /** The value on the style axis this style is for. */
   id: AxisValue
+  /** Display name. */
   label: string
+  /** One or two characters for a control token. */
   abbreviation: string
   /** Empty when the style declares none: nothing is drawn. */
   icon: string
+  /** Fill and border in both themes. */
   color: ThemedColor
+  /** Circle radius and icon font size. */
   size: { r: number; iconSize: number }
+  /** Charge, core radius and rest bands. */
   physics: { charge: number; coreRadius: number; band: { x: Band; y: Band } }
+  /** What a dependency edge touching a hidden node of this value does. */
   whenHidden: 'ascend' | 'splice'
+  /** The glanceable summary for a node of this value. */
   summaryKind: 'children' | 'degree' | 'none'
 }
 
@@ -127,9 +142,11 @@ export interface ResolvedNodeStyle {
  */
 export type EdgeTypeId = string
 
-/** One spring: stiffness (k) and rest length. */
+/** One spring. */
 export interface SpringPhysics {
+  /** Stiffness, k. */
   strength: number
+  /** Rest length, in world units. */
   distance: number
 }
 
@@ -156,6 +173,7 @@ export interface EdgeType {
    * classified; the first of each is the split-colour token's two halves.
    */
   sourceValue?: AxisValue | readonly AxisValue[]
+  /** The endpoint values at the other end, as `sourceValue` reads them. */
   targetValue?: AxisValue | readonly AxisValue[]
   /** Which relation an edge of this type expresses; an edge is classified only as a type of its own relation. */
   relation: 'containment' | 'dependency'
@@ -176,6 +194,7 @@ export interface EdgeType {
 
 /** An edge type with its defaults filled in — what `Taxonomy.edgeTypes` carries. */
 export interface ResolvedEdgeType extends EdgeType {
+  /** The declared label, else the id. */
   label: string
   /** The first source value — one half of the split-colour token. */
   sourceValue: AxisValue
@@ -183,8 +202,11 @@ export interface ResolvedEdgeType extends EdgeType {
   targetValue: AxisValue
   /** Every (source, target) pair the type runs between: each source value with each target value, in declaration order. */
   pairs: readonly (readonly [AxisValue, AxisValue])[]
+  /** The declared spring, else the middling one. */
   physics: SpringPhysics
+  /** The declared stroke over its relation's default, field by field. */
   style: EdgeStroke
+  /** The declared tooltip, else the label. */
   tooltip: string
 }
 

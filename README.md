@@ -69,7 +69,7 @@ export function App() {
 
 The containment edges from each service to its team are derived from
 `parentId`; the edge between the services is a dependency unless it says
-otherwise, and is classified as `calls` because that is the one declared type
+otherwise, and is classified as `'calls'` because that is the one declared type
 between two services; the filter axis is the style axis unless others are
 declared; the filter, the locks, the axes shown, the search, the theme, the
 selection and the layout are the view's own until the host asks for them.
@@ -97,15 +97,15 @@ never by spreading the built object.
   | `physics.charge` / `physics.coreRadius` | −40 r / 4 r |
   | `physics.band.y` | the value's slice of the stack, by its position in the order |
   | `physics.band.x` | 0 to 380 (`BAND_FRAME.x`) |
-  | `whenHidden` | `ascend`: a dependency edge touching a hidden node re-points to its nearest visible ancestor; `splice` follows the node's own edges through |
-  | `summaryKind` | `degree` (`→3 ←2` in the hover box); `children` counts what the node contains; `none` shows neither |
+  | `whenHidden` | `'ascend'`: a dependency edge touching a hidden node re-points to its nearest visible ancestor; `'splice'` follows the node's own edges through |
+  | `summaryKind` | `'degree'` (`→3 ←2` in the hover box); `'children'` counts what the node contains; `'none'` shows neither |
 
   `fallbackStyle` draws a value nobody declared; `styleLabel` names the axis
   in the controls.
 - **Edge types.** Each `EdgeType` has an `id`, the `sourceValue` and
   `targetValue` it runs between — a style value, several (the type runs
   between every source value and every target value), or left out for any
-  declared value — its `relation` (`containment` or `dependency`), and
+  declared value — its `relation` (`'containment'` or `'dependency'`), and
   optionally a `match`, values the edge itself must carry on the host's edge
   axes (a call and a signal between two services, by the edge's `kind`);
   `label` defaults to the id, `style` (colour per theme, alpha, dash, width)
@@ -116,10 +116,10 @@ never by spreading the built object.
   [Classifying an edge](#classifying-an-edge).
 - **Filter axes.** `filterAxes` defaults to the style axis as an
   allow-list. Each `AxisDescriptor` is an `id`, a `label` (default the id)
-  and what an empty selection means: `none` (an allow-list: nothing selected
-  shows nothing) or `all` (a narrowing axis: nothing selected shows
+  and what an empty selection means: `'none'` (an allow-list: nothing selected
+  shows nothing) or `'all'` (a narrowing axis: nothing selected shows
   everything). The policies follow — a node with no value on the axis
-  (`absentMeans`), how a focus widens it (`widens`: `always`, or `whenActive`
+  (`absentMeans`), how a focus widens it (`widens`: `'always'`, or `'whenActive'`
   — only while a selection is active), whether a change keeps the camera
   (`keepCamera`: a narrowing axis does, an allow-list refits) — and may be
   overridden. `chipsFor(values)` groups values into chips (default one per
@@ -130,12 +130,12 @@ never by spreading the built object.
   and no icon elsewhere, the abbreviation from the label, no tooltip),
   `initialSelection(values)` is the first open's selection (default every
   value on an allow-list, none on a narrowing axis), `presentation` is
-  `chip` or `tag`.
+  `'chip'` or `'tag'`.
 - **Scalars and hooks.** `scalars` adds computed axes (`id`, `label` and
   `tooltip` — defaults the id and the label — and `compute(graph)` answering a
   number per node; `normalize` maps
-  the answers onto [0, 1]: `max` divides by the largest and refuses a
-  negative, `range` puts the smallest at 0 and the largest at 1, `none`
+  the answers onto [0, 1]: `'max'` divides by the largest and refuses a
+  negative, `'range'` puts the smallest at 0 and the largest at 1, `'none'`
   trusts them) to the built-in
   reach, degree and depth. `contextLine(node, parent)` is the hover box's
   line or lines under the name, text or elements (default the parent's
@@ -180,7 +180,7 @@ engine compares them and never parses one.
   is two nodes sharing a `copyKey`: the library indexes the copies
   (`copyGroups`), draws their halo and counts them in the hover box. A host may
   list containment edges of its own between any two nodes.
-- **An edge's `relation`** is `containment` or `dependency` (the default;
+- **An edge's `relation`** is `'containment'` or `'dependency'` (the default;
   `isContainment(edge)` reads it). A containment edge from a node to its
   `parentId` is derived; one a host lists itself, to any node, is drawn in
   the containment stroke and sprung as its type says, but never walked as
@@ -189,7 +189,7 @@ engine compares them and never parses one.
   its own to edges and nodes alike through `values`; any axis the nodes
   carry can be pushed, pulled and laid out on.
 - **Adornments.** A node may carry `badges` (short texts drawn as chips above
-  it) and a `ring` (`dashed`, for a node set apart).
+  it) and a `ring` (`'dashed'`, for a node set apart).
 - **Identity.** Keep one `graph` object until something in it changes: a new
   object equal to the last rebuilds the layout for nothing, and the view says
   so once. The same for the taxonomy — build it once, outside render; the
@@ -201,8 +201,8 @@ engine compares them and never parses one.
   table lacks, a duplicate node or edge id, a parent not in the graph. The
   view runs it, lists the diagnostics under the bar, hands them to
   `onDiagnostics` and draws what remains — adding two warnings of its own:
-  `containment-untyped`, when a containment edge it derived from `parentId`
-  has no declared type, and `group-key-undeclared`, once per key a derived
+  `'containment-untyped'`, when a containment edge it derived from `parentId`
+  has no declared type, and `'group-key-undeclared'`, once per key a derived
   group's `of` answers that its `keys` do not declare. A host that wants to
   refuse a bad graph calls it first.
 
@@ -292,7 +292,7 @@ the console. Everything else is optional.
   cluster, which takes the theme button with it), `diagnostics`,
   `shortcuts`, `directionLine` (the hover box's) and `activateZoom` (the
   double-click zoom) — `searchTitle` and `searchPlaceholder` for the host's
-  own words, `systemTheme` (what `system` means, for a host that knows its
+  own words, `systemTheme` (what `'system'` means, for a host that knows its
   own theme), `className`, `style`, and `defaultPositions` (kept positions,
   read whenever the simulation is built; a node the live layout already
   holds keeps its place).
@@ -302,7 +302,7 @@ the console. Everything else is optional.
   (the first graph's included), `onLayoutChange(layout)`. Every node handed
   out is the host's own object. The resolved theme is for the host's own
   chrome beside the pane; a host that writes it as a `data-theme` on an
-  ancestor of the pane passes `systemTheme` too, so `system` follows the
+  ancestor of the pane passes `systemTheme` too, so `'system'` follows the
   host's answer and not the pane's own echo.
 - **The handle.** Through a ref, `focusNode(id)` reveals, centres and selects
   a node in one call — it widens the filter on the axes shown, flashes a lock
@@ -323,10 +323,10 @@ the console. Everything else is optional.
   An error diagnostic drops the edge, or the later node of a duplicated id,
   or clears the `parentId`, it names. The pane's theme observer watches every
   `data-theme` in the document unless `systemTheme` is given.
-- **Keyboard.** `keyboard` scopes the shortcuts: `pane` (the default — the
+- **Keyboard.** `keyboard` scopes the shortcuts: `'pane'` (the default — the
   focusable root handles the keys that reach it, so a page keeps Tab and
-  Space for its own controls), `global` (the window — a page that is the
-  pane, or a tab shell's active tab) or `none` (a hidden tab). The keys are
+  Space for its own controls), `'global'` (the window — a page that is the
+  pane, or a tab shell's active tab) or `'none'` (a hidden tab). The keys are
   [SPEC § Keyboard](SPEC.md#keyboard).
 
 ## Two views sharing a bar
@@ -374,7 +374,7 @@ changes — `reseedFilter` is the rule the hook itself applies to every view
 when `graph` changes, on the axes the user has not touched); `linked.state`,
 `linked.active` and `linked.search` are everything,
 for a host that persists them. The bar carries its own theme and scheme
-(`theme`, default `system`; `systemTheme` says what that means), so it needs
+(`theme`, default `'system'`; `systemTheme` says what that means), so it needs
 no wrapper; give it the `graph` (or the `values` per axis — `valuesOn(records,
 axis)` reads them off any subjects carrying `values`) and, if the host reads
 its own data, the `counts`. The lock toggles appear only when `locks` is
@@ -402,10 +402,10 @@ name).
 ## Theming
 
 The pane resolves its theme from its own choice (Auto / Light / Dark) or, for
-`system`, from `systemTheme` when the host gives it, else the nearest
+`'system'`, from `systemTheme` when the host gives it, else the nearest
 ancestor's `data-theme` and then the OS — `useHostTheme(ref)` is that same
 read, for a host's own chrome, and `themeChoiceOf(value)` reads a stored
-choice back (`system` for anything else). A server render knows neither
+choice back (`'system'` for anything else). A server render knows neither
 ancestors nor OS, so a server-rendered pane paints light until it hydrates; a
 host that wants no flash resolves the theme on the server (a cookie, say) and
 passes `systemTheme`.
@@ -455,8 +455,8 @@ bands are laid in `BAND_FRAME` (world units: the hierarchy axis from −300 to
 ## Collapse rules
 
 A dependency edge whose end is hidden is **graduated**: re-pointed to the
-nearest visible ancestor (`ascend`) or followed through the hidden node's own
-edges (`splice`). Two graduated edges landing on one visible pair collapse to
+nearest visible ancestor (`'ascend'`) or followed through the hidden node's own
+edges (`'splice'`). Two graduated edges landing on one visible pair collapse to
 one, the host's `collapse` hook choosing which original it stands for; an
 original edge between two visible nodes stands for every projection landing
 on its pair; two original edges between visible nodes never collapse, and

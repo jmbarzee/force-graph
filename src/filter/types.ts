@@ -295,7 +295,9 @@ export function matchesFocus(node: { values: Readonly<Record<string, string>> },
 
 /** What `passesSelection` reads. */
 export interface PassesSelectionInput<N> {
+  /** The selections the record is judged against. */
   filter: FilterState
+  /** Resolves each axis's policy. */
   taxonomy: Pick<Taxonomy, 'axisFor'>
   /** The axes the view shows — the only ones that filter. One the taxonomy does not declare filters nothing. */
   axes: readonly AxisId[]
@@ -361,11 +363,15 @@ export interface HiddenMatches {
 export interface HiddenMatchesInput<N extends { id: string; values?: AxisValues }> {
   /** Every node the search ran over, visible or not. */
   nodes: Iterable<N>
+  /** The selections that hide nodes. */
   filter: FilterState
+  /** Resolves each axis's policy. */
   taxonomy: Pick<Taxonomy, 'axisFor'>
   /** The axes the view shows, in order: the first one a hidden match fails is the chip it is counted on. */
   axes: readonly AxisId[]
+  /** The ids of the nodes the filter shows. */
   visibleIds: ReadonlySet<string>
+  /** Whether a node matches the search. */
   matches: (node: N) => boolean
   /** A node's value on an axis. Default: its `values`. */
   valueOn?: (node: N, axis: AxisId) => string | undefined

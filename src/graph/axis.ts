@@ -36,10 +36,13 @@ export function internValue(parts: string | readonly string[]): AxisValue {
   return typeof parts === 'string' ? parts : parts.join('\u0000')
 }
 
-/** One button in a filter bar: a label, an optional glyph, and the values it toggles. */
+/** One button in a filter bar. */
 export interface FilterChip {
+  /** Unique among the axis's chips. */
   id: string
+  /** The chip's text. */
   label: string
+  /** A glyph drawn before the label. */
   icon?: string
   /** A style value whose colour this chip wears, in the pane's theme; none means neutral. */
   tint?: AxisValue
@@ -62,9 +65,11 @@ export interface FilterChip {
  * descriptor) can supply one too and share the identity-mapping builder.
  */
 export interface AxisNamer {
+  /** The axis named. */
   id: AxisId
   /** Human label for the axis itself, e.g. for a dropdown or a chip group. */
   label: string
+  /** A value's display name. */
   labelFor(value: AxisValue): string
   /** One or two characters for a token. */
   abbreviationFor(value: AxisValue): string
@@ -104,6 +109,7 @@ export interface ReheatPolicy {
  * nothing enforcing agreement, free to drift apart unnoticed.
  */
 export interface AxisDescriptor {
+  /** The axis a node's `values` are keyed by. */
   id: AxisId
   /** Human label for the axis itself, e.g. for a dropdown or a chip group. Default: the id. */
   label?: string
@@ -164,25 +170,35 @@ export interface AxisDescriptor {
 
 /** A filter axis with every policy filled in — what `Taxonomy.filterAxes` carries. */
 export interface ResolvedAxisDescriptor extends AxisNamer {
+  /** What an empty selection means: `none` hides everything, `all` shows everything. */
   emptyMeans: 'all' | 'none'
+  /** What happens to a node carrying no value on this axis while a selection is active. */
   absentMeans: 'visible' | 'hidden'
   /** How a focus widens this axis to reveal its target. */
   widens: 'always' | 'whenActive'
   /** Whether a change on this axis keeps the user's pan and zoom (a narrowing axis does; an allow-list refits). */
   keepCamera: boolean
+  /** A chip's hover text; absent, none. */
   tooltipFor?(value: AxisValue): string
   /** A value's glyph, or '' for none. */
   iconFor(value: AxisValue): string
+  /** The chips the available values group into. */
   chipsFor(values: readonly AxisValue[]): readonly FilterChip[]
+  /** The values selected when the view first opens, given the values the graph presents. */
   initialSelection(values: readonly AxisValue[]): readonly AxisValue[]
+  /** How the bar draws the chips: a tinted `chip`, or a neutral `tag`. */
   presentation: 'chip' | 'tag'
 }
 
 /** How the style axis names and adorns its values, for a descriptor's defaults. */
 export interface StyleNamer {
+  /** The style axis: a descriptor on it takes these names by default. */
   axis: AxisId
+  /** A style value's label. */
   labelFor(value: AxisValue): string
+  /** A style value's abbreviation. */
   abbreviationFor(value: AxisValue): string
+  /** A style value's icon, or '' for none. */
   iconFor(value: AxisValue): string
 }
 
@@ -234,6 +250,7 @@ export function valueOf(
 
 /** One bucket of a mapping: a named group of source values. */
 export interface MappingBucket {
+  /** Unique within its mapping. */
   id: string
   /** Display name — a tooltip, a column header. */
   label: string
@@ -243,6 +260,7 @@ export interface MappingBucket {
    * answer better.
    */
   abbreviation: string
+  /** The source values the bucket groups. */
   values: readonly AxisValue[]
 }
 
@@ -255,19 +273,27 @@ export interface MappingBucket {
  * existing example is three separate kinds folded into one filter chip.
  */
 export interface AxisMapping {
+  /** Unique among mappings. */
   id: string
+  /** Display name. */
   label: string
+  /** The axis whose values are mapped. */
   axis: AxisId
+  /** The buckets, in order; no value sits in two. */
   buckets: readonly MappingBucket[]
   /** The bucket a value belongs to, or undefined if the mapping omits it. */
   bucketFor(value: AxisValue | undefined): MappingBucket | undefined
 }
 
-/** What `createAxisMapping` is given: the mapping's id, label, axis and buckets, before the buckets are checked for overlap. */
+/** What `createAxisMapping` is given, before the buckets are checked for overlap. */
 export interface AxisMappingSpec {
+  /** Unique among mappings. */
   id: string
+  /** Display name. */
   label: string
+  /** The axis whose values are mapped. */
   axis: AxisId
+  /** The buckets, in order. */
   buckets: readonly MappingBucket[]
 }
 

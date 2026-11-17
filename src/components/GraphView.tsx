@@ -52,10 +52,20 @@ import { validateGraph, derivedContainmentDiagnostics, dropInvalid } from '../gr
 import type { GraphDiagnostic } from '../graph/validate'
 
 /** A node's position in the layout, in world units. */
-export interface Position { x: number; y: number }
+export interface Position {
+  /** Rightward. */
+  x: number
+  /** Downward. */
+  y: number
+}
 
-/** The host's action for a node, offered in the hover box: its label, and what it does with the host's own node. */
-export interface NodeAction { label: string; onSelect: (node: GraphNode) => void }
+/** The host's action for a node, offered in the hover box. */
+export interface NodeAction {
+  /** The button's text. */
+  label: string
+  /** Called with the host's node when the user picks the action. */
+  onSelect: (node: GraphNode) => void
+}
 
 /** What `groupsControl` may ask of the view. */
 export interface GroupsControl {
@@ -141,8 +151,9 @@ export interface GraphViewProps {
   nodeAction?: NodeAction | ((node: GraphNode) => NodeAction | null)
   /** Which parts of the pane's chrome are offered. Default: everything, the lock toggles only when `locks` is controlled with its callback. */
   chrome?: GraphViewChrome
-  /** The search control's title and placeholder, for a host with its own words. */
+  /** The search control's title, for a host with its own words. */
   searchTitle?: string
+  /** The search field's placeholder, for a host with its own words. */
   searchPlaceholder?: string
   /**
    * The selected node, when the host controls the selection: the view shows
@@ -194,6 +205,7 @@ export interface GraphViewProps {
   defaultFilter?: FilterState
   /** Which axes are locked against a cross-view adoption. Default: `defaultLocks`, else none. Controlling it with `onLocksChange` shows the lock toggles. */
   locks?: AxisLocks
+  /** Every change to the locks. */
   onLocksChange?: (next: AxisLocks) => void
   /** Where the view's own locks start when the host does not control them. Read once. */
   defaultLocks?: AxisLocks
@@ -201,16 +213,19 @@ export interface GraphViewProps {
   overriddenLocks?: ReadonlySet<string>
   /** The axes shown, in order. Default: `defaultAxes`, else every declared filter axis. Editable in the bar unless controlled without a callback. */
   axes?: readonly string[]
+  /** Every change to the axes shown. */
   onAxesChange?: (next: readonly string[]) => void
   /** Where the view's own axes start when the host does not control them. Read once. */
   defaultAxes?: readonly string[]
   /** The search control. Default: `defaultSearch`, else closed and empty. */
   search?: SearchState
+  /** Every change to the search. */
   onSearchChange?: (next: SearchState) => void
   /** Where the view's own search starts when the host does not control it. Read once. */
   defaultSearch?: SearchState
   /** The pane's theme choice. Default: `defaultTheme`, else `system`. */
   theme?: ThemeChoice
+  /** Every change to the theme choice. */
   onThemeChange?: (next: ThemeChoice) => void
   /** Where the view's own theme choice starts when the host does not control it. Read once. */
   defaultTheme?: ThemeChoice

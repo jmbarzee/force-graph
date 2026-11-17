@@ -37,7 +37,9 @@ export interface ScalarAxis {
 
 /** A scalar with its words filled in — what `Taxonomy.scalars` carries. */
 export interface ResolvedScalarAxis extends ScalarAxis {
+  /** The declared label, else the id. */
   readonly label: string
+  /** The declared tooltip, else the label. */
   readonly tooltip: string
 }
 
@@ -54,7 +56,9 @@ export function resolveScalarAxis(scalar: ScalarAxis): ResolvedScalarAxis {
  * past each other.
  */
 export interface ScalarSpan {
+  /** Where a score of 0 rests. */
   readonly zero: number
+  /** Where a score of 1 rests. */
   readonly one: number
 }
 
@@ -65,7 +69,9 @@ export interface ScalarSpan {
  * declared bands do; the tuning stores what the user decided, nothing else.
  */
 export interface ScalarTuning {
+  /** The scalar's id. */
   readonly scalar: string
+  /** The span the user dragged to; absent, the taxonomy's. */
   readonly span?: ScalarSpan
 }
 
