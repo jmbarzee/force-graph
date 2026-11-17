@@ -3,7 +3,8 @@
 // produces the variables its CSS would declare.
 
 import type React from 'react'
-import { cssSuffix, schemeVars } from '../graph/scheme'
+import type { Fill } from '../graph/coloring'
+import { cssSuffix, keyVars, schemeVars } from '../graph/scheme'
 import type { Theme } from '../graph/scheme'
 import type { Taxonomy } from '../graph/taxonomy'
 
@@ -36,7 +37,7 @@ export function createTheme(themes: { readonly [T in Theme]?: { readonly [R in T
   return { light: varsOf('light'), dark: varsOf('dark') }
 }
 
-/** A themed root's inline style: the scheme's colours, then the host's tokens, for one theme. */
-export function scopeStyle(taxonomy: Taxonomy, theme: Theme, tokens?: ThemeTokens): React.CSSProperties {
-  return { ...schemeVars(taxonomy, theme), ...tokens?.[theme] }
+/** A themed root's inline style for one theme: the scheme's colours, the fill's over them, then the host's tokens. */
+export function scopeStyle(taxonomy: Taxonomy, theme: Theme, tokens?: ThemeTokens, fill?: Fill): React.CSSProperties {
+  return { ...schemeVars(taxonomy, theme), ...(fill && keyVars(taxonomy, fill, theme)), ...tokens?.[theme] }
 }

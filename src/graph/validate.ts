@@ -8,6 +8,8 @@
 // it to `onDiagnostics`, and draws what remains; a host that wants to refuse a
 // bad graph before mounting calls it itself.
 
+import type { AxisValue } from './axis'
+import type { Fill } from './coloring'
 import type { Graph, GraphEdge, GraphNode } from './model'
 import { nodesById, relationOf, seriesOf, unitWeight, windowOf, withContainmentEdges } from './model'
 import type { Taxonomy } from './taxonomy'
@@ -22,10 +24,11 @@ import { engineOf } from './taxonomy'
  * series that does not read against the window, a style value the taxonomy
  * does not declare, containment edges that contradict `parentId`,
  * containment edges derived from `parentId` that no type claims
- * (`containment-untyped`). The view adds two of its own, through
+ * (`containment-untyped`). The view adds three of its own, through
  * `onDiagnostics`: a key a colouring or the groups do not declare
- * (`key-undeclared`) and a key or group colour outside the scheme's forms
- * (`key-color-invalid`).
+ * (`key-undeclared`), a key or group colour outside the scheme's forms
+ * (`key-color-invalid`), and a chip tint naming no key of the fill
+ * (`tint-undeclared`).
  */
 export type GraphDiagnosticCode =
   | 'edge-id-duplicate'
@@ -45,6 +48,7 @@ export type GraphDiagnosticCode =
   | 'containment-untyped'
   | 'key-undeclared'
   | 'key-color-invalid'
+  | 'tint-undeclared'
 
 /** One defect in a host's graph, as data. */
 export interface GraphDiagnostic {
@@ -273,4 +277,16 @@ function derivedContainmentDiagnostics(drawn: Graph, host: Graph, taxonomy: Taxo
     edgeId: untyped[0],
     message: `${untyped.length} derived containment edge${one ? '' : 's'} (${shown}${untyped.length > 3 ? ', …' : ''}) ${one ? 'has' : 'have'} no type: no declared containment type runs between the child's value and the parent's; ${one ? 'it draws' : 'they draw'} in the containment stroke and spring${one ? 's' : ''} with the middling spring`,
   }]
+}
+
+/** Every chip, over each declared axis's values, whose tint names no key of the fill: once per chip. */
+export function tintDiagnostics(taxonomy: Taxonomy, values: ReadonlyMap<string, readonly AxisValue[]>, fill: Fill): GraphDiagnostic[] {
+  const out: GraphDiagnostic[] = []
+  for (const axis of taxonomy.filterAxes) {
+    for (const chip of axis.chipsFor(values.get(axis.id) ?? [])) {
+      if (chip.tint === undefined || fill.keys.has(chip.tint)) continue
+      out.push({ severity: 'warning', code: 'tint-undeclared', message: `chip ${JSON.stringify(chip.id)} on ${JSON.stringify(axis.id)} wears ${JSON.stringify(chip.tint)}, which the fill's keys do not declare; it draws neutral` })
+    }
+  }
+  return out
 }

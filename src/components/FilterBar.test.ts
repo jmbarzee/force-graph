@@ -2,8 +2,9 @@
 import React, { act } from 'react'
 import { createRoot } from 'react-dom/client'
 import { afterEach, beforeEach, describe, expect, it, vi } from 'vitest'
-import { FilterBar, axesOpenedBy, axesReseeded, firstLine } from './FilterBar'
+import { FilterBar, axesOpenedBy, axesReseeded, firstLine, tintOf } from './FilterBar'
 import type { FilterBarProps } from './FilterBar'
+import { fillOf } from '../graph/coloring'
 import { createTaxonomy } from '../graph/taxonomy'
 import type { FilterState } from '../filter/types'
 import { withLock } from '../filter/types'
@@ -21,6 +22,23 @@ describe('firstLine', () => {
 
   it('has nothing to collapse in a hidden row, whose items have no height', () => {
     expect(firstLine([{ top: 0, bottom: 0 }, { top: 0, bottom: 0 }])).toEqual({ height: 0, rest: 0 })
+  })
+})
+
+describe('tintOf', () => {
+  const taxonomy = createTaxonomy({ styleAxis: 'kind', styles: [{ id: 'svc', label: 'Service' }], filterAxes: [{ id: 'team', emptyMeans: 'all' }, { id: 'site', emptyMeans: 'all' }] })
+  const fill = fillOf({ by: 'axis', axis: 'team' }, { nodes: [{ id: 'a', name: 'a', values: { team: 'red', site: 'x' } }], edges: [] }, taxonomy)
+  const chip = (values: string[], tint?: string) => ({ id: values.join(), label: values.join(), values, tint })
+
+  it('wears a named key, else the one value of a chip on the fill’s axis, else nothing', () => {
+    expect(tintOf(chip(['x'], 'red'), 'site', fill)).toBe('red')
+    expect(tintOf(chip(['red']), 'team', fill)).toBe('red')
+    expect(tintOf(chip(['red', 'blue']), 'team', fill)).toBeUndefined()
+    expect(tintOf(chip(['x']), 'site', fill)).toBeUndefined()
+  })
+
+  it('draws a tint naming no key neutral', () => {
+    expect(tintOf(chip(['red'], 'svc'), 'team', fill)).toBeUndefined()
   })
 })
 

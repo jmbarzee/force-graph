@@ -11,6 +11,7 @@ import { pushForKey } from '../graph/forces'
 import type { ResolvedPhysics } from '../graph/forces'
 
 import { useTaxonomy } from './graph-view/useTaxonomy'
+import { useFill } from './graph-view/useFill'
 import { bucketColor } from './controls/bucketColor'
 import { alikeShift, laddersOn, rowsOf } from './controls/ladders'
 import { LadderToggles, useCollapsed } from './controls/LadderToggles'
@@ -57,7 +58,8 @@ export function ChargeMap({ params, resolved, present, onParamChange, hoveredBuc
   const ladders = laddersOn(taxonomy, push.mapping, shown.map(b => b.id))
   const rows = rowsOf(shown.map(b => b.id), ladders, collapsed)
   const at = (id: string) => ({ x: pushForKey(push, id).coreRadius, y: Math.abs(pushForKey(push, id).charge) })
-  const color = (id: string) => bucketColor(taxonomy, push.mapping, id)
+  const fill = useFill(taxonomy)
+  const color = (id: string) => bucketColor(taxonomy, fill, push.mapping, id)
   const bucketToken = (id: string): MapToken => {
     const b = shown.find(s => s.id === id)!
     return {
@@ -136,6 +138,7 @@ export function ChargeMap({ params, resolved, present, onParamChange, hoveredBuc
 // slider beneath.
 export function ChargeCurves({ params, resolved, present, onParamChange, hoveredBucket, onHoverBucket }: ChargeControlProps) {
   const taxonomy = useTaxonomy()
+  const fill = useFill(taxonomy)
   const { push } = resolved
   // Only the buckets the visible set holds; the tuning keeps the rest.
   const shown = push.mapping.buckets.filter(b => present.has(b.id))
@@ -172,12 +175,12 @@ export function ChargeCurves({ params, resolved, present, onParamChange, hovered
 
     const built = sampled.map(({ type, rEff, pts }) => ({
       id: type,
-      color: bucketColor(taxonomy, push.mapping, type),
+      color: bucketColor(taxonomy, fill, push.mapping, type),
       markerX: xFor(rEff),
       points: pts.map(p => `${xFor(p.d).toFixed(1)},${yFor(p.v).toFixed(1)}`).join(' '),
     }))
     return { curves: built, dMax }
-  }, [params, pushMul, push, crMul, exp, taxonomy, present])
+  }, [params, pushMul, push, crMul, exp, taxonomy, fill, present])
 
   return (
     <ForceCurves

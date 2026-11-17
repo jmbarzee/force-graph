@@ -8,7 +8,9 @@
 // matches its filter hides; a pane that computes its own passes them in.
 
 import { TaxonomyContext } from './graph-view/useTaxonomy'
-import type { AxisId, AxisLabels, AxisValue, AxisValues } from '../graph/axis'
+import { useFill } from './graph-view/useFill'
+import type { AxisId, AxisLabels, AxisValues, FilterChip } from '../graph/axis'
+import type { Fill } from '../graph/coloring'
 import { countsOn, labelled, valuesOn } from '../graph/axis'
 import type { Graph } from '../graph/model'
 import type { Taxonomy } from '../graph/taxonomy'
@@ -21,16 +23,10 @@ import type { Theme } from '../graph/scheme'
 import { useRecentlyChanged } from './graph-view/useRecentlyChanged'
 import type { RecentlyChanged } from './graph-view/useRecentlyChanged'
 
-// A chip's tint names a style value; one that names nothing declared is a
-// host bug, said once per chip and per bar on the console rather than thrown
-// in render, and the chip draws neutral.
-function tintOf(chipId: string, tint: AxisValue, taxonomy: Taxonomy, said: Set<string>): AxisValue {
-  if (taxonomy.styleValues.includes(tint)) return tint
-  if (!said.has(chipId)) {
-    said.add(chipId)
-    console.error(`[filter] chip ${JSON.stringify(chipId)} borrows the colour of ${JSON.stringify(tint)}, which the taxonomy does not declare`)
-  }
-  return tint
+/** The fill key a chip wears: its tint, else its one value on the axis the fill follows; undefined is neutral. */
+export function tintOf(chip: FilterChip, axis: AxisId, fill: Fill): string | undefined {
+  const key = chip.tint ?? (axis === fill.axis && chip.values.length === 1 ? chip.values[0] : undefined)
+  return key !== undefined && fill.keys.has(key) ? key : undefined
 }
 import { hiddenMatchesOf, passesSelection, selectionFor } from '../filter/types'
 import { NO_OVERRIDES } from '../filter/linked'
@@ -270,7 +266,7 @@ export function FilterBar<R extends SearchRecord = SearchRecord>({
   const fromContext = React.useContext(TaxonomyContext)
   const taxonomy = taxonomyProp ?? fromContext
   if (!taxonomy) throw new Error('FilterBar has no taxonomy: pass `taxonomy`, or mount it inside <TaxonomyContext.Provider value={…}>.')
-  const undeclaredTints = React.useRef(new Set<string>())
+  const fill = useFill(taxonomy)
   // The filter, locks and axes compared by content, as the pane compares
   // them: a host rebuilding one each render changes nothing here.
   const filter = useStable(filterProp, filterStatesEqual)
@@ -312,7 +308,7 @@ export function FilterBar<R extends SearchRecord = SearchRecord>({
   // no wrapper to read its tints, and a pane's bar is handed the resolved one.
   const rootRef = React.useRef<HTMLDivElement>(null)
   const theme = useTheme(rootRef, themeChoice, systemTheme)
-  const schemeStyle = React.useMemo(() => scopeStyle(taxonomy, theme, tokens), [taxonomy, theme, tokens])
+  const schemeStyle = React.useMemo(() => scopeStyle(taxonomy, theme, tokens, fill), [taxonomy, theme, tokens, fill])
   // The add-axis menu, open while the user picks among several.
   const [addOpen, setAddOpen] = React.useState(false)
   const labelOf = (id: string) => taxonomy.axisFor(id)?.label ?? id
@@ -443,11 +439,12 @@ export function FilterBar<R extends SearchRecord = SearchRecord>({
                     look.modifierPrefix ? `${look.modifierPrefix}-${chip.id}` : '',
                     isChanged ? 'recently-changed' : '',
                   ].filter(Boolean).join(' ')
+                  const tint = tintOf(chip, axis, fill)
                   return (
                     <button
                       key={chip.id}
                       className={cls}
-                      style={chip.tint ? ({ ['--gv-chip-tint' as string]: `var(${taxonomy.colorVar(tintOf(chip.id, chip.tint, taxonomy, undeclaredTints.current))})` } as React.CSSProperties) : undefined}
+                      style={tint === undefined ? undefined : ({ ['--gv-chip-tint' as string]: `var(${taxonomy.colorVar(tint)})` } as React.CSSProperties)}
                       onClick={() => change(toggleGroup(filter, axis, chip.values), axis)}
                       title={chip.tooltip ?? (isActive ? `Hide ${chip.label.toLowerCase()}` : `Show ${chip.label.toLowerCase()}`)}
                     >

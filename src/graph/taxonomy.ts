@@ -91,10 +91,12 @@ export interface Taxonomy {
   /** Every edge type, in control-panel order, its defaults filled in. */
   readonly edgeTypes: readonly ResolvedEdgeType[]
   /**
-   * The custom property a value's fill is published under (`-border` for its
-   * border): `--gv-node-` and the value id in kebab case, or a numbered name
-   * when the id kebab-cases to nothing or to another value's name. The one
-   * way to learn the name; a host's CSS reads it through `schemeVars` or
+   * The custom property a style value's or a fill key's colour is published
+   * under (`-border` for its border): `--gv-node-` and the id in kebab case,
+   * or, for a style value, a numbered name when the id kebab-cases to nothing
+   * or to another value's name. A key and a style value that share a name
+   * share the property, and inside a pane the key's colour wins. The one way
+   * to learn the name; a host's CSS reads it through `schemeVars` or
    * `schemeStylesheet`.
    */
   colorVar(value: AxisValue): string

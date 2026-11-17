@@ -260,7 +260,7 @@
   font-weight: 500;
 }
 
-/* A chip's tint is the style value it borrows (inline `--gv-chip-tint`, set by
+/* A chip's tint is the fill key it wears (inline `--gv-chip-tint`, set by
    the bar from the themed root's --gv-node-<suffix>); its hover and active
    backgrounds are that tint mixed down to the theme's tint percentages, so
    the bar needs no per-kind rule, no literal palette and no dark rule. */

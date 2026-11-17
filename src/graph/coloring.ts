@@ -3,8 +3,8 @@ import type { AxisId, AxisValue } from './axis'
 import { checkedKey, groupsByNode, nodeGroupsOf } from './groups'
 import type { Groups, LegendKey } from './groups'
 import type { Graph, GraphNode } from './model'
-import { hueOf } from './scheme'
-import type { ThemedHue } from './scheme'
+import { hueOf, pairOf } from './scheme'
+import type { ThemedColor, ThemedHue } from './scheme'
 import type { Taxonomy } from './taxonomy'
 import type { GraphDiagnostic } from './validate'
 
@@ -87,4 +87,49 @@ export function resolveColoring(coloring: SetColoring, graph: Graph, taxonomy: T
     }
   }
   return { keys, of, diagnostics }
+}
+
+/** A node's fill: each key's label and colour, and each node's key. */
+export interface Fill {
+  /** The axis the fill follows; undefined when a host function answers each node's key. */
+  axis: AxisId | undefined
+  /** Every key, in slot order, with its legend label and colour. */
+  keys: ReadonlyMap<string, { label: string; color: ThemedColor }>
+  /** Each keyed node's key, by node id. */
+  of: ReadonlyMap<string, string>
+  /** What resolving the colouring reported. */
+  diagnostics: readonly GraphDiagnostic[]
+}
+
+/**
+ * The fill a colouring gives a graph. Absent, or the style axis without
+ * keys, it is every declared style's own colour; otherwise each key's hue as
+ * a body's fill and border.
+ */
+export function fillOf(coloring: Coloring | undefined, graph: Graph, taxonomy: Taxonomy): Fill {
+  const styleAxis = taxonomy.styleAxis()
+  if (!coloring || (coloring.by === 'axis' && coloring.axis === styleAxis && !coloring.keys)) {
+    const labelFor = taxonomy.axisFor(styleAxis)?.labelFor
+    const keys = new Map(taxonomy.styleValues.map(v => {
+      const { label, color } = taxonomy.styleOf(v)
+      return [v, { label: labelFor?.(v) ?? label, color }]
+    }))
+    const of = new Map<string, string>()
+    for (const node of graph.nodes) {
+      const v = node.values[styleAxis]
+      if (v !== undefined && keys.has(v)) of.set(node.id, v)
+    }
+    return { axis: styleAxis, keys, of, diagnostics: [] }
+  }
+  const resolved = resolveColoring(coloring, graph, taxonomy, [])
+  const keys = new Map([...resolved.keys].map(([id, { label, hue }]) => [id, { label, color: pairOf(hue) }]))
+  const of = new Map<string, string>()
+  for (const [id, [key]] of resolved.of) if (key !== undefined) of.set(id, key)
+  return { axis: coloring.by === 'axis' ? coloring.axis : undefined, keys, of, diagnostics: resolved.diagnostics }
+}
+
+/** A node's fill and border: its key's, else `fallback`. Allocates nothing, for the draw loop. */
+export function pairFor(fill: Fill, id: string, fallback: ThemedColor): ThemedColor {
+  const key = fill.of.get(id)
+  return (key !== undefined && fill.keys.get(key)?.color) || fallback
 }
