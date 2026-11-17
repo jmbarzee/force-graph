@@ -1,11 +1,11 @@
-.PHONY: help check typecheck typecheck-example test build docs readme release
+.PHONY: help check typecheck typecheck-example test build docs react-types readme release
 
 ## help — print the targets
 help:
 	@sed -n 's/^## //p' Makefile
 
 ## check — everything CI runs
-check: typecheck typecheck-example test build docs readme
+check: typecheck typecheck-example test build docs react-types readme
 
 ## typecheck — the library's types
 typecheck:
@@ -27,6 +27,11 @@ build:
 ## docs — every declaration the build ships carries a doc comment
 docs: build
 	node verify/dts-docs.mjs
+
+## react-types — a host compiles against the shipped declarations under React 18's types and React 19's
+react-types: build
+	npx tsc --noEmit -p verify/react-types/tsconfig.18.json
+	npx tsc --noEmit -p verify/react-types/tsconfig.19.json
 
 ## readme — the README names nothing src/ exports that the entry does not
 readme:

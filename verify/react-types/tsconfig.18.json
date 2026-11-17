@@ -1,0 +1,9 @@
+{
+  "extends": "./tsconfig.json",
+  "compilerOptions": {
+    "paths": {
+      "react": ["../../node_modules/@types/react-18"],
+      "react/*": ["../../node_modules/@types/react-18/*"]
+    }
+  }
+}
