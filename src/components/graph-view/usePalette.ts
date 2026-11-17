@@ -16,7 +16,7 @@ const ROLES = [
 export type Palette = Readonly<Record<(typeof ROLES)[number], string>>
 
 /** The palette `el` inherits: the pane's tokens, a host's overrides included, not the document's. */
-export function resolvePalette(el: Element): Palette {
+function resolvePalette(el: Element): Palette {
   const style = getComputedStyle(el)
   return Object.fromEntries(ROLES.map(role => [role, style.getPropertyValue(`--gv-${cssSuffix(role)}`).trim()])) as Palette
 }
