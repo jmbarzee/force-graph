@@ -11,7 +11,7 @@ import type { FilterState } from '../filter/types'
 import { GROUPS, initialFilter, selectionFor, withSelection } from '../filter/types'
 import { GroupLegend } from './GroupLegend'
 import type { ActiveGroup, NodeGroup } from '../graph/groups'
-import { GROUP_PALETTE } from '../graph/groups'
+import { PALETTE } from '../graph/scheme'
 
 beforeEach(() => {
   ;(globalThis as { IS_REACT_ACT_ENVIRONMENT?: boolean }).IS_REACT_ACT_ENVIRONMENT = true
@@ -109,6 +109,6 @@ it('asks the host to widen a controlled group filter for a focus, and writes not
 it('reports a group colour it cannot read once, and draws the group from the palette', async () => {
   let reported: readonly GraphDiagnostic[] = []
   const view = await mountGroups({ groups: [{ ...groups[0]!, color: 'nope' }], onDiagnostics: d => { reported = d } })
-  expect(reported.filter(d => d.code === 'group-color-invalid')).toHaveLength(1)
-  expect(view.drawn()[0]!.color).toBe(GROUP_PALETTE.light[0])
+  expect(reported.filter(d => d.code === 'key-color-invalid')).toHaveLength(1)
+  expect(view.drawn()[0]!.color).toBe(PALETTE[0].light)
 })

@@ -1,5 +1,6 @@
 import { describe, expect, it } from 'vitest'
-import { activeGroupsOf, cohesionOf, GROUP_PALETTE, groupsByNode, groupSlotsOf, nodeGroupsOf } from './groups'
+import { activeGroupsOf, cohesionOf, groupsByNode, groupSlotsOf, nodeGroupsOf } from './groups'
+import { PALETTE } from './scheme'
 import type { DerivedGroups, NodeGroup } from './groups'
 import type { GraphEdge, GraphNode } from './model'
 
@@ -23,7 +24,7 @@ describe('nodeGroupsOf', () => {
   it('reports an undeclared key once', () => {
     const { diagnostics } = nodeGroupsOf(derived, nodes)
     expect(diagnostics).toHaveLength(1)
-    expect(diagnostics[0]).toMatchObject({ severity: 'warning', code: 'group-key-undeclared', nodeId: 'c' })
+    expect(diagnostics[0]).toMatchObject({ severity: 'warning', code: 'key-undeclared', nodeId: 'c' })
   })
 
   it('answers no warnings with one shared empty list', () => {
@@ -39,10 +40,10 @@ describe('nodeGroupsOf', () => {
   it('drops a colour that is not hex, rgb() or hsl(), with one warning, for a palette slot', () => {
     for (const color of ['nope', '#11223344', 'var(--x)']) {
       const { groups, diagnostics } = nodeGroupsOf([group('x', 'a')].map(g => ({ ...g, color })), nodes)
-      expect(diagnostics.map(d => d.code)).toEqual(['group-color-invalid'])
-      expect(activeGroupsOf(groups, groupSlotsOf(groups, []), new Set(['a']))[0]!.color).toBe(GROUP_PALETTE.dark[0])
+      expect(diagnostics.map(d => d.code)).toEqual(['key-color-invalid'])
+      expect(activeGroupsOf(groups, groupSlotsOf(groups, []), new Set(['a']))[0]!.color).toBe(PALETTE[0].dark)
     }
-    expect(nodeGroupsOf({ ...derived, keys: [{ id: 'red', label: 'Red', color: 'nope' }] }, nodes).diagnostics.map(d => d.code)).toContain('group-color-invalid')
+    expect(nodeGroupsOf({ ...derived, keys: [{ id: 'red', label: 'Red', color: 'nope' }] }, nodes).diagnostics.map(d => d.code)).toContain('key-color-invalid')
   })
 })
 
@@ -60,13 +61,21 @@ describe('activeGroupsOf over derived groups', () => {
     const redHidden = colours(['c', 'd'])
     expect(redHidden.has('red')).toBe(false)
     expect(redHidden.get('green')).toBe(all.get('green'))
-    expect(all.get('green')).toBe(GROUP_PALETTE.dark[2])
+    expect(all.get('green')).toBe(PALETTE[2].dark)
+  })
+
+  it('draws a hue colour in its theme and a string in both', () => {
+    const hue = { light: '#010101', dark: '#fefefe' }
+    const groups = [{ ...group('x', 'a'), color: hue }, { ...group('y', 'a'), color: '#123456' }]
+    for (const theme of ['light', 'dark'] as const) {
+      expect(activeGroupsOf(groups, groupSlotsOf(groups, []), new Set(['a']), undefined, theme).map(g => g.color)).toEqual([hue[theme], '#123456'])
+    }
   })
 
   it('draws no glow for a group not shown, and recolours none of the others', () => {
     const { groups } = nodeGroupsOf(derived, nodes)
     const drawn = activeGroupsOf(groups, groupSlotsOf(groups, []), new Set(['a', 'b', 'c']), id => id !== 'red')
-    expect(drawn.map(g => [g.id, g.color])).toEqual([['blue', '#123456'], ['green', GROUP_PALETTE.dark[2]]])
+    expect(drawn.map(g => [g.id, g.color])).toEqual([['blue', '#123456'], ['green', PALETTE[2].dark]])
   })
 })
 

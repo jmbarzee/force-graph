@@ -216,9 +216,9 @@ engine compares them and never parses one.
   view runs it, lists the diagnostics under the bar, hands them to
   `onDiagnostics` and draws what remains — adding three warnings of its own:
   `'containment-untyped'`, when a containment edge it derived from `parentId`
-  has no declared type, `'group-key-undeclared'`, once per key a derived
+  has no declared type, `'key-undeclared'`, once per key a derived
   group's `of` answers that its `keys` do not declare, and
-  `'group-color-invalid'`, once per group or key whose `color` is not hex,
+  `'key-color-invalid'`, once per group or key whose `color` is not hex,
   `rgb()` or `hsl()`, which takes a palette colour instead. A host that wants
   to refuse a bad graph calls it first.
 
@@ -300,7 +300,8 @@ the console. Everything else is optional.
   `{ keys, of }` — the `LegendKey`s, `{ id, label, color?, weight? }`, and a
   function answering each node's keys — or listed as `NodeGroup`s, each an id
   and the node ids it covers; membership is settled once per graph and
-  groups, a key or group with no `color` takes a palette slot no earlier group
+  groups, a `color` is one string for both themes or a `ThemedHue`,
+  `{ light, dark }`, a key or group with none takes a palette slot no earlier group
   joined to it by an edge holds, so a filter that hides one recolours no
   other, and `weight`, 0..1, swells its glow, up to double; the filter's
   `GROUPS` entry hides a group's glow and every node no shown group holds, a

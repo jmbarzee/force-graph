@@ -8,41 +8,9 @@
 // host's.
 
 import type { GraphEdge, GraphNode } from './model'
-import type { Theme } from './scheme'
-import { isSchemeColor } from './scheme'
+import type { Theme, ThemedHue } from './scheme'
+import { hueOf, isSchemeColor, PALETTE } from './scheme'
 import type { GraphDiagnostic } from './validate'
-
-// A small cycling palette per theme. Identity is carried by the host's legend,
-// so colours only need to separate the handful of sibling groups shown at
-// once — not be globally unique. The light set is the same ten hues a few
-// stops deeper, so a glow reads on a pale canvas.
-/** The cycling glow palette per theme; a group with no `color` of its own takes a slot by `groupSlotsOf`. */
-export const GROUP_PALETTE: Readonly<Record<Theme, readonly string[]>> = {
-  dark: [
-    '#2DD4BF', // teal
-    '#F59E0B', // amber
-    '#A78BFA', // violet
-    '#F472B6', // rose
-    '#34D399', // green
-    '#60A5FA', // blue
-    '#FB923C', // orange
-    '#A3E635', // lime
-    '#22D3EE', // cyan
-    '#E879F9', // fuchsia
-  ],
-  light: [
-    '#0F766E', // teal
-    '#B45309', // amber
-    '#6D28D9', // violet
-    '#BE185D', // rose
-    '#047857', // green
-    '#1D4ED8', // blue
-    '#C2410C', // orange
-    '#4D7C0F', // lime
-    '#0E7490', // cyan
-    '#A21CAF', // fuchsia
-  ],
-}
 
 // Glow intensity multiplier for the group its control emphasises (hovered in
 // its legend, vs. the default 1). Drives both brightness and — since the
@@ -64,8 +32,8 @@ export interface NodeGroup {
   id: string
   /** The nodes in the group, visible or not. */
   nodeIds: ReadonlySet<string>
-  /** The glow's colour: hex, `rgb()` or `hsl()`; absent or any other, a palette slot no group joined to it by an edge holds. */
-  color?: string
+  /** The glow's colour, one for both themes or a hue per theme: hex, `rgb()` or `hsl()`; absent or any other, a palette slot no group joined to it by an edge holds. */
+  color?: string | ThemedHue
   /** 0..1: how far the glow's halo and corridor swell; absent, they do not. */
   weight?: number
 }
@@ -76,8 +44,8 @@ export interface LegendKey {
   id: string
   /** The key's name in a legend. */
   label: string
-  /** The key's colour: hex, `rgb()` or `hsl()`; absent or any other, a palette slot no key joined to it by an edge holds. */
-  color?: string
+  /** The key's colour, one for both themes or a hue per theme: hex, `rgb()` or `hsl()`; absent or any other, a palette slot no key joined to it by an edge holds. */
+  color?: string | ThemedHue
   /** 0..1: how far the key's glow swells; absent, it does not. */
   weight?: number
 }
@@ -99,25 +67,26 @@ export type Groups = readonly NodeGroup[] | DerivedGroups
 
 const NO_DIAGNOSTICS: readonly GraphDiagnostic[] = []
 
+/** A key or group as given, or without a `color` outside the scheme's forms, which adds a `key-color-invalid` warning. */
+export function checkedKey<K extends { id: string; color?: string | ThemedHue }>(key: K, diagnostics: GraphDiagnostic[]): K {
+  if (key.color === undefined || isSchemeColor(key.color)) return key
+  diagnostics.push({ severity: 'warning', code: 'key-color-invalid', message: `key ${JSON.stringify(key.id)} has colour ${JSON.stringify(key.color)}, which is not hex, rgb() or hsl(); the view gives it a palette colour` })
+  return { ...key, color: undefined }
+}
+
 /**
- * The listed form of `groups` over `nodes`, with a `group-color-invalid`
- * warning per colour outside the scheme's forms, which is dropped, and a
- * `group-key-undeclared` warning per key `of` answers that `keys` does not
- * declare. A listed form with no such colour comes back as given; no
+ * The listed form of `groups` over `nodes`, each colour through `checkedKey`,
+ * with a `key-undeclared` warning per key `of` answers that `keys` does not
+ * declare. A listed form with no invalid colour comes back as given; no
  * warnings come back as one shared empty list.
  */
 export function nodeGroupsOf(groups: Groups, nodes: readonly GraphNode[]): { groups: readonly NodeGroup[]; diagnostics: readonly GraphDiagnostic[] } {
   const diagnostics: GraphDiagnostic[] = []
-  const checked = <G extends { id: string; color?: string }>(g: G): G => {
-    if (g.color === undefined || isSchemeColor(g.color)) return g
-    diagnostics.push({ severity: 'warning', code: 'group-color-invalid', message: `group ${JSON.stringify(g.id)} has colour ${JSON.stringify(g.color)}, which is not hex, rgb() or hsl(); the view gives it a palette colour` })
-    return { ...g, color: undefined }
-  }
   if (!('of' in groups)) {
-    const listed = groups.map(checked)
+    const listed = groups.map(g => checkedKey(g, diagnostics))
     return diagnostics.length ? { groups: listed, diagnostics } : { groups, diagnostics: NO_DIAGNOSTICS }
   }
-  const listed = groups.keys.map(checked).map(k => ({ id: k.id, nodeIds: new Set<string>(), color: k.color, weight: k.weight }))
+  const listed = groups.keys.map(k => ({ id: k.id, nodeIds: new Set<string>(), color: checkedKey(k, diagnostics).color, weight: k.weight }))
   const members = new Map(listed.map(g => [g.id, g.nodeIds]))
   const undeclared = new Set<string>()
   for (const node of nodes) {
@@ -126,7 +95,7 @@ export function nodeGroupsOf(groups: Groups, nodes: readonly GraphNode[]): { gro
       if (ids) ids.add(node.id)
       else if (!undeclared.has(key)) {
         undeclared.add(key)
-        diagnostics.push({ severity: 'warning', code: 'group-key-undeclared', nodeId: node.id, message: `node ${JSON.stringify(node.id)} belongs to group ${JSON.stringify(key)}, which the groups' keys do not declare; the view ignores it` })
+        diagnostics.push({ severity: 'warning', code: 'key-undeclared', nodeId: node.id, message: `node ${JSON.stringify(node.id)} belongs to group ${JSON.stringify(key)}, which the groups' keys do not declare; the view ignores it` })
       }
     }
   }
@@ -140,7 +109,7 @@ export function nodeGroupsOf(groups: Groups, nodes: readonly GraphNode[]): { gro
  * visible set, so a filter recolours nothing.
  */
 export function groupSlotsOf(groups: readonly NodeGroup[], edges: readonly GraphEdge[]): number[] {
-  const size = GROUP_PALETTE.dark.length
+  const size = PALETTE.length
   const groupsOf = new Map<string, number[]>()
   groups.forEach((g, i) => {
     for (const id of g.nodeIds) {
@@ -211,14 +180,13 @@ export interface GlowGroup extends ActiveGroup {
  * in the theme's palette — so hiding one group recolours none of the others.
  */
 export function activeGroupsOf(groups: readonly NodeGroup[], slots: readonly number[], visibleIds: ReadonlySet<string>, shown: (id: string) => boolean = () => true, theme: Theme = 'dark', emphasized: string | null = null): GlowGroup[] {
-  const palette = GROUP_PALETTE[theme]
   const out: GlowGroup[] = []
   groups.forEach((g, i) => {
     if (!shown(g.id)) return
     const nodeIds = new Set<string>()
     for (const id of g.nodeIds) if (visibleIds.has(id)) nodeIds.add(id)
     if (nodeIds.size === 0) return
-    out.push({ id: g.id, strength: g.id === emphasized ? HOVER_STRENGTH : 1, nodeIds, color: g.color ?? palette[slots[i]], weight: g.weight })
+    out.push({ id: g.id, strength: g.id === emphasized ? HOVER_STRENGTH : 1, nodeIds, color: hueOf(g.color, slots[i])[theme], weight: g.weight })
   })
   return out
 }
