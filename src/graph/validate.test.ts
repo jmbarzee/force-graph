@@ -22,3 +22,20 @@ describe('a parent cycle', () => {
     expect(dropInvalid(graph, diagnostics).nodes.map(n => n.parentId)).toEqual(['c', undefined, undefined, 'c'])
   })
 })
+
+describe('an edge weight', () => {
+  const weights = [undefined, 0, 0.5, 1, -0.1, 1.5, NaN, Infinity]
+  const weighted: Graph = {
+    nodes: [node('a'), node('b')],
+    edges: weights.map((weight, i) => ({ id: `e${i}`, sourceId: 'a', targetId: 'b', weight })),
+  }
+  const diagnostics = validateGraph(weighted, taxonomy).filter(d => d.code === 'edge-weight-invalid')
+
+  it('is a warning outside [0, 1] or not finite', () => {
+    expect(diagnostics.map(d => [d.severity, d.edgeId])).toEqual([['warning', 'e4'], ['warning', 'e5'], ['warning', 'e6'], ['warning', 'e7']])
+  })
+
+  it('keeps its edge', () => {
+    expect(dropInvalid(weighted, diagnostics).edges).toHaveLength(weights.length)
+  })
+})

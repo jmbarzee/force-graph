@@ -21,6 +21,8 @@ export function buildGraph(catalog: Catalog): Graph {
   const edges: GraphEdge[] = []
   /** Catalog code → node id, so requirements can resolve. */
   const byCode = new Map<string, string>()
+  /** Catalog code → credits, which weight the requirements on it. */
+  const credits = new Map<string, number>()
 
   // Containment is `parentId` and nothing else: the library derives the
   // containment edge from it, so only dependencies are listed as edges — and
@@ -34,6 +36,7 @@ export function buildGraph(catalog: Catalog): Graph {
       sourceId: from,
       targetId: to,
       values: { [REQUIREMENT]: req.kind },
+      weight: credits.get(req.code)! / heaviest,
     })
   }
 
@@ -61,6 +64,7 @@ export function buildGraph(catalog: Catalog): Graph {
     for (const code of c.listings) {
       const dept = ids.has(`dept:${subjectOf(code)}`) ? `dept:${subjectOf(code)}` : undefined
       byCode.set(code, `course:${code}`)
+      credits.set(code, c.credits)
       add({
         id: `course:${code}`,
         name: c.title,
@@ -82,6 +86,7 @@ export function buildGraph(catalog: Catalog): Graph {
     // Labs belong to the course, not to a listing: they sit under the first.
     for (const lab of c.labs ?? []) {
       byCode.set(lab.code, `lab:${lab.code}`)
+      credits.set(lab.code, lab.credits)
       add({
         id: `lab:${lab.code}`,
         name: lab.title,
@@ -99,6 +104,7 @@ export function buildGraph(catalog: Catalog): Graph {
     }
   }
   // Requirements last, once every code has a node. Each listing carries its course's.
+  const heaviest = Math.max(...credits.values())
   for (const c of catalog.courses) {
     for (const code of c.listings) for (const req of c.requires ?? []) depends(`course:${code}`, req)
     for (const lab of c.labs ?? []) for (const req of lab.requires ?? []) depends(`lab:${lab.code}`, req)

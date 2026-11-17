@@ -3,7 +3,7 @@
 
 import React from 'react'
 import './GraphView.css'
-import { nodesById, readableGraph, isContainment, withContainmentEdges } from '../graph/model'
+import { nodesById, readableGraph, isContainment, unitWeight, withContainmentEdges } from '../graph/model'
 import type { Graph, GraphEdge, GraphNode } from '../graph/model'
 import type { FilterState, AxisLocks } from '../filter/types'
 import { GROUPS, changedAxes, initialFilter, filterStatesEqual, hiddenMatchesOf, listEqual, locksEqual, reseedFilter, selectionFor, selects } from '../filter/types'
@@ -582,7 +582,9 @@ export const GraphView = React.forwardRef<GraphViewHandle, GraphViewProps>(funct
     const strokes = new Map<GraphEdge, EdgeStroke>()
     for (const edge of visibleEdges) {
       const type = edgeTypes.get(edge.id)
-      strokes.set(edge, type !== undefined ? taxonomy.edgeStrokeFor(type) : isContainment(edge) ? CONTAINMENT_STROKE : NEUTRAL_STROKE)
+      const base = type !== undefined ? taxonomy.edgeStrokeFor(type) : isContainment(edge) ? CONTAINMENT_STROKE : NEUTRAL_STROKE
+      const w = unitWeight(edge)
+      strokes.set(edge, w ? { ...base, width: base.width * (1 + w) } : base)
     }
     return strokes
   }, [visibleEdges, edgeTypes, taxonomy])

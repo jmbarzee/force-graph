@@ -132,6 +132,14 @@ export interface GraphEdge {
    * and not an axis lives here.
    */
   payload?: Readonly<Record<string, unknown>>
+  /** How heavy the edge is, in `[0, 1]`: its stroke is drawn up to twice as wide. Absent, 0. The spring does not read it. */
+  weight?: number
+}
+
+/** The edge's weight as drawn: absent or not finite, 0; else clamped to `[0, 1]`. A weight out of range is `validateGraph`'s to name. */
+export function unitWeight(edge: Pick<GraphEdge, 'weight'>): number {
+  const w = edge.weight
+  return w === undefined || !Number.isFinite(w) ? 0 : Math.min(1, Math.max(0, w))
 }
 
 /** The edge's relation: as declared, or `dependency`. A misspelt relation is `validateGraph`'s to name. */

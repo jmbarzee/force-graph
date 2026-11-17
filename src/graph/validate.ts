@@ -9,16 +9,17 @@
 // bad graph before mounting calls it itself.
 
 import type { Graph, GraphEdge, GraphNode } from './model'
-import { nodesById, relationOf } from './model'
+import { nodesById, relationOf, unitWeight } from './model'
 import type { Taxonomy } from './taxonomy'
 
 /**
  * The defects `validateGraph` names. Errors: a node or edge id used twice,
  * an edge whose endpoint is not in the graph, an unknown relation, a type
  * whose relation is not the edge's, a rule that threw, a parent not in the
- * graph, a cycle of parents. Warnings: an edge no type claims, a style value
- * the taxonomy does not declare, containment edges that contradict
- * `parentId`, derived containment edges no type claims
+ * graph, a cycle of parents. Warnings: an edge no type claims, an edge
+ * weight outside `[0, 1]` or not finite, a style value the taxonomy does not
+ * declare, containment edges that contradict `parentId`, derived containment
+ * edges no type claims
  * (`containment-untyped`, from `derivedContainmentDiagnostics`), a key a
  * colouring or the groups do not declare (`key-undeclared`) and a key or group
  * colour outside the scheme's forms (`key-color-invalid`), both from
@@ -31,6 +32,7 @@ export type GraphDiagnosticCode =
   | 'edge-type-rule-threw'
   | 'edge-type-unclassified'
   | 'edge-type-relation-mismatch'
+  | 'edge-weight-invalid'
   | 'parent-missing'
   | 'parent-cycle'
   | 'containment-parent-mismatch'
@@ -61,9 +63,9 @@ const RELATIONS = new Set(['containment', 'dependency'])
  * draw as given (a duplicated node id, a dangling endpoint, an unknown
  * relation, a type whose relation is not the edge's, a parent not in the
  * graph, a cycle of parents) and warnings for what it draws but the host
- * should know (an unclassified edge, an undeclared style value, containment
- * edges that contradict `parentId`). Pure; the same graph and taxonomy give
- * the same list, in graph order.
+ * should know (an unclassified edge, an invalid weight, an undeclared style
+ * value, containment edges that contradict `parentId`). Pure; the same graph
+ * and taxonomy give the same list, in graph order.
  */
 export function validateGraph(graph: Graph, taxonomy: Taxonomy): GraphDiagnostic[] {
   const out: GraphDiagnostic[] = []
@@ -117,6 +119,9 @@ export function validateGraph(graph: Graph, taxonomy: Taxonomy): GraphDiagnostic
       const set = containers.get(edge.sourceId) ?? new Set<string>()
       set.add(edge.targetId)
       containers.set(edge.sourceId, set)
+    }
+    if (edge.weight !== undefined && unitWeight(edge) !== edge.weight) {
+      out.push({ severity: 'warning', code: 'edge-weight-invalid', edgeId: edge.id, message: `edge ${JSON.stringify(edge.id)} has weight ${String(edge.weight)}, outside [0, 1]; the view clamps it, and draws one not finite as no weight` })
     }
     let typeId: string | undefined
     try {
