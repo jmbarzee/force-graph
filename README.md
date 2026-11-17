@@ -317,9 +317,10 @@ the console. Everything else is optional.
   as drawn and a `GroupsControl` — `shown(id)`, `toggle(id)` while the filter
   is writable, which writes `GROUPS` as the bar writes an axis, and
   `emphasize(id | null)`; `GroupLegend` is one — `items`, the `active`
-  groups and the `control`), `markedEdges` (edge ids drawn with a dashed
-  band behind their stroke, a graduated edge when the edge it stands for
-  is), a `nodeAction`
+  groups and the `control`, and `children`, the host's own controls, held
+  above its items, which scroll once the legend reaches the pane's foot),
+  `markedEdges` (edge ids drawn with a dashed band behind their stroke, a
+  graduated edge when the edge it stands for is), a `nodeAction`
   for the hover box (`{ label, onSelect }`, or a function of the node
   answering one or null), `chrome` to turn parts of
   the pane off — `controls` (the control panel), `themeToggle` (the theme

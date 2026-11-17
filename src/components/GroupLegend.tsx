@@ -18,6 +18,8 @@ export interface GroupLegendProps {
   control: GroupsControl
   /** The legend's heading. */
   title?: string
+  /** The host's own controls, such as a picker for which axis the groups follow: above the items, and still while they scroll. */
+  children?: React.ReactNode
   /** A class on the legend's root, for the host's styling. */
   className?: string
 }
@@ -27,7 +29,7 @@ export interface GroupLegendProps {
  * the view drew it in, a checkbox that shows or hides it in the view's
  * filter, and hover emphasis.
  */
-export function GroupLegend({ items, active, control, title, className }: GroupLegendProps) {
+export function GroupLegend({ items, active, control, title, children, className }: GroupLegendProps) {
   const colorById = React.useMemo(() => new Map(active.map(g => [g.id, g.color] as const)), [active])
   // A legend that goes away under the pointer takes its emphasis with it.
   const controlRef = React.useRef(control)
@@ -37,19 +39,22 @@ export function GroupLegend({ items, active, control, title, className }: GroupL
   return (
     <div className={`gv-group-legend${className ? ` ${className}` : ''}`} onMouseLeave={() => control.emphasize(null)}>
       {title && <div className="gv-group-legend-title">{title}</div>}
-      {items.map(item => {
-        const on = control.shown(item.id)
-        const color = colorById.get(item.id)
-        const Row = toggle ? 'label' : 'div'
-        return (
-          <Row key={item.id} className={`gv-group-legend-row${on ? '' : ' off'}`} onMouseEnter={() => control.emphasize(item.id)}>
-            {toggle && <input type="checkbox" checked={on} onChange={() => toggle(item.id)} />}
-            <span className="gv-group-legend-swatch" style={{ background: color ?? 'transparent' }} />
-            <span className="gv-group-legend-label">{item.label}</span>
-            {on && color === undefined && <span className="gv-group-legend-note">not shown</span>}
-          </Row>
-        )
-      })}
+      {children}
+      <div className="gv-group-legend-items">
+        {items.map(item => {
+          const on = control.shown(item.id)
+          const color = colorById.get(item.id)
+          const Row = toggle ? 'label' : 'div'
+          return (
+            <Row key={item.id} className={`gv-group-legend-row${on ? '' : ' off'}`} onMouseEnter={() => control.emphasize(item.id)}>
+              {toggle && <input type="checkbox" checked={on} onChange={() => toggle(item.id)} />}
+              <span className="gv-group-legend-swatch" style={{ background: color ?? 'transparent' }} />
+              <span className="gv-group-legend-label">{item.label}</span>
+              {on && color === undefined && <span className="gv-group-legend-note">not shown</span>}
+            </Row>
+          )
+        })}
+      </div>
     </div>
   )
 }
