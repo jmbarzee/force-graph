@@ -121,10 +121,10 @@ interface FilterBarBaseProps {
   refreshFlash?: boolean | number
 }
 
-/** The first line of a row's items, laid out at these offsets from its top: its height, and how many items wrap past it. */
+/** The first line of a row's items, laid out at these offsets from its top: its height, and how many items wrap past it. A hidden row, not laid out, has none. */
 export function firstLine(items: readonly { top: number; bottom: number }[]): { height: number; rest: number } {
   const first = items[0]
-  if (!first) return { height: 0, rest: 0 }
+  if (!first || first.bottom <= first.top) return { height: 0, rest: 0 }
   const onIt = items.filter(i => i.top < first.bottom)
   return { height: Math.max(...onIt.map(i => i.bottom)), rest: items.length - onIt.length }
 }

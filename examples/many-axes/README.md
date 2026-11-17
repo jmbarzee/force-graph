@@ -2,7 +2,8 @@
 
 Five filter axes of thirty values each, on a graph with no edges: the filter
 bar at its busiest. It opens with every axis on one row of chips, and the
-canvas in view.
+canvas in view. A second bar starts hidden behind a toggle, as a host keeps
+a lens it is not showing.
 
 ## Run
 
