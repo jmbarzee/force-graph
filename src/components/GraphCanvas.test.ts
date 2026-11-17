@@ -1,5 +1,10 @@
-import { describe, expect, it } from 'vitest'
-import { edgeAt } from './GraphCanvas'
+// @vitest-environment jsdom
+import React, { act } from 'react'
+import { createRoot } from 'react-dom/client'
+import { describe, expect, it, vi } from 'vitest'
+import { edgeAt, GraphCanvas } from './GraphCanvas'
+import { TaxonomyContext } from './graph-view/useTaxonomy'
+import { createTaxonomy } from '../graph/taxonomy'
 import type { GraphEdge } from '../graph/model'
 import type { EdgeStroke } from '../graph/scheme'
 import { NEUTRAL_STROKE } from '../graph/shapes'
@@ -39,5 +44,23 @@ describe('edgeAt', () => {
     expect(edgeAt(50, 7, [ab, ba], at, vp, lanes, drawn)).toBe(ab)
     expect(edgeAt(50, -7, [ab, ba], at, vp, lanes, drawn)).toBe(ba)
     expect(edgeAt(50, 0, [ab, ba], at, vp, lanes, drawn)).toBeNull()
+  })
+})
+
+describe('GraphCanvas', () => {
+  it('clears node and edge hover when the pointer leaves it', () => {
+    ;(globalThis as { IS_REACT_ACT_ENVIRONMENT?: boolean }).IS_REACT_ACT_ENVIRONMENT = true
+    window.ResizeObserver = class { observe() {} unobserve() {} disconnect() {} }
+    const onHoverNode = vi.fn()
+    const onHoverEdge = vi.fn()
+    const props = { nodes: [], edges: [], onHoverNode, onHoverEdge } as unknown as React.ComponentProps<typeof GraphCanvas>
+    const el = document.body.appendChild(document.createElement('div'))
+    const root = createRoot(el)
+    act(() => root.render(React.createElement(TaxonomyContext.Provider, { value: createTaxonomy({ styleAxis: 'kind', styles: [] }) },
+      React.createElement(GraphCanvas, props))))
+    act(() => { el.querySelector('canvas')!.dispatchEvent(new PointerEvent('pointerout', { bubbles: true })) })
+    expect(onHoverNode).toHaveBeenCalledWith(null)
+    expect(onHoverEdge).toHaveBeenCalledWith(null)
+    act(() => root.unmount())
   })
 })
