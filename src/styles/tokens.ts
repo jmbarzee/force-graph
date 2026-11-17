@@ -1,6 +1,7 @@
 // The typed path to `tokens.css`: one role per host-facing token, named by
 // dropping `--gv-` and camel-casing the rest, so a host's theme object
-// produces the variables its CSS would declare.
+// produces the variables its CSS would declare; and the scheme's stylesheet
+// for a host's own CSS.
 
 import type React from 'react'
 import { fillOf } from '../graph/coloring'
@@ -60,9 +61,8 @@ export function schemeStylesheet(
   view?: { coloring?: { fill?: Coloring }; graph: Graph },
 ): string {
   const fill = view && fillOf(view.coloring?.fill, view.graph, taxonomy)
-  const light = Object.entries(scopeStyle(taxonomy, 'light', undefined, fill))
-  const lit = new Map(light)
-  const dark = Object.entries(scopeStyle(taxonomy, 'dark', undefined, fill)).filter(([v, value]) => value !== lit.get(v))
+  const light = scopeStyle(taxonomy, 'light', undefined, fill) as Record<string, unknown>
+  const dark = Object.entries(scopeStyle(taxonomy, 'dark', undefined, fill)).filter(([v, value]) => value !== light[v])
   const block = (selector: string, vars: [string, unknown][]) => `${selector} {\n${vars.map(([v, value]) => `  ${v}: ${value};`).join('\n')}\n}`
-  return dark.length > 0 ? `${block(':root', light)}\n${block(darkSelector, dark)}` : block(':root', light)
+  return dark.length > 0 ? `${block(':root', Object.entries(light))}\n${block(darkSelector, dark)}` : block(':root', Object.entries(light))
 }
