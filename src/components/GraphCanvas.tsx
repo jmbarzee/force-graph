@@ -154,6 +154,28 @@ export function drawRing(
   return edge + RING_GAP + width
 }
 
+// A stacked node's ghost k sits k·GHOST_STEP·r up and right of it, at GHOST_ALPHA[k − 1] of its alpha.
+const GHOST_STEP = 0.2
+const GHOST_ALPHA = [0.5, 0.25]
+
+/** Paints a stacked node's ghosts, back first: copies of its body, each a step further up and right and fainter. */
+export function drawGhosts(
+  ctx: CanvasRenderingContext2D, x: number, y: number, r: number,
+  fill: string, border: string, lineWidth: number, alpha: number,
+): void {
+  ctx.fillStyle = fill
+  ctx.strokeStyle = border
+  ctx.lineWidth = lineWidth
+  for (let k = GHOST_ALPHA.length; k > 0; k--) {
+    const o = k * GHOST_STEP * r
+    ctx.globalAlpha = GHOST_ALPHA[k - 1] * alpha
+    ctx.beginPath()
+    ctx.arc(x + o, y - o, r, 0, Math.PI * 2)
+    ctx.fill()
+    ctx.stroke()
+  }
+}
+
 interface GraphCanvasProps {
   nodes: SimNode[]
   edges: GraphEdge[]
@@ -537,6 +559,8 @@ export function GraphCanvas({
       const hasHighlight = d.highlightedNodes !== null && d.highlightedNodes.size > 0
       // Soften the dim while the group glow is on (see DIM_ALPHA_GROUPS).
       const dimAlpha = d.groupGlows.length > 0 ? DIM_ALPHA_GROUPS : DIM_ALPHA
+      const dimmed = (id: string) =>
+        (hasHighlight && !d.highlightedNodes!.has(id)) || (d.searchMatchIds !== null && !d.searchMatchIds.has(id))
 
       // World coordinates are anchored by hierarchical gravity, so the canvas
       // can project directly through the user's viewport — no per-frame
@@ -547,6 +571,9 @@ export function GraphCanvas({
       // Hoisted so the group-glow layer (drawn first) and the node layer below
       // share one value.
       const mul = nodeSizeMul(vp.scale, d.nodeScale)
+      // A body's border: 1.25px at the lowest zoom keeps the outline visible
+      // without turning small nodes into bullseyes.
+      const bodyWidth = Math.max(1, Math.min(2, vp.scale * 1.25))
 
       ctx.setTransform(dpr, 0, 0, dpr, 0, 0)
       ctx.clearRect(0, 0, w, h)
@@ -608,6 +635,19 @@ export function GraphCanvas({
         ctx.restore()
         ctx.globalAlpha = 1
       }
+
+      // Stacked nodes' ghosts, behind every edge and body.
+      for (const node of d.nodes) {
+        if (!node.stack) continue
+        const sx = node.x * vp.scale + vp.x, sy = node.y * vp.scale + vp.y
+        const def = engineOf(d.taxonomy).nodeStyleOf(node)
+        const r = def.size.r * mul
+        const reach = r * (1 + GHOST_ALPHA.length * GHOST_STEP)
+        if (sx + reach < 0 || sx - reach > w || sy + reach < 0 || sy - reach > h) continue
+        const { fill, border } = pairFor(d.fill, node.id, def.color)[d.theme]
+        drawGhosts(ctx, sx, sy, r, fill, border, bodyWidth, dimmed(node.id) ? dimAlpha : 1)
+      }
+      ctx.globalAlpha = 1
 
       // Draw edges
       for (const edge of hoveredLast(d.edges, d.hoveredEdgeId)) {
@@ -961,23 +1001,19 @@ export function GraphCanvas({
         if (sx + hw < -CULL_MARGIN || sx - hw > w + CULL_MARGIN ||
           sy + hw < -CULL_MARGIN || sy - hw > h + CULL_MARGIN) continue
 
-        const nodeHighlighted = d.highlightedNodes?.has(node.id) ?? false
-        const searchDimmed = d.searchMatchIds !== null && !d.searchMatchIds.has(node.id)
-        const nodeDimmed = (hasHighlight && !nodeHighlighted) || searchDimmed
+        const nodeDimmed = dimmed(node.id)
         const nodeAlpha = nodeDimmed ? dimAlpha : 1
         ctx.globalAlpha = nodeAlpha
 
         const { fill, border } = pairFor(d.fill, node.id, def.color)[d.theme]
         const icon   = def.icon
 
-        // Filled body + crisp border. The border is ~3 stops darker than the
-        // fill; 1.25px at the lowest zoom keeps the outline visible without
-        // turning small nodes into bullseyes.
+        // Filled body + crisp border, ~3 stops darker than the fill.
         ctx.beginPath()
         ctx.arc(sx, sy, r, 0, Math.PI * 2)
         ctx.fillStyle = fill
         ctx.fill()
-        ctx.lineWidth = Math.max(1, Math.min(2, vp.scale * 1.25))
+        ctx.lineWidth = bodyWidth
         ctx.strokeStyle = border
         ctx.stroke()
 

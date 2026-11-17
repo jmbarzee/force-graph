@@ -213,7 +213,9 @@ one.
   its own to edges and nodes alike through `values`; any axis the nodes
   carry can be pushed, pulled and laid out on.
 - **Adornments.** A node may carry `badges` (short texts drawn as chips above
-  it) and a `ring` (`'dashed'`, for a node set apart). An edge may carry a
+  it), a `ring` (`'dashed'`, for a node set apart) and `stack` (`true`, for a
+  node standing for many members: two fading copies drawn behind it, a mark
+  and never a count, which neither hover nor rings see). An edge may carry a
   `weight`, 0..1, which widens its stroke up to double; the spring does not
   read it.
 - **Playback.** A graph may declare a `window`, a `TimeWindow` of

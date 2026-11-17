@@ -29,6 +29,8 @@ export interface Lab {
   code: string
   title: string
   credits: number
+  /** How many sections run; more than one is drawn as a stack. */
+  sections?: number
   requires?: Requirement[]
 }
 
@@ -39,6 +41,8 @@ export interface Course {
   /** Every code the course is listed under; the subject prefix names its department. */
   listings: string[]
   credits: number
+  /** How many sections run; more than one is drawn as a stack. */
+  sections?: number
   campus: Campus
   term: Term
   requires?: Requirement[]
@@ -128,9 +132,10 @@ export const catalog: Catalog = {
       title: 'General Chemistry',
       listings: ['CHEM 101'],
       credits: 4,
+      sections: 6,
       campus: 'north',
       term: 'Autumn',
-      labs: [{ code: 'CHEM 101L', title: 'General Chemistry Lab', credits: 1 }],
+      labs: [{ code: 'CHEM 101L', title: 'General Chemistry Lab', credits: 1, sections: 12 }],
     },
     {
       id: 'orgchem',

@@ -2,7 +2,7 @@
 
 import type { AxisValues, Relation } from './axis'
 
-/** A node of the host's graph: an opaque id, a name, its values on the host's axes, and an optional parent, copy key, ring, badges and payload. */
+/** A node of the host's graph: an opaque id, a name, its values on the host's axes, and an optional parent, copy key, ring, badges, stack and payload. */
 export interface GraphNode {
   /**
    * Stable identity, owned by whoever produced the graph.
@@ -60,6 +60,12 @@ export interface GraphNode {
    * tag, a count. Display only, never identity. Absent or empty, no chips.
    */
   badges?: readonly string[]
+
+  /**
+   * Whether the node stands for many members: drawn as a stack, two fading
+   * copies of its body behind it. A mark, never a count. Absent, one body.
+   */
+  stack?: boolean
 }
 
 /** The key a node's copies share: its `copyKey`, or its own id. */
@@ -287,7 +293,7 @@ export function graphEquals(a: Graph, b: Graph): boolean {
   for (let i = 0; i < a.nodes.length; i++) {
     const x = a.nodes[i], y = b.nodes[i]
     if (x === y) continue
-    if (x.id !== y.id || x.name !== y.name || x.parentId !== y.parentId || x.copyKey !== y.copyKey || x.ring !== y.ring || x.payload !== y.payload) return false
+    if (x.id !== y.id || x.name !== y.name || x.parentId !== y.parentId || x.copyKey !== y.copyKey || x.ring !== y.ring || x.stack !== y.stack || x.payload !== y.payload) return false
     if (!sameValues(x.values, y.values) || !sameList(x.badges, y.badges)) return false
   }
   for (let i = 0; i < a.edges.length; i++) {
