@@ -41,7 +41,6 @@ describe('tintOf', () => {
   it('draws a tint naming no key neutral', () => {
     expect(tintOf(chip(['red'], 'svc'), 'team', fill)).toBeUndefined()
   })
-
 })
 
 describe('axesOpenedBy', () => {

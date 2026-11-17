@@ -21,7 +21,7 @@ describe('keyVars', () => {
   const graph = { nodes: [{ id: 'a', name: 'a', values: { kind: 'red', team: 'red' } }, { id: 'b', name: 'b', values: { kind: 'red', team: 'blueTeam' } }], edges: [] }
   const fill = fillOf({ by: 'axis', axis: 'team' }, graph, taxonomy)
 
-  it('publishes each key’s fill and border under colorVar, in either theme', () => {
+  it('publishes each key’s fill and border under its name, in either theme', () => {
     expect(keyVars(fill, 'dark')).toEqual({
       '--gv-node-red': PALETTE[0].dark, '--gv-node-red-border': pairOf(PALETTE[0]).dark.border,
       '--gv-node-blue-team': PALETTE[1].dark, '--gv-node-blue-team-border': pairOf(PALETTE[1]).dark.border,
