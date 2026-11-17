@@ -3,7 +3,8 @@
 // element they are spread on.
 
 import React from 'react'
-import { schemeVars } from '../../graph/scheme'
+import { scopeStyle } from '../../styles/tokens'
+import type { ThemeTokens } from '../../styles/tokens'
 import type { Theme } from '../../graph/scheme'
 import type { Taxonomy } from '../../graph/taxonomy'
 import { useResolvedTheme } from './useTheme'
@@ -23,9 +24,9 @@ const BODY: React.RefObject<HTMLElement | null> = {
 export function useScheme(taxonomy: Taxonomy, { choice = 'system', systemTheme, tokens }: {
   choice?: ThemeChoice
   systemTheme?: Theme
-  tokens?: Readonly<Record<Theme, React.CSSProperties>>
+  tokens?: ThemeTokens
 } = {}) {
   const theme = useResolvedTheme(BODY, choice, systemTheme) ?? 'light'
-  const style = React.useMemo<React.CSSProperties>(() => ({ ...schemeVars(taxonomy, theme), ...tokens?.[theme] }), [taxonomy, theme, tokens])
+  const style = React.useMemo(() => scopeStyle(taxonomy, theme, tokens), [taxonomy, theme, tokens])
   return { theme, scopeProps: { 'data-gv-theme': theme, style } }
 }

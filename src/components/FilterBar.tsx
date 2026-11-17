@@ -15,7 +15,8 @@ import type { Taxonomy } from '../graph/taxonomy'
 import { useControllable, useStable } from './graph-view/useControllable'
 import { useTheme } from './graph-view/useTheme'
 import type { ThemeChoice } from './graph-view/useTheme'
-import { schemeVars } from '../graph/scheme'
+import { scopeStyle } from '../styles/tokens'
+import type { ThemeTokens } from '../styles/tokens'
 import type { Theme } from '../graph/scheme'
 import { useRecentlyChanged } from './graph-view/useRecentlyChanged'
 import type { RecentlyChanged } from './graph-view/useRecentlyChanged'
@@ -94,7 +95,7 @@ interface FilterBarBaseProps {
   /** What `system` resolves to, for a host that knows its own theme. Given, the bar reads no ancestor's `data-theme` and no OS preference for it. */
   systemTheme?: Theme
   /** Per theme, the tokens `createTheme` overrides on the bar's root. A pane's bar takes the pane's. */
-  tokens?: Readonly<Record<Theme, React.CSSProperties>>
+  tokens?: ThemeTokens
   /** Chip badge counts per axis and value, read by the host off its own data. Absent: the graph's entity counts (the copies of one `copyKey` once) when `graph` is given, else no badges. */
   counts?: ReadonlyMap<string, ReadonlyMap<string, number>>
   filter: FilterState
@@ -281,7 +282,7 @@ export function FilterBar({
   // no wrapper to read its tints, and a pane's bar is handed the resolved one.
   const rootRef = React.useRef<HTMLDivElement>(null)
   const theme = useTheme(rootRef, themeChoice, systemTheme)
-  const schemeStyle = React.useMemo(() => ({ ...schemeVars(taxonomy, theme), ...tokens?.[theme] }), [taxonomy, theme, tokens])
+  const schemeStyle = React.useMemo(() => scopeStyle(taxonomy, theme, tokens), [taxonomy, theme, tokens])
   // The add-axis menu, open while the user picks among several.
   const [addOpen, setAddOpen] = React.useState(false)
   const labelOf = (id: string) => taxonomy.axisFor(id)?.label ?? id

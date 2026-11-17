@@ -5,6 +5,7 @@ import { flushSync } from 'react-dom'
 import { createRoot } from 'react-dom/client'
 import { beforeEach, expect, it } from 'vitest'
 import css from './tokens.css?raw'
+import readme from '../../README.md?raw'
 import { TOKEN_ROLES, createTheme, tokenVar } from './tokens'
 import { FilterBar } from '../components/FilterBar'
 import { GraphView } from '../components/GraphView'
@@ -31,9 +32,11 @@ function mount(rules = '') {
   return host
 }
 
-it('has a role for every token tokens.css declares, and none it does not', () => {
+it("has a role for every token the README's table offers, each one tokens.css declares", () => {
+  const tabled = new Set([...readme.matchAll(/^\| `(--gv-[a-z-]+)` \|/gm)].map(m => m[1]))
   const declared = new Set(css.match(/--gv-[a-z-]+(?=:)/g))
-  expect(new Set(TOKEN_ROLES.map(tokenVar))).toEqual(declared)
+  expect(new Set(TOKEN_ROLES.map(tokenVar))).toEqual(tabled)
+  for (const token of tabled) expect(declared).toContain(token)
 })
 
 it('refuses an unknown role at compile time', () => {

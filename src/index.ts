@@ -33,6 +33,7 @@ export type { ContextLine, Highlight, HighlightDirection, HighlightGraph, StyleS
 export { schemeStylesheet, schemeVars } from './graph/scheme'
 export type { ColorPair, EdgeStroke, Theme, ThemedColor } from './graph/scheme'
 export { createTheme } from './styles/tokens'
+export type { ThemeTokens } from './styles/tokens'
 export type { ResolvedScalarAxis, ScalarAxis } from './graph/scalar'
 export { layoutFromJSON, layoutToJSON } from './graph/layout'
 export type { LayoutJSON, LayoutState, LayoutTuningJSON } from './graph/layout'
