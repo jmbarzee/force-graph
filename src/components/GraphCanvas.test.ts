@@ -1,8 +1,8 @@
 // @vitest-environment jsdom
 import React, { act } from 'react'
 import { createRoot } from 'react-dom/client'
-import { describe, expect, it, vi } from 'vitest'
-import { drawGhosts, drawRing, edgeAt, GraphCanvas } from './GraphCanvas'
+import { afterEach, describe, expect, it, vi } from 'vitest'
+import { drawGhosts, drawRing, edgeAt, FOCUS_DASH, GraphCanvas, SELECTION_WIDTH } from './GraphCanvas'
 import { TaxonomyContext } from './graph-view/useTaxonomy'
 import { createTaxonomy } from '../graph/taxonomy'
 import type { GraphEdge } from '../graph/model'
@@ -118,6 +118,11 @@ describe('GraphCanvas', () => {
     act(() => root.unmount())
   })
 
+  afterEach(() => {
+    vi.unstubAllGlobals()
+    vi.restoreAllMocks()
+  })
+
   it('paints stacked nodes\' ghosts behind every edge, and rings only the body', () => {
     const { ctx, paints } = recordingCtx()
     vi.spyOn(HTMLCanvasElement.prototype, 'getContext').mockReturnValue(ctx)
@@ -147,13 +152,13 @@ describe('GraphCanvas', () => {
     const onBody = (p: Paint) => p.y === 200 && (p.x === 200 || p.x === 300)
     const ghosts = paints.filter(p => p.radius !== undefined && !onBody(p))
     expect(ghosts.filter(p => p.op === 'fill')).toHaveLength(4)
+    const labBody = paints.find(p => p.op === 'fill' && p.x === 300 && p.y === 200)!
+    expect(ghosts.find(p => p.op === 'fill')!.color).toBe(labBody.color)
     const firstEdge = paints.findIndex(p => p.op === 'stroke' && p.radius === undefined)
     expect(paints.indexOf(ghosts[ghosts.length - 1])).toBeLessThan(firstEdge)
-    const rings = paints.filter(p => p.width === 2.5 || p.dash.join() === '2,2')
+    const rings = paints.filter(p => p.width === SELECTION_WIDTH || p.dash === FOCUS_DASH)
     expect(rings.map(p => [p.x, p.y])).toEqual([[300, 200], [300, 200]])
 
     act(() => root.unmount())
-    vi.unstubAllGlobals()
-    vi.restoreAllMocks()
   })
 })

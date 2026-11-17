@@ -646,8 +646,7 @@ What is not built is filed as issues:
   ([#9](https://github.com/jmbarzee/force-graph/issues/9)),
   undirected edges ([#11](https://github.com/jmbarzee/force-graph/issues/11)),
   an edge time series played back
-  ([#33](https://github.com/jmbarzee/force-graph/issues/33)), a node drawn as a stack of ghosts
-  ([#19](https://github.com/jmbarzee/force-graph/issues/19)).
+  ([#33](https://github.com/jmbarzee/force-graph/issues/33)).
 - **Interaction** — selecting several nodes
   ([#28](https://github.com/jmbarzee/force-graph/issues/28)), edge hover and
   its outputs ([#16](https://github.com/jmbarzee/force-graph/issues/16)), a

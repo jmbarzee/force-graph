@@ -338,7 +338,9 @@ filter.
 - **Nodes.** A disc of the value's `size.r` in its fill and border for the
   resolved theme, its icon inside and its name below, in
   `--gv-color-graph-label`, semibold and slightly translucent. Names over 15
-  characters show 12 and an ellipsis. Badges sit above the node. Its rings
+  characters show 12 and an ellipsis. Badges sit above the node. A `stack`
+  node draws two fading copies of its body up and to its right, behind
+  every edge. Nothing hovers or rings them. Its rings
   stack outward, 2 px apart, an absent one leaving no gap: the
   `coloring.ring` key's colour, dashed for a `dashed` node and in its fill
   when keyless; the copy halo; the selection; the focus. Size follows Node

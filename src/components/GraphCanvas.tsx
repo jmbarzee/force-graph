@@ -134,10 +134,10 @@ const LABEL_ELIDE_SCALE = 0.25    // hide name labels below this scale (except h
 // A node's rings stack outward, each RING_GAP screen px clear of the one inside it.
 const RING_GAP = 2
 const RING_WIDTH = 2
-const SELECTION_WIDTH = 2.5
+export const SELECTION_WIDTH = 2.5
 const NO_DASH: number[] = []
 const DATA_DASH = [3, 3]
-const FOCUS_DASH = [2, 2]
+export const FOCUS_DASH = [2, 2]
 
 /** Strokes a ring `RING_GAP` outside `edge` and answers its outer edge, where the next ring starts. */
 export function drawRing(
@@ -158,7 +158,7 @@ export function drawRing(
 const GHOST_STEP = 0.2
 const GHOST_ALPHA = [0.5, 0.25]
 
-/** Paints a stacked node's ghosts, back first: copies of its body, each a step further up and right and fainter. */
+/** Paints a stacked node's ghosts, back first. */
 export function drawGhosts(
   ctx: CanvasRenderingContext2D, x: number, y: number, r: number,
   fill: string, border: string, lineWidth: number, alpha: number,
