@@ -15,6 +15,8 @@ import type { Taxonomy } from '../graph/taxonomy'
 import type { GlowGroup } from '../graph/groups'
 import { useTaxonomy } from './graph-view/useTaxonomy'
 import { useLatest } from './graph-view/useControllable'
+import { usePalette } from './graph-view/usePalette'
+import type { Palette } from './graph-view/usePalette'
 import { listenWheelZoom } from './graph-view/wheelZoom'
 import type { EdgeStroke, Theme } from '../graph/scheme'
 import { NEUTRAL_STROKE } from '../graph/shapes'
@@ -22,8 +24,6 @@ import { withAlpha } from '../graph/scheme'
 import type { ForceSection } from './GraphControlPanel'
 import type { GravityHover } from './GravityControls'
 
-const FOCUS_RING_COLOR = '#4A90D9'
-const SELECTION_RING_COLOR = '#FFFFFF'
 const DIM_ALPHA = 0.2
 // A gentler dim floor used while the decomposition group glow is active. The
 // glow already pulls the eye to the grouped nodes, so the full 0.2 dim on the
@@ -85,10 +85,6 @@ const BADGE_PAD_X = 4          // horizontal text padding inside a chip
 const BADGE_PAD_Y = 2          // vertical text padding inside a chip
 const BADGE_GAP = 3            // gap between adjacent chips
 const BADGE_NODE_GAP = 4       // gap between the node's top edge and the chip row
-// Violet chip — deliberately outside the node-type palette so a cardinality
-// badge never reads as a node body of some type.
-const BADGE_FILL = '#7C3AED'
-const BADGE_TEXT_COLOR = '#FFFFFF'
 function badgeFont(px: number): string {
   return `600 ${px.toFixed(1)}px ${ICON_FONT_FAMILY}`
 }
@@ -116,19 +112,6 @@ function badgeExtent(node: { badges?: readonly string[] }, mul: number): number 
   return BADGE_NODE_GAP * mul + chipH
 }
 
-
-// Read a CSS custom property with a fallback, resolved against a specific
-// element. We resolve against the canvas (not `document.documentElement`)
-// because the theme is declared on the pane's root, below `<html>` — reading
-// from the document root would yield the host's value, not the pane's. The
-// canvas is a descendant of the themed element, so it inherits the right
-// value in either theme.
-function cssVar(el: Element | null, name: string, fallback: string): string {
-  const target = el ?? (typeof document !== 'undefined' ? document.documentElement : null)
-  if (!target) return fallback
-  const v = getComputedStyle(target).getPropertyValue(name).trim()
-  return v || fallback
-}
 
 // What an edge draws as when the view's stroke map has no entry for it — a
 // state the view does not produce (the map is built from the same edge array
@@ -238,6 +221,8 @@ interface DrawData {
   // node belongs to a duplicate group. All visible nodes sharing this key
   // receive the duplicate halo. Null when no dup node is active.
   activeDupDefKey: string | null
+  // The tokens the frame draws in; undefined until the canvas mounts.
+  palette: Palette | undefined
 }
 
 export function GraphCanvas({
@@ -291,6 +276,7 @@ export function GraphCanvas({
   }, [hoveredNodeId, selectedNodeId, nodeMap, dupNodeIds])
 
   const taxonomy = useTaxonomy()
+  const palette = usePalette(canvasRef)
 
   // --- Ref-based draw data (updated every render, read by draw loop) ---
   const drawData = React.useRef<DrawData>({
@@ -298,14 +284,14 @@ export function GraphCanvas({
     nodes, edges, nodeMap, viewport, groupGlows, markedEdges, highlightedNodes, highlightedEdges,
     hoveredNodeId, selectedNodeId, focusedNodeId, searchMatchIds,
     forceParams, resolved, overlay, theme, edgeStrokes, edgeOffsets, activeSection, activePushBucket, activeGravityBucket, activePullEdge, nodeScale, running,
-    dupNodeIds, activeDupDefKey,
+    dupNodeIds, activeDupDefKey, palette,
   })
   drawData.current = {
     taxonomy,
     nodes, edges, nodeMap, viewport, groupGlows, markedEdges, highlightedNodes, highlightedEdges,
     hoveredNodeId, selectedNodeId, focusedNodeId, searchMatchIds,
     forceParams, resolved, overlay, theme, edgeStrokes, edgeOffsets, activeSection, activePushBucket, activeGravityBucket, activePullEdge, nodeScale, running,
-    dupNodeIds, activeDupDefKey,
+    dupNodeIds, activeDupDefKey, palette,
   }
 
   // Resize observer
@@ -448,23 +434,12 @@ export function GraphCanvas({
 
     const drawFrame = () => {
       const d = drawData.current
+      const p = d.palette
+      if (!p) return
       const { w, h } = size
       const hasHighlight = d.highlightedNodes !== null && d.highlightedNodes.size > 0
       // Soften the dim while the group glow is on (see DIM_ALPHA_GROUPS).
       const dimAlpha = d.groupGlows.length > 0 ? DIM_ALPHA_GROUPS : DIM_ALPHA
-
-      // Resolve theme-tracking colours every frame. Cheap (CSS lookup +
-      // string trim per draw) and guarantees the canvas text follows a
-      // theme switch without needing a full effect teardown.
-      // Dedicated, high-contrast label colour (darker than --gv-color-text in
-      // light themes, brighter in dark) so node names pop off the background.
-      const labelColor = cssVar(canvas, '--gv-color-graph-label', '#0f172a')
-      // Dim variant keeps the same hue, just at low alpha. We synthesise it
-      // by appending an alpha to the resolved hex when possible; otherwise
-      // fall back to the existing rgba grey.
-      const labelDimColor = labelColor.startsWith('#') && labelColor.length === 7
-        ? labelColor + '33'  // ~20% alpha
-        : 'rgba(100,116,139,0.2)'
 
       // World coordinates are anchored by hierarchical gravity, so the canvas
       // can project directly through the user's viewport — no per-frame
@@ -567,7 +542,7 @@ export function GraphCanvas({
           ctx.globalAlpha = edgeDimmed ? dimAlpha : MARK_ALPHA
           ctx.beginPath()
           ctx.setLineDash(MARK_DASH)
-          ctx.strokeStyle = labelColor
+          ctx.strokeStyle = p.colorGraphLabel
           ctx.lineWidth = MARK_WIDTH
           ctx.moveTo(sx, sy)
           ctx.lineTo(tx, ty)
@@ -706,9 +681,6 @@ export function GraphCanvas({
         // highlight reads as part of the view, not a generic stoplight:
         // amber = stretched, cool blue = compressed, calm
         // timer-teal = near rest.
-        const tensionStretch = cssVar(canvas, '--gv-tension-stretch', '#d97706')
-        const tensionCompress = cssVar(canvas, '--gv-tension-compress', '#7CB9E8')
-        const tensionRest = cssVar(canvas, '--gv-tension-rest', '#7EC8B8')
         for (const edge of d.edges) {
           const src = d.nodeMap.get(edge.sourceId)
           const tgt = d.nodeMap.get(edge.targetId)
@@ -731,11 +703,11 @@ export function GraphCanvas({
 
           let tensionColor: string
           if (ratio > 1.15) {
-            tensionColor = tensionStretch
+            tensionColor = p.tensionStretch
           } else if (ratio < 0.85) {
-            tensionColor = tensionCompress
+            tensionColor = p.tensionCompress
           } else {
-            tensionColor = tensionRest
+            tensionColor = p.tensionRest
           }
 
           if (activePullKey) {
@@ -783,7 +755,7 @@ export function GraphCanvas({
             ctx.beginPath()
             ctx.moveTo(mx1 - perpX * tickLen, my1 - perpY * tickLen)
             ctx.lineTo(mx1 + perpX * tickLen, my1 + perpY * tickLen)
-            ctx.strokeStyle = tensionRest
+            ctx.strokeStyle = p.tensionRest
             ctx.globalAlpha = 0.7
             ctx.lineWidth = 1.5
             ctx.stroke()
@@ -808,7 +780,7 @@ export function GraphCanvas({
         const hover = d.activeGravityBucket
         const fillOf = (bucket: string | undefined): string => {
           const color = bucket !== undefined ? d.overlay.colors.get(bucket) : undefined
-          return color ?? cssVar(canvas, '--gv-color-text-muted', '#94A3B8')
+          return color ?? p.colorTextMuted
         }
         const drawnOn = (axis: 'x' | 'y') => hover !== null && hover.axis === axis &&
           (axis === 'y' && d.overlay.rings.length > 0
@@ -845,8 +817,8 @@ export function GraphCanvas({
               // A scalar axis: one gradient from its 0 end to its 1 end.
               const z = toScreen(gradient.zero), o = toScreen(gradient.one)
               const g = coord === 'y' ? ctx.createLinearGradient(0, z, 0, o) : ctx.createLinearGradient(z, 0, o, 0)
-              g.addColorStop(0, cssVar(canvas, '--gv-color-text-muted', '#94A3B8'))
-              g.addColorStop(1, cssVar(canvas, '--gv-color-text', '#1E293B'))
+              g.addColorStop(0, p.colorTextMuted)
+              g.addColorStop(1, p.colorText)
               ctx.fillStyle = g
               ctx.globalAlpha = 0.12
             } else {
@@ -920,7 +892,7 @@ export function GraphCanvas({
         if (vp.scale >= LABEL_ELIDE_SCALE && icon) {
           ctx.save()
           ctx.font = `${def.size.iconSize * mul}px ${ICON_FONT_FAMILY}`
-          ctx.fillStyle = '#FFFFFF'
+          ctx.fillStyle = p.colorSurface
           ctx.globalAlpha = (nodeDimmed ? dimAlpha : 1) * 0.92
           ctx.fillText(icon, sx, sy + 0.5)
           ctx.restore()
@@ -966,12 +938,12 @@ export function GraphCanvas({
           ctx.restore()
         }
 
-        // Selection ring — white solid ring. Expands to r + 10 when the
+        // Selection ring — a solid ring. Expands to r + 10 when the
         // duplicate halo is also active, keeping the two rings clearly apart.
         if (node.id === d.selectedNodeId) {
           const selR = dupHaloActive ? r + 10 : r + 5
           ctx.save()
-          ctx.strokeStyle = SELECTION_RING_COLOR
+          ctx.strokeStyle = p.selectionRingColor
           ctx.lineWidth = 2.5
           ctx.setLineDash([])
           ctx.beginPath()
@@ -984,7 +956,7 @@ export function GraphCanvas({
         // Sits at r + 9 so it clears the duplicate halo at r + 7.
         if (node.id === d.focusedNodeId && vp.scale >= DETAIL_REDUCE_SCALE) {
           ctx.save()
-          ctx.strokeStyle = FOCUS_RING_COLOR
+          ctx.strokeStyle = p.focusRingColor
           ctx.lineWidth = 2
           ctx.setLineDash([2, 2])
           ctx.beginPath()
@@ -1021,9 +993,9 @@ export function GraphCanvas({
           ctx.globalAlpha = nodeDimmed ? dimAlpha : 1
           for (const chip of chips) {
             roundRectPath(ctx, cx, rowY, chip.w, chipH, chipH / 2)
-            ctx.fillStyle = BADGE_FILL
+            ctx.fillStyle = p.badgeFill
             ctx.fill()
-            ctx.fillStyle = BADGE_TEXT_COLOR
+            ctx.fillStyle = p.badgeText
             ctx.fillText(chip.text, cx + chip.w / 2, rowY + chipH / 2 + 0.5)
             cx += chip.w + gap
           }
@@ -1060,9 +1032,8 @@ export function GraphCanvas({
             labelBoxes.push(box)
             // Softened + slightly translucent so names aren't the only bright
             // text on the dark canvas and edges stay visible through them.
-            // Dimmed labels already encode their fade in the colour itself.
-            ctx.globalAlpha = nodeDimmed ? 1 : LABEL_ALPHA
-            ctx.fillStyle = nodeDimmed ? labelDimColor : labelColor
+            ctx.globalAlpha = nodeDimmed ? DIM_ALPHA : LABEL_ALPHA
+            ctx.fillStyle = p.colorGraphLabel
             ctx.fillText(text, sx, labelY)
             ctx.globalAlpha = 1
           }
