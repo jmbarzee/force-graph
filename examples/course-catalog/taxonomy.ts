@@ -181,7 +181,7 @@ const FILTERS: readonly AxisDescriptor[] = [
     label: 'Campus',
     // Nothing selected shows every campus; faculties and departments have none
     // and always show. A narrowing axis, so the policies and the one chip per
-    // campus are the defaults. Its names arrive with the data, as `labels`.
+    // campus are the defaults.
     emptyMeans: 'all',
   },
 ]

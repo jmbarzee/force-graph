@@ -135,16 +135,12 @@ export function withSpringOverride(pair: PairTuning, id: EdgeTypeId, value: Spri
   return { ...pair, spring }
 }
 
-/**
- * The identity bucketing of the taxonomy's style axis — one bucket per declared
- * value. The style axis has no descriptor (it is not a filter), so its names
- * come from the taxonomy and `labels`.
- */
+/** The identity bucketing of the taxonomy's style axis: one bucket per declared value, named by `styleLabelFor`. */
 export function styleIdentityMapping(taxonomy: Taxonomy, labels?: AxisLabels): AxisMapping {
   return identityMapping({
     id: taxonomy.styleAxis(),
     label: taxonomy.styleLabel(),
-    labelFor: labelledBy(labels, taxonomy.styleAxis(), value => taxonomy.styleOf(value).label),
+    labelFor: styleLabelFor(taxonomy, labels),
     abbreviationFor: value => engineOf(taxonomy).abbreviationFor(value),
   }, taxonomy.styleValues)
 }
@@ -234,6 +230,12 @@ function nodeAxes(taxonomy: Taxonomy, graph: Graph): AxisId[] {
     }
   }
   return out
+}
+
+/** A style value's name: `labels`, then the style axis's `labelFor`, then the style's label. */
+export function styleLabelFor(taxonomy: Taxonomy, labels?: AxisLabels): (value: AxisValue) => string {
+  const style = taxonomy.styleAxis()
+  return labelled(taxonomy.axisFor(style), labels)?.labelFor ?? labelledBy(labels, style, value => taxonomy.styleOf(value).label)
 }
 
 /** How an axis names itself and its values: `labels`, then its descriptor's way, or — for an axis no descriptor declares — the id and the value. */

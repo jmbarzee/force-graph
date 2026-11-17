@@ -120,6 +120,16 @@ describe('labelledParams', () => {
     expect(named.pair.mapping.buckets.map(b => [b.id, b.label])).toEqual([['svc', 'Backend']])
   })
 
+  it('names a style bucket labels does not name by the style axis\'s labelFor', () => {
+    const filtered = createTaxonomy({
+      styleAxis: 'kind',
+      styles: ['svc', 'db'].map(id => ({ id, label: `${id} style`, color: { light: { fill: '#000000', border: '#000000' }, dark: { fill: '#ffffff', border: '#ffffff' } } })),
+      filterAxes: [{ id: 'kind', emptyMeans: 'none', labelFor: v => (v === 'db' ? 'Database' : `${v} style`) }],
+    })
+    const named = labelledParams(defaultParamsFor(filtered), filtered, { kind: { svc: 'Service' } })
+    expect(named.pair.mapping.buckets.map(b => b.label)).toEqual(['Service', 'Database'])
+  })
+
   it('hands back the same parameters with no labels', () => {
     expect(labelledParams(params, taxonomy, undefined)).toBe(params)
   })

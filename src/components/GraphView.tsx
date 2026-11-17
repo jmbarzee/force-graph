@@ -13,7 +13,7 @@ import { NO_OVERRIDES } from '../filter/linked'
 import type { LinkedViewState } from '../filter/linked'
 import type { ForceParams, SimNode, Simulation } from '../graph/simulation'
 import { bandOverlay, resolvePhysics } from '../graph/forces'
-import { countsOn, isIdentityMapping, labelled, labelledBy, mappingKey, valuesOn } from '../graph/axis'
+import { countsOn, isIdentityMapping, mappingKey, valuesOn } from '../graph/axis'
 import type { AxisId, AxisLabels, AxisMapping } from '../graph/axis'
 import type { PresentSets } from './graph-view/present'
 import { presentSetsOf } from './graph-view/present'
@@ -22,7 +22,7 @@ import { scopeStyle } from '../styles/tokens'
 import type { ThemeTokens } from '../styles/tokens'
 import { useResolvedTheme, THEME_CHOICES } from './graph-view/useTheme'
 import type { ThemeChoice } from './graph-view/useTheme'
-import { axisOptions, labelledParams, layoutAxisOptions, pairTuning, sprungEdges } from '../graph/simulation'
+import { axisOptions, labelledParams, layoutAxisOptions, styleLabelFor, pairTuning, sprungEdges } from '../graph/simulation'
 import { copyGroups, copyKeyOf } from '../graph/model'
 import type { NodeScaleParams } from '../graph/node-scale'
 import { CONTAINMENT_STROKE, NEUTRAL_STROKE, played, weighted } from '../graph/shapes'
@@ -535,9 +535,8 @@ export const GraphView = React.forwardRef<GraphViewHandle, GraphViewProps>(funct
   const namedParams = React.useMemo(() => labelledParams(forceParams, taxonomy, labels), [forceParams, taxonomy, labels])
   const namedResolved = React.useMemo(() => (namedParams === forceParams ? resolved : resolvePhysics(namedParams, taxonomy)), [namedParams, forceParams, resolved, taxonomy])
   const styleLabelOf = React.useMemo(() => {
-    const style = taxonomy.styleAxis()
     const engine = engineOf(taxonomy)
-    const labelFor = labelled(taxonomy.axisFor(style), labels)?.labelFor ?? labelledBy(labels, style, v => taxonomy.styleOf(v).label)
+    const labelFor = styleLabelFor(taxonomy, labels)
     return (node: GraphNode) => {
       const value = engine.styleValueOf(node)
       return value === undefined ? engine.nodeStyleOf(node).label : labelFor(value)
