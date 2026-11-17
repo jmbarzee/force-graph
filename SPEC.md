@@ -86,6 +86,7 @@ that would animate a reveal or a hide are
 
 **Fit** (the button, `fit()`) frames every visible node. The first
 layout is framed once its warm-up cools, and so is a refitting filter change.
+Every frame lands in the canvas below the filter bar.
 Resizing the pane keeps
 the world point at its centre fixed.
 

@@ -409,7 +409,7 @@ export const GraphView = React.forwardRef<GraphViewHandle, GraphViewProps>(funct
   // Camera (viewport transform, container and overlay refs, every framing),
   // framing the visible nodes, set below once they are derived.
   const visibleNodesRef = React.useRef<SimNode[]>([])
-  const { viewport, setViewport, containerRef, overlayRef, requestFrame, tickFrame } = useViewport(visibleNodesRef)
+  const { viewport, setViewport, containerRef, overlayRef, overlayHeight, requestFrame, tickFrame } = useViewport(visibleNodesRef)
   // The simulation instance + its handlers are owned by useSimulation, and the
   // RAF loop + fps by useSimulationLoop, both called below once `graph` and the
   // visible subgraph are available.
@@ -422,21 +422,6 @@ export const GraphView = React.forwardRef<GraphViewHandle, GraphViewProps>(funct
   const searchInputRef = React.useRef<HTMLInputElement>(null)
   const [shortcutsOpen, setShortcutsOpen] = React.useState(false)
 
-  // The overlay (filter chips, search, the host's findings, the pane's
-  // diagnostics, the search results) floats over the full-bleed canvas, and
-  // its height is dynamic. It is measured whole, so a host control anchored
-  // at `--gv-toolbar-height` sits under everything the overlay shows, the open
-  // search results included.
-  const [toolbarHeight, setToolbarHeight] = React.useState(0)
-  useIsomorphicLayoutEffect(() => {
-    const el = overlayRef.current
-    if (!el || typeof ResizeObserver === 'undefined') return
-    const update = () => setToolbarHeight(el.getBoundingClientRect().height)
-    update()
-    const ro = new ResizeObserver(update)
-    ro.observe(el)
-    return () => ro.disconnect()
-  }, [])
   // A pane that measures no height while displayed draws nothing and says
   // nothing: said once here, with the fix. A pane hidden by its host
   // (`display: none`, a tab shell's other tab) has no offset parent and is
@@ -707,10 +692,6 @@ export const GraphView = React.forwardRef<GraphViewHandle, GraphViewProps>(funct
     return { visibleMatchIds: split.visible, hiddenMatchCount: split.hiddenCount, hiddenMatches: split.hiddenByAxis }
   }, [searchQuery, visibleIds, filter, axes, taxonomy, hostIndex])
 
-  // Physics loop + filter-driven reheats. Owns the RAF tick (with the held
-  // framings' tick, fps, and stability stop), the hover tooltip re-render
-  // tick, and the seed/reheat-on-filter-change effects. It consumes the sim,
-  // the visible subgraph, and the camera's framing as inputs.
   const { fps } = useSimulationLoop({
     simRef, running, setRunning,
     visibleIds, downstreamScores,
@@ -854,7 +835,7 @@ export const GraphView = React.forwardRef<GraphViewHandle, GraphViewProps>(funct
   React.useImperativeHandle(ref, () => ({
     focusNode: focusNodeById,
     select: requestSelect,
-    fit: () => requestFrame({ ids: visibleNodesRef.current.map(n => n.id) }),
+    fit: handleFitToView,
     getPositions: () => new Map((simRef.current?.nodes ?? []).map(n => [n.id, { x: n.x, y: n.y }])),
     setPositions: (next: ReadonlyMap<string, Position>) => {
       const sim = simRef.current
@@ -872,7 +853,7 @@ export const GraphView = React.forwardRef<GraphViewHandle, GraphViewProps>(funct
       const next = fn(prev)
       if (!filterStatesEqual(prev, next)) userWriteFilter(next, changedAxes(prev, next))
     },
-  }), [focusNodeById, requestFrame, setRunning, requestSelect, simRef, visibleNodesRef, filterRef, userWriteFilter])
+  }), [focusNodeById, handleFitToView, setRunning, requestSelect, simRef, filterRef, userWriteFilter])
 
   // Keyboard, scoped by `keyboard`: on the pane, the focusable root
   // handles the keys that reach it; globally, the window does — a tab shell
@@ -1009,7 +990,7 @@ export const GraphView = React.forwardRef<GraphViewHandle, GraphViewProps>(funct
       data-gv-theme={theme}
       tabIndex={keyboard === 'pane' ? 0 : undefined}
       onKeyDown={keyboard === 'pane' ? paneKeyDown : undefined}
-      style={{ ...schemeStyle, ...(toolbarHeight ? { ['--gv-toolbar-height' as string]: `${toolbarHeight}px` } : {}), ...style }}
+      style={{ ...schemeStyle, ...(overlayHeight ? { ['--gv-toolbar-height' as string]: `${overlayHeight}px` } : {}), ...style }}
     >
       {/* Canvas fills the full viewport beneath the floating overlay */}
       <div className="gv-graph-canvas-area">

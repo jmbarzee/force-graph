@@ -1,16 +1,15 @@
 // useViewport — the camera concern for the Graph View.
 //
-// Owns the viewport (pan/zoom transform, which follows a pane resize), the
-// DOM container ref used to measure the canvas and the overlay ref that
-// covers its top, and every framing: `requestFrame` takes a `FrameRequest` and
-// frames it now or holds it for the physics loop's `tickFrame`. The keyboard
-// handlers zoom about the centre of `containerRef`.
+// Owns the viewport, which follows a pane resize, and every framing: each
+// lands in the canvas below the overlay.
 
 import React from 'react'
 import { DEFAULT_VIEWPORT, followResize } from '../../graph/viewport'
 import type { PaneSize, Viewport } from '../../graph/viewport'
 import type { SimNode } from '../../graph/simulation'
 import { frameView } from './frame'
+import { useLatest } from './useControllable'
+import { useIsomorphicLayoutEffect } from './useIsomorphicLayoutEffect'
 import type { FrameRequest } from './frame'
 
 export interface ViewportController {
@@ -18,6 +17,7 @@ export interface ViewportController {
   setViewport: React.Dispatch<React.SetStateAction<Viewport>>
   containerRef: React.RefObject<HTMLDivElement>
   overlayRef: React.RefObject<HTMLDivElement>
+  overlayHeight: number
   requestFrame: (request: FrameRequest) => void
   // Frame what `requestFrame` held, as the layout's alpha allows; the loop calls it each tick.
   tickFrame: (alpha: number) => void
@@ -28,6 +28,23 @@ export function useViewport(drawn: React.RefObject<readonly SimNode[]>): Viewpor
   const [viewport, setViewport] = React.useState<Viewport>(DEFAULT_VIEWPORT)
   const containerRef = React.useRef<HTMLDivElement>(null)
   const overlayRef = React.useRef<HTMLDivElement>(null)
+
+  // The overlay (filter chips, search, the host's findings, the pane's
+  // diagnostics, the search results) floats over the full-bleed canvas, and
+  // its height is dynamic. It is measured whole, so a frame and a host control
+  // anchored at `--gv-toolbar-height` sit under everything it shows, the open
+  // search results included.
+  const [overlayHeight, setOverlayHeight] = React.useState(0)
+  const overlayHeightRef = useLatest(overlayHeight)
+  useIsomorphicLayoutEffect(() => {
+    const el = overlayRef.current
+    if (!el || typeof ResizeObserver === 'undefined') return
+    const update = () => setOverlayHeight(el.getBoundingClientRect().height)
+    update()
+    const ro = new ResizeObserver(update)
+    ro.observe(el)
+    return () => ro.disconnect()
+  }, [])
 
   // A resize keeps the world point at the pane's centre fixed. The shift is
   // the change since the size the viewport was last computed for: `measure()`
@@ -58,16 +75,15 @@ export function useViewport(drawn: React.RefObject<readonly SimNode[]>): Viewpor
   const apply = React.useCallback((request: FrameRequest): boolean => {
     const size = measure()
     if (!size?.width || !size.height) return false
-    const area = { ...size, top: overlayRef.current?.getBoundingClientRect().height ?? 0 }
+    const area = { ...size, overlay: overlayHeightRef.current }
     setViewport(vp => frameView(vp, request, drawn.current ?? [], area))
     return true
-  }, [measure, drawn])
+  }, [measure, drawn, overlayHeightRef])
 
   // A warm request waits for a measured pane; the others act once, framed or not.
   const held = React.useRef<{ warm?: FrameRequest; next?: FrameRequest }>({})
   const requestFrame = React.useCallback((request: FrameRequest) => {
-    const when = request.when ?? 'now'
-    if (when !== 'now') { held.current[when] = request; return }
+    if (request.when) { held.current[request.when] = request; return }
     apply(request)
     request.then?.()
   }, [apply])
@@ -85,5 +101,5 @@ export function useViewport(drawn: React.RefObject<readonly SimNode[]>): Viewpor
     }
   }, [apply])
 
-  return { viewport, setViewport, containerRef, overlayRef, requestFrame, tickFrame }
+  return { viewport, setViewport, containerRef, overlayRef, overlayHeight, requestFrame, tickFrame }
 }

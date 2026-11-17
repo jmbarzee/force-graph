@@ -26,7 +26,6 @@ export interface SimulationLoopParams {
   axes: readonly ResolvedAxisDescriptor[]
   hoveredNodeId: string | null
   selectedNodeId: string | null
-  /** The camera's framing, for a refitting filter change, and its tick for what it holds. */
   requestFrame: (request: FrameRequest) => void
   tickFrame: (alpha: number) => void
   taxonomy: Taxonomy
