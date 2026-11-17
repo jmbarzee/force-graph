@@ -18,9 +18,15 @@ import { PALETTE } from '../graph/scheme'
 import type { EdgeStroke } from '../graph/scheme'
 
 // What the canvas was last handed, and every simulation the view built.
-const drawn = vi.hoisted(() => ({ strokes: new Map<{ id: string }, EdgeStroke>(), simulations: [] as object[], hover: (_id: string | null) => {} }))
+const drawn = vi.hoisted(() => ({
+  strokes: new Map<{ id: string }, EdgeStroke>(), simulations: [] as object[],
+  hover: (_id: string | null) => {}, hoverEdge: (_hover: { id: string; x: number; y: number } | null) => {}, hoveredEdgeId: null as string | null,
+}))
 vi.mock('./GraphCanvas', () => ({
-  GraphCanvas: (props: { edgeStrokes: typeof drawn.strokes; onHoverNode: typeof drawn.hover }) => { drawn.strokes = props.edgeStrokes; drawn.hover = props.onHoverNode; return null },
+  GraphCanvas: (props: { edgeStrokes: typeof drawn.strokes; onHoverNode: typeof drawn.hover; onHoverEdge: typeof drawn.hoverEdge; hoveredEdgeId: string | null }) => {
+    drawn.strokes = props.edgeStrokes; drawn.hover = props.onHoverNode; drawn.hoverEdge = props.onHoverEdge; drawn.hoveredEdgeId = props.hoveredEdgeId
+    return null
+  },
 }))
 vi.mock('../graph/simulation', async importOriginal => {
   const actual = await importOriginal<typeof import('../graph/simulation')>()
@@ -311,4 +317,48 @@ it('says so when the filter draws no node, and stops once it draws one', async (
 it('leaves an empty graph to the host', async () => {
   const view = await mount({}, graphOf())
   expect(view.el.querySelector('.gv-graph-empty')).toBeNull()
+})
+
+describe('edge hover', () => {
+  const [a, b] = first.nodes
+  const prerequisite = { id: 'e', sourceId: 'n0', targetId: 'n1' }
+  const graph: Graph = { nodes: [a!, { ...b!, parentId: 'n0' }], edges: [prerequisite] }
+
+  it('hands the host its own edge and boxes it, a node winning over it, and null 150 ms after the pointer leaves', async () => {
+    vi.useFakeTimers()
+    try {
+      const onEdgeHover = vi.fn()
+      const view = await mount({ onEdgeHover }, graph)
+      await act(async () => drawn.hoverEdge({ id: 'e', x: 10, y: 20 }))
+      expect(onEdgeHover).toHaveBeenLastCalledWith(prerequisite)
+      expect(onEdgeHover.mock.lastCall![0]).toBe(prerequisite)
+      expect(drawn.hoveredEdgeId).toBe('e')
+      expect(view.el.querySelector('.gv-tooltip-name')!.textContent).toBe('a → b')
+
+      // The pointer onto a node, then back onto the edge within the node's grace.
+      await act(async () => { drawn.hover('n0'); drawn.hoverEdge(null) })
+      expect(onEdgeHover).toHaveBeenLastCalledWith(null)
+      expect(drawn.hoveredEdgeId).toBeNull()
+      await act(async () => { drawn.hover(null); drawn.hoverEdge({ id: 'e', x: 10, y: 20 }) })
+      expect(drawn.hoveredEdgeId).toBeNull()
+      await act(async () => { vi.advanceTimersByTime(150) })
+      expect(onEdgeHover).toHaveBeenLastCalledWith(prerequisite)
+
+      await act(async () => drawn.hoverEdge(null))
+      await act(async () => { vi.advanceTimersByTime(149) })
+      expect(onEdgeHover).toHaveBeenLastCalledWith(prerequisite)
+      await act(async () => { vi.advanceTimersByTime(1) })
+      expect(onEdgeHover).toHaveBeenLastCalledWith(null)
+      expect(view.el.querySelector('.gv-graph-hover-tooltip')).toBeNull()
+    } finally {
+      vi.useRealTimers()
+    }
+  })
+
+  it('hands a derived containment edge as derived', async () => {
+    const onEdgeHover = vi.fn()
+    await mount({ onEdgeHover }, graph)
+    await act(async () => drawn.hoverEdge({ id: 'in:n1', x: 0, y: 0 }))
+    expect(onEdgeHover).toHaveBeenLastCalledWith({ id: 'in:n1', sourceId: 'n1', targetId: 'n0', relation: 'containment' })
+  })
 })

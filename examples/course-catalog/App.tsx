@@ -97,6 +97,7 @@ export function App({ initialTheme = 'system', initialFocus }: { initialTheme?: 
             presets={PRESETS}
             nodeAction={{ label: 'Open details', onSelect: setDetails }}
             onNodeActivate={setDetails}
+            onEdgeHover={edge => console.log('edge hover', edge)}
             theme={themeChoice}
             onThemeChange={setThemeChoice}
             filter={filter}

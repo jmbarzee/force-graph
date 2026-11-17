@@ -118,6 +118,8 @@ export interface TaxonomyEngine {
   edgeStrokeFor(id: EdgeTypeId): EdgeStroke
   /** The hover box's context line(s) for a node — the host's, or its parent's name. */
   contextLine(node: GraphNode, parent: GraphNode | undefined): ContextLine
+  /** The hover box's context line(s) for an edge — the host's, or none. */
+  edgeContextLine(edge: GraphEdge, source: GraphNode, target: GraphNode): ContextLine
   /** The highlight for an active node — the host's refinement of the library's transitive walk in the given direction. */
   highlight(active: GraphNode, base: Highlight, graph: HighlightGraph, direction: HighlightDirection): Highlight
   /** Where a node sits on the style axis, or undefined if it sits nowhere. */
@@ -207,6 +209,12 @@ export interface TaxonomySpec {
    * origin — as one line or several. Absent, the line is the parent's name.
    */
   contextLine?: (node: GraphNode, parent: GraphNode | undefined) => ContextLine
+  /**
+   * The hover box's context for an edge, under its ends: handed the host's
+   * edge (the original a graduated edge stands for) and its two nodes.
+   * Absent, none.
+   */
+  edgeContextLine?: (edge: GraphEdge, source: GraphNode, target: GraphNode) => ContextLine
   /**
    * What the search control matches a node on, case-insensitively: a code
    * from the payload beside the name, say. Absent, the name.
@@ -498,6 +506,7 @@ export function createTaxonomy(spec: TaxonomySpec): Taxonomy {
     edgeTypeOf,
     collapse: spec.collapse ?? (kept => kept),
     contextLine: spec.contextLine ?? ((_node, parent) => parent?.name),
+    edgeContextLine: spec.edgeContextLine ?? (() => undefined),
     highlight: spec.highlight ?? ((_active, base) => base),
   })
   return taxonomy

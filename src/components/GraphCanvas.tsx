@@ -124,6 +124,7 @@ function badgeExtent(node: { badges?: readonly string[] }, mul: number): number 
 // this canvas is given), kept quiet because this runs in the draw loop.
 
 const ARROWHEAD_SIZE = 8
+const EDGE_HIT_PX = 4
 const CULL_MARGIN = 100
 const FLASH_MS = 600
 
@@ -147,6 +148,8 @@ interface GraphCanvasProps {
   highlightedNodes: Set<string> | null
   highlightedEdges: Set<string> | null
   hoveredNodeId: string | null
+  hoveredEdgeId: string | null
+  onHoverEdge: (hover: EdgeHover | null) => void
   selectedNodeId: string | null
   focusedNodeId: string | null
   /** Flashes `id` for `FLASH_MS` from `at`, a `performance.now()` time. */
@@ -195,6 +198,40 @@ function laneOffset(
   return [sx + nx, sy + ny, tx + nx, ty + ny]
 }
 
+type Point = { x: number; y: number }
+
+/** An edge's stroke on screen, source to target, in its lane. */
+function segmentOf(
+  edge: GraphEdge, src: Point, tgt: Point, vp: Viewport, offsets: ReadonlyMap<string, number>,
+): [number, number, number, number] {
+  const [sx, sy] = worldToScreen(vp, src.x, src.y)
+  const [tx, ty] = worldToScreen(vp, tgt.x, tgt.y)
+  return laneOffset(edge, offsets.get(edge.id) ?? 0, sx, sy, tx, ty)
+}
+
+/** The edge under the pointer, and the screen point where the pointer is on it. */
+export interface EdgeHover { id: string; x: number; y: number }
+
+/** The edge whose stroke passes within `EDGE_HIT_PX` of a screen point, the nearest when several do. */
+export function edgeAt(
+  px: number, py: number, edges: readonly GraphEdge[], nodeMap: ReadonlyMap<string, Point>,
+  vp: Viewport, offsets: ReadonlyMap<string, number>,
+): GraphEdge | null {
+  let hit: GraphEdge | null = null
+  let nearest = EDGE_HIT_PX
+  for (const edge of edges) {
+    const src = nodeMap.get(edge.sourceId)
+    const tgt = nodeMap.get(edge.targetId)
+    if (!src || !tgt) continue
+    const [ax, ay, bx, by] = segmentOf(edge, src, tgt, vp, offsets)
+    const dx = bx - ax, dy = by - ay
+    const t = Math.max(0, Math.min(1, ((px - ax) * dx + (py - ay) * dy) / (dx * dx + dy * dy || 1)))
+    const d = Math.hypot(px - ax - t * dx, py - ay - t * dy)
+    if (d <= nearest) { hit = edge; nearest = d }
+  }
+  return hit
+}
+
 // All data the draw function needs, stored in a ref to avoid effect teardown
 interface DrawData {
   // Read by the loop rather than closed over: drawData.current is rewritten
@@ -210,6 +247,7 @@ interface DrawData {
   highlightedNodes: Set<string> | null
   highlightedEdges: Set<string> | null
   hoveredNodeId: string | null
+  hoveredEdgeId: string | null
   selectedNodeId: string | null
   focusedNodeId: string | null
   flashNode: { id: string; at: number } | null
@@ -243,7 +281,7 @@ export function GraphCanvas({
   onNodeDragStart, onNodeDragMove, onNodeDragEnd,
   onDoubleClickNode, onFitView, onHoverNode, onSelectNode,
   highlightedNodes, highlightedEdges,
-  hoveredNodeId, selectedNodeId, focusedNodeId, flashNode, searchMatchIds,
+  hoveredNodeId, hoveredEdgeId, onHoverEdge, selectedNodeId, focusedNodeId, flashNode, searchMatchIds,
   running, forceParams, resolved, overlay, theme, edgeStrokes, edgeOffsets, undirectedEdges, activeSection, activePushBucket,
   activeGravityBucket, activePullEdge, nodeScale, groupGlows, markedEdges,
 }: GraphCanvasProps) {
@@ -296,14 +334,14 @@ export function GraphCanvas({
   const drawData = React.useRef<DrawData>({
     taxonomy, fill,
     nodes, edges, nodeMap, viewport, groupGlows, markedEdges, highlightedNodes, highlightedEdges,
-    hoveredNodeId, selectedNodeId, focusedNodeId, flashNode, searchMatchIds,
+    hoveredNodeId, hoveredEdgeId, selectedNodeId, focusedNodeId, flashNode, searchMatchIds,
     forceParams, resolved, overlay, theme, edgeStrokes, edgeOffsets, undirectedEdges, activeSection, activePushBucket, activeGravityBucket, activePullEdge, nodeScale, running,
     dupNodeIds, activeDupDefKey, palette,
   })
   drawData.current = {
     taxonomy, fill,
     nodes, edges, nodeMap, viewport, groupGlows, markedEdges, highlightedNodes, highlightedEdges,
-    hoveredNodeId, selectedNodeId, focusedNodeId, flashNode, searchMatchIds,
+    hoveredNodeId, hoveredEdgeId, selectedNodeId, focusedNodeId, flashNode, searchMatchIds,
     forceParams, resolved, overlay, theme, edgeStrokes, edgeOffsets, undirectedEdges, activeSection, activePushBucket, activeGravityBucket, activePullEdge, nodeScale, running,
     dupNodeIds, activeDupDefKey, palette,
   }
@@ -372,6 +410,8 @@ export function GraphCanvas({
       // Hover detection
       const node = hitTest(cx, cy)
       onHoverNode(node?.id ?? null)
+      const edge = node ? null : edgeAt(cx, cy, edges, nodeMap, viewport, edgeOffsets)
+      onHoverEdge(edge && { id: edge.id, x: cx, y: cy })
       return
     }
 
@@ -389,7 +429,7 @@ export function GraphCanvas({
       const [wx, wy] = screenToWorld(viewport, cx, cy)
       onNodeDragMove(wx, wy)
     }
-  }, [viewport, hitTest, onViewportChange, onNodeDragMove, onHoverNode])
+  }, [viewport, hitTest, onViewportChange, onNodeDragMove, onHoverNode, onHoverEdge, edges, nodeMap, edgeOffsets])
 
   const handlePointerUp = React.useCallback((e: React.PointerEvent) => {
     const ds = dragState.current
@@ -532,9 +572,7 @@ export function GraphCanvas({
         const tgt = d.nodeMap.get(edge.targetId)
         if (!src || !tgt) continue
 
-        const [sx0, sy0] = worldToScreen(vp, src.x, src.y)
-        const [tx0, ty0] = worldToScreen(vp, tgt.x, tgt.y)
-        const [sx, sy, tx, ty] = laneOffset(edge, d.edgeOffsets.get(edge.id) ?? 0, sx0, sy0, tx0, ty0)
+        const [sx, sy, tx, ty] = segmentOf(edge, src, tgt, vp, d.edgeOffsets)
 
         if (Math.max(sx, tx) < -CULL_MARGIN || Math.min(sx, tx) > w + CULL_MARGIN ||
           Math.max(sy, ty) < -CULL_MARGIN || Math.min(sy, ty) > h + CULL_MARGIN) continue
@@ -550,7 +588,8 @@ export function GraphCanvas({
         // Highlights override the per-style alpha so the active subgraph
         // pops; dim non-highlighted/non-matching edges down to DIM_ALPHA.
         const edgeDimmed = hasHighlight ? !edgeHighlighted : edgeSearchDimmed
-        const edgeAlpha = hasHighlight && edgeHighlighted ? 1 : edgeDimmed ? dimAlpha : baseAlpha
+        const hovered = edge.id === d.hoveredEdgeId
+        const edgeAlpha = hovered || (hasHighlight && edgeHighlighted) ? 1 : edgeDimmed ? dimAlpha : baseAlpha
 
         if (d.markedEdges.has(edge.id)) {
           ctx.globalAlpha = edgeDimmed ? dimAlpha : MARK_ALPHA
@@ -567,7 +606,7 @@ export function GraphCanvas({
         ctx.beginPath()
         ctx.setLineDash([...style.dash])
         ctx.strokeStyle = style.color[d.theme]
-        ctx.lineWidth = style.width
+        ctx.lineWidth = style.width + (hovered ? 2 : 0)
         ctx.moveTo(sx, sy)
         ctx.lineTo(tx, ty)
         ctx.stroke()
@@ -703,9 +742,7 @@ export function GraphCanvas({
           const cat = springFor(d.resolved.spring, edge, src, tgt)
           if (activePullKey && cat.key !== activePullKey) continue
 
-          const [sx0, sy0] = worldToScreen(vp, src.x, src.y)
-          const [tx0, ty0] = worldToScreen(vp, tgt.x, tgt.y)
-          const [sx, sy, tx, ty] = laneOffset(edge, d.edgeOffsets.get(edge.id) ?? 0, sx0, sy0, tx0, ty0)
+          const [sx, sy, tx, ty] = segmentOf(edge, src, tgt, vp, d.edgeOffsets)
           if (Math.max(sx, tx) < -CULL_MARGIN || Math.min(sx, tx) > w + CULL_MARGIN ||
             Math.max(sy, ty) < -CULL_MARGIN || Math.min(sy, ty) > h + CULL_MARGIN) continue
 

@@ -290,6 +290,13 @@ The hover box, beside the node, holds:
 The box stays open while the pointer travels onto it and over it, so its
 button can be clicked.
 
+With no node under the pointer, the drawn edge nearest it within 4 px,
+containment included, is hovered: drawn at full opacity over any dim, 2 px
+wider, in its own colour and dash. Its box, where the pointer met the edge,
+holds the original's ends (`source → target`, `↔` for an undirected type),
+its type's tooltip, and the lines `edgeContextLine` answers. A hovered node
+wins over an edge, through its grace period too.
+
 The selected node wears a ring. A graph that no longer holds the view's own selection
 clears it.
 
