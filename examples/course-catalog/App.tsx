@@ -4,17 +4,18 @@
 // node by naming it (`focus`), keeps where the nodes came to rest across a
 // reload, and leaves the axes, the locks and the search to the view. It
 // supplies what only the host can know — findings, programme groups, a preset
-// of its own, and what "Open details" does — and glows by programme or campus.
+// of its own, and what "Open details" does — glows by programme or campus, and
+// rings by term.
 
 import React from 'react'
 import {
   GraphView, GroupLegend, TUNING_PRESETS, TaxonomyContext, copyGroups, copyKeyOf, initialFilter, nodesById, payloadNumber, payloadString, useFocusRequest, useScheme, withSelection,
 } from '@jmbarzee/force-graph'
 import type {
-  FilterState, GraphNode, SetColoring, ThemeChoice, TuningPreset,
+  Coloring, FilterState, GraphNode, SetColoring, ThemeChoice, TuningPreset,
 } from '@jmbarzee/force-graph'
 import { CAMPUS_LABEL, catalog } from './data'
-import type { Campus, Catalog } from './data'
+import type { Campus, Catalog, Term } from './data'
 import { buildGraph, programmeGroups } from './graph'
 import { loadPositions, savePositions } from './positions'
 import { CAMPUS, ENTITY, taxonomy } from './taxonomy'
@@ -30,6 +31,11 @@ const labels = { [CAMPUS]: CAMPUS_LABEL }
 /** What the glow can follow: the programmes, or the campus axis while the programmes stay declared. */
 const GLOW = { programmes: { by: 'groups' }, campus: { by: 'axis', axis: CAMPUS } } satisfies Record<string, SetColoring>
 type GlowBy = keyof typeof GLOW
+const TERMS: readonly Term[] = ['Autumn', 'Spring', 'Summer']
+/** Each course and lab ringed by its term. */
+const RING: Coloring = { by: 'node', keys: TERMS.map(t => ({ id: t, label: t })), of: n => payloadString(n, 'term') }
+/** Opens selected: ringed by term, dashed (no department owns IDST) and a copy of PHIL 300. */
+const OPENING = [nodeByCode.get('IDST 300')!]
 
 /** Data-quality warnings the registrar should see. */
 function findingsOf(data: Catalog): string[] {
@@ -57,7 +63,7 @@ export function App({ initialTheme = 'system', initialFocus }: { initialTheme?: 
   const [themeChoice, setThemeChoice] = React.useState<ThemeChoice>(initialTheme)
   const [details, setDetails] = React.useState<GraphNode | null>(null)
   // Controlled: the panel's close clears it, and the view selects what it says.
-  const [selected, setSelected] = React.useState<readonly GraphNode[]>([])
+  const [selected, setSelected] = React.useState<readonly GraphNode[]>(OPENING)
   // A request, not a state: the view applies it when it changes, and each ask
   // is a fresh one, so asking again for the same node asks again.
   const [focus, requestFocus] = useFocusRequest()
@@ -90,7 +96,7 @@ export function App({ initialTheme = 'system', initialFocus }: { initialTheme?: 
             counts="faceted"
             findings={FINDINGS.length > 0 && <Findings messages={FINDINGS} />}
             groups={groups}
-            coloring={{ glow: GLOW[glowBy] }}
+            coloring={{ glow: GLOW[glowBy], ring: RING }}
             groupsControl={(active, control) => glowBy === 'programmes'
               ? <GroupLegend title="Degree programmes" items={groups.keys} active={active} control={control}>{glowSwitch}</GroupLegend>
               : <div className="gv-group-legend">{glowSwitch}</div>}

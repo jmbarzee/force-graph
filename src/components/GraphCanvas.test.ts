@@ -2,7 +2,7 @@
 import React, { act } from 'react'
 import { createRoot } from 'react-dom/client'
 import { describe, expect, it, vi } from 'vitest'
-import { edgeAt, GraphCanvas } from './GraphCanvas'
+import { drawRing, edgeAt, GraphCanvas } from './GraphCanvas'
 import { TaxonomyContext } from './graph-view/useTaxonomy'
 import { createTaxonomy } from '../graph/taxonomy'
 import type { GraphEdge } from '../graph/model'
@@ -44,6 +44,35 @@ describe('edgeAt', () => {
     expect(edgeAt(50, 7, [ab, ba], at, vp, lanes, drawn)).toBe(ab)
     expect(edgeAt(50, -7, [ab, ba], at, vp, lanes, drawn)).toBe(ba)
     expect(edgeAt(50, 0, [ab, ba], at, vp, lanes, drawn)).toBeNull()
+  })
+})
+
+/** A context that records each stroke with the state it was drawn in. */
+function recordingCtx() {
+  const strokes: { radius: number; color: unknown; width: number; dash: number[]; alpha: number }[] = []
+  let radius = 0, dash: number[] = []
+  const ctx = {
+    strokeStyle: '' as unknown, lineWidth: 1, globalAlpha: 1,
+    setLineDash: (d: number[]) => { dash = d },
+    beginPath: () => {},
+    arc: (_x: number, _y: number, r: number) => { radius = r },
+    stroke: () => { strokes.push({ radius, color: ctx.strokeStyle, width: ctx.lineWidth, dash, alpha: ctx.globalAlpha }) },
+  }
+  return { ctx: ctx as unknown as CanvasRenderingContext2D, strokes }
+}
+
+describe('drawRing', () => {
+  it('strokes 2px clear of the edge, and answers its outer edge', () => {
+    const { ctx, strokes } = recordingCtx()
+    expect(drawRing(ctx, 0, 0, 10, 2, 'red', [3, 3], 0.2)).toBe(14)
+    expect(strokes).toEqual([{ radius: 13, color: 'red', width: 2, dash: [3, 3], alpha: 0.2 }])
+  })
+
+  it('stacks each ring where the one inside it ends', () => {
+    const { ctx, strokes } = recordingCtx()
+    let edge = 10
+    for (const width of [2, 2, 2.5, 2]) edge = drawRing(ctx, 0, 0, edge, width, 'c', [], 1)
+    expect(strokes.map(s => s.radius)).toEqual([13, 17, 21.25, 25.5])
   })
 })
 

@@ -1,5 +1,5 @@
 import { describe, expect, it, vi } from 'vitest'
-import { coloringsEqual, fillOf, glowOf, pairFor, resolveColoring } from './coloring'
+import { coloringsEqual, fillOf, glowOf, hueFor, pairFor, resolveColoring } from './coloring'
 import type { Coloring, SetColoring } from './coloring'
 import { groupSlotsOf } from './groups'
 import type { NodeGroup } from './groups'
@@ -160,5 +160,15 @@ describe('pairFor', () => {
     const fallback = taxonomy.styleOf(undefined).color
     expect(pairFor(fill, 'a', fallback)).toBe(fill.keys.get('red')!.color)
     expect(pairFor(fill, 'd', fallback)).toBe(fallback)
+  })
+})
+
+describe('hueFor', () => {
+  it('answers a keyed node its key’s hue, and a keyless or undeclared one none', () => {
+    const keys = [{ id: 'red', label: 'Red', color: '#123456' }]
+    const ring = resolve({ by: 'node', keys, of: n => (n.id === 'c' ? 'mauve' : n.values.team) })
+    expect(hueFor(ring, 'a')).toEqual({ light: '#123456', dark: '#123456' })
+    expect(hueFor(ring, 'c')).toBeUndefined()
+    expect(hueFor(ring, 'd')).toBeUndefined()
   })
 })

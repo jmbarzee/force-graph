@@ -14,8 +14,8 @@ import { nodeSizeMul, type NodeScaleParams } from '../graph/node-scale'
 import type { Taxonomy } from '../graph/taxonomy'
 import { engineOf } from '../graph/taxonomy'
 import type { GlowGroup } from '../graph/groups'
-import { pairFor } from '../graph/coloring'
-import type { Fill } from '../graph/coloring'
+import { hueFor, pairFor } from '../graph/coloring'
+import type { Fill, ResolvedColoring } from '../graph/coloring'
 import { useTaxonomy } from './graph-view/useTaxonomy'
 import { useFill } from './graph-view/useFill'
 import { useLatest } from './graph-view/useControllable'
@@ -129,9 +129,30 @@ const EDGE_HIT_PX = 4
 const CULL_MARGIN = 100
 const FLASH_MS = 600
 
-// Zoom elision thresholds
 const LABEL_ELIDE_SCALE = 0.25    // hide name labels below this scale (except hovered/selected)
-const DETAIL_REDUCE_SCALE = 0.1   // drop decorative rings below this scale
+
+// A node's rings stack outward, each RING_GAP screen px clear of the one inside it.
+const RING_GAP = 2
+const RING_WIDTH = 2
+const SELECTION_WIDTH = 2.5
+const NO_DASH: number[] = []
+const DATA_DASH = [3, 3]
+const FOCUS_DASH = [2, 2]
+
+/** Strokes a ring `RING_GAP` outside `edge` and answers its outer edge, where the next ring starts. */
+export function drawRing(
+  ctx: CanvasRenderingContext2D, x: number, y: number, edge: number,
+  width: number, color: string, dash: number[], alpha: number,
+): number {
+  ctx.strokeStyle = color
+  ctx.lineWidth = width
+  ctx.setLineDash(dash)
+  ctx.globalAlpha = alpha
+  ctx.beginPath()
+  ctx.arc(x, y, edge + RING_GAP + width / 2, 0, Math.PI * 2)
+  ctx.stroke()
+  return edge + RING_GAP + width
+}
 
 interface GraphCanvasProps {
   nodes: SimNode[]
@@ -178,6 +199,8 @@ interface GraphCanvasProps {
   nodeScale: NodeScaleParams
   // Decomposition group glow layer (drawn behind everything). Empty = no overlay.
   groupGlows: GlowGroup[]
+  /** The ring colouring; null rings only the nodes marked `ring: 'dashed'`, in their fill. */
+  ring: ResolvedColoring | null
   /** The visible edges drawn with a marking band, by id. */
   markedEdges: ReadonlySet<string>
 }
@@ -247,6 +270,7 @@ interface DrawData {
   // every render, a closure is not.
   taxonomy: Taxonomy
   fill: Fill
+  ring: ResolvedColoring | null
   nodes: SimNode[]
   edges: GraphEdge[]
   nodeMap: Map<string, SimNode>
@@ -291,7 +315,7 @@ export function GraphCanvas({
   highlightedNodes, highlightedEdges,
   hoveredNodeId, hoveredEdgeId, onHoverEdge, selectedNodeIds, focusedNodeId, flashNode, searchMatchIds,
   running, forceParams, resolved, overlay, theme, edgeStrokes, edgeOffsets, undirectedEdges, activeSection, activePushBucket,
-  activeGravityBucket, activePullEdge, nodeScale, groupGlows, markedEdges,
+  activeGravityBucket, activePullEdge, nodeScale, groupGlows, ring, markedEdges,
 }: GraphCanvasProps) {
   const canvasRef = React.useRef<HTMLCanvasElement>(null)
   const containerRef = React.useRef<HTMLDivElement>(null)
@@ -335,14 +359,14 @@ export function GraphCanvas({
 
   // --- Ref-based draw data (updated every render, read by draw loop) ---
   const drawData = React.useRef<DrawData>({
-    taxonomy, fill,
+    taxonomy, fill, ring,
     nodes, edges, nodeMap, viewport, groupGlows, markedEdges, highlightedNodes, highlightedEdges,
     hoveredNodeId, hoveredEdgeId, selectedNodeIds, focusedNodeId, flashNode, searchMatchIds,
     forceParams, resolved, overlay, theme, edgeStrokes, edgeOffsets, undirectedEdges, activeSection, activePushBucket, activeGravityBucket, activePullEdge, nodeScale, running,
     dupNodeIds, activeDupDefKeys, palette,
   })
   drawData.current = {
-    taxonomy, fill,
+    taxonomy, fill, ring,
     nodes, edges, nodeMap, viewport, groupGlows, markedEdges, highlightedNodes, highlightedEdges,
     hoveredNodeId, hoveredEdgeId, selectedNodeIds, focusedNodeId, flashNode, searchMatchIds,
     forceParams, resolved, overlay, theme, edgeStrokes, edgeOffsets, undirectedEdges, activeSection, activePushBucket, activeGravityBucket, activePullEdge, nodeScale, running,
@@ -940,7 +964,8 @@ export function GraphCanvas({
         const nodeHighlighted = d.highlightedNodes?.has(node.id) ?? false
         const searchDimmed = d.searchMatchIds !== null && !d.searchMatchIds.has(node.id)
         const nodeDimmed = (hasHighlight && !nodeHighlighted) || searchDimmed
-        ctx.globalAlpha = nodeDimmed ? dimAlpha : 1
+        const nodeAlpha = nodeDimmed ? dimAlpha : 1
+        ctx.globalAlpha = nodeAlpha
 
         const { fill, border } = pairFor(d.fill, node.id, def.color)[d.theme]
         const icon   = def.icon
@@ -963,20 +988,8 @@ export function GraphCanvas({
           ctx.save()
           ctx.font = `${def.size.iconSize * mul}px ${ICON_FONT_FAMILY}`
           ctx.fillStyle = GLYPH_COLOR
-          ctx.globalAlpha = (nodeDimmed ? dimAlpha : 1) * 0.92
+          ctx.globalAlpha = nodeAlpha * 0.92
           ctx.fillText(icon, sx, sy + 0.5)
-          ctx.restore()
-        }
-
-        // Orphan indicator — dropped at very low zoom (decorative noise at that scale)
-        if (node.ring === 'dashed' && vp.scale >= DETAIL_REDUCE_SCALE) {
-          ctx.save()
-          ctx.setLineDash([3, 3])
-          ctx.strokeStyle = fill
-          ctx.lineWidth = 1.5
-          ctx.beginPath()
-          ctx.arc(sx, sy, r + 4, 0, Math.PI * 2)
-          ctx.stroke()
           ctx.restore()
         }
 
@@ -984,55 +997,19 @@ export function GraphCanvas({
         // DIM_ALPHA above) — the ring vocabulary is reserved for other
         // decoration.
 
-        // Duplicate halo — colored ring in the node's own fill color drawn on
-        // every visible copy of a definition whenever ANY of those copies is
-        // hovered or selected. The halo always renders at full color (alpha
-        // 0.55) — it deliberately ignores nodeDimmed so it pops even when the
-        // rest of the node is faded by the highlight system.
-        //
-        // Sits at r + 5 (same gap from the node edge as the default
-        // selection ring) and uses a slightly thinner stroke so the two rings
-        // read as distinct even when they appear together.
-        const dupHaloActive = d.activeDupDefKeys.has(copyKeyOf(node)) &&
-          vp.scale >= DETAIL_REDUCE_SCALE
-        if (dupHaloActive) {
-          ctx.save()
-          ctx.strokeStyle = fill
-          ctx.lineWidth = 2
-          ctx.setLineDash([])
-          ctx.globalAlpha = 0.55
-          ctx.beginPath()
-          ctx.arc(sx, sy, r + 5, 0, Math.PI * 2)
-          ctx.stroke()
-          ctx.restore()
+        // The rings, outward: the data ring, the copy halo (on every visible
+        // copy while any is hovered or selected, undimmed so it pops), the
+        // selection ring, the focus ring.
+        const hue = d.ring && hueFor(d.ring, node.id)
+        ctx.save()
+        let edge = r
+        if (hue || node.ring === 'dashed') {
+          edge = drawRing(ctx, sx, sy, edge, RING_WIDTH, hue ? hue[d.theme] : fill, node.ring === 'dashed' ? DATA_DASH : NO_DASH, nodeAlpha)
         }
-
-        // Selection ring — a solid ring. Expands to r + 10 when the
-        // duplicate halo is also active, keeping the two rings clearly apart.
-        if (d.selectedNodeIds.has(node.id)) {
-          const selR = dupHaloActive ? r + 10 : r + 5
-          ctx.save()
-          ctx.strokeStyle = p.selectionRingColor
-          ctx.lineWidth = 2.5
-          ctx.setLineDash([])
-          ctx.beginPath()
-          ctx.arc(sx, sy, selR, 0, Math.PI * 2)
-          ctx.stroke()
-          ctx.restore()
-        }
-
-        // Focus ring — dropped at very low zoom (dashes too small to read).
-        // Sits at r + 9 so it clears the duplicate halo at r + 7.
-        if (node.id === d.focusedNodeId && vp.scale >= DETAIL_REDUCE_SCALE) {
-          ctx.save()
-          ctx.strokeStyle = p.focusRingColor
-          ctx.lineWidth = 2
-          ctx.setLineDash([2, 2])
-          ctx.beginPath()
-          ctx.arc(sx, sy, r + 9, 0, Math.PI * 2)
-          ctx.stroke()
-          ctx.restore()
-        }
+        if (d.activeDupDefKeys.has(copyKeyOf(node))) edge = drawRing(ctx, sx, sy, edge, RING_WIDTH, fill, NO_DASH, 0.55)
+        if (d.selectedNodeIds.has(node.id)) edge = drawRing(ctx, sx, sy, edge, SELECTION_WIDTH, p.selectionRingColor, NO_DASH, nodeAlpha)
+        if (node.id === d.focusedNodeId) drawRing(ctx, sx, sy, edge, RING_WIDTH, p.focusRingColor, FOCUS_DASH, nodeAlpha)
+        ctx.restore()
 
         if (node.id === d.flashNode?.id) {
           const t = (performance.now() - d.flashNode.at) / FLASH_MS
@@ -1073,7 +1050,7 @@ export function GraphCanvas({
           const totalW = chips.reduce((s, c) => s + c.w, 0) + gap * (chips.length - 1)
           const rowY = sy - r - BADGE_NODE_GAP * mul - chipH
           let cx = sx - totalW / 2
-          ctx.globalAlpha = nodeDimmed ? dimAlpha : 1
+          ctx.globalAlpha = nodeAlpha
           for (const chip of chips) {
             roundRectPath(ctx, cx, rowY, chip.w, chipH, chipH / 2)
             ctx.fillStyle = p.badgeFill

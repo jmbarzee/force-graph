@@ -362,9 +362,13 @@ the console. Everything else is optional.
   the default, the view's `groups`. A key's `weight` swells its glow as a
   group's does; `groups` still drive the `GROUPS` filter and cohesion, and
   `toggle` writes `GROUPS` only while the glow follows them.
+  `coloring={{ ring }}` rings each keyed node in its key's colour by a
+  `Coloring`; a node's `ring: 'dashed'` dashes that ring, in its fill when
+  it has no key. A node's rings stack outward in one order, an absent one
+  leaving no gap: the ring, the copy halo, the selection, the focus.
 
   ```tsx
-  <GraphView graph={graph} taxonomy={taxonomy} coloring={{ fill: { by: 'axis', axis: 'team' }, glow: { by: 'axis', axis: 'site' } }} />
+  <GraphView graph={graph} taxonomy={taxonomy} coloring={{ fill: { by: 'axis', axis: 'team' }, glow: { by: 'axis', axis: 'site' }, ring: { by: 'axis', axis: 'tier' } }} />
   ```
 - **Inputs.** `counts` (chip badges; the graph's entity counts unless given,
   the copies of one `copyKey` once; `'faceted'` counts each axis under the
