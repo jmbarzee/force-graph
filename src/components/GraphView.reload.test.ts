@@ -2,23 +2,19 @@
 import React, { act } from 'react'
 import { createRoot } from 'react-dom/client'
 import { beforeEach, expect, it, vi } from 'vitest'
-import { GraphView } from './GraphView'
-import type { GraphViewHandle } from './GraphView'
+import { GraphView, type GraphViewHandle } from './GraphView'
 import { createTaxonomy } from '../graph/taxonomy'
 import type { Graph } from '../graph/model'
 import type { SimNode } from '../graph/simulation'
-import type { Viewport } from '../graph/viewport'
-import { DEFAULT_VIEWPORT } from '../graph/viewport'
+import { DEFAULT_VIEWPORT, type Viewport } from '../graph/viewport'
 import { frameView } from './graph-view/frame'
 
-// The canvas, reduced to the viewport it is handed.
 let viewport: Viewport = DEFAULT_VIEWPORT
 vi.mock('./GraphCanvas', () => ({
   GraphCanvas: (props: { viewport: Viewport }) => { viewport = props.viewport; return null },
 }))
 
 const area = { width: 800, height: 600 }
-// The loop's waiting frames, by id; `tick` runs them.
 let frames = new Map<number, FrameRequestCallback>()
 let nextFrame = 0
 beforeEach(() => {
@@ -35,7 +31,6 @@ beforeEach(() => {
   viewport = DEFAULT_VIEWPORT
 })
 
-/** Run the loop `n` ticks, or until it stops asking for another. */
 const tick = (n = Infinity) => act(async () => {
   for (let i = 0; i < n && frames.size; i++) {
     const due = [...frames.values()]
@@ -60,15 +55,18 @@ async function mount(start: Graph) {
     root.render(React.createElement(GraphView, { ref, graph, taxonomy, onSelectionChange: n => selections.push(n?.id ?? null) }))
   })
   await render(start)
-  return { ref, render, selections }
+  const frame = (ids: string[]) => {
+    const nodes = [...ref.current!.getPositions()].map(([id, p]) => ({ id, ...p }))
+    return frameView(viewport, { ids }, nodes as SimNode[], { ...area, overlay: 0 })
+  }
+  return { ref, render, selections, frame }
 }
 
 it('frames a graph that follows one that drew no node', async () => {
   const view = await mount(graphOf())
-  await tick()
   await view.render(first)
   await tick()
-  expect(viewport).not.toEqual(DEFAULT_VIEWPORT)
+  expect(view.frame(first.nodes.map(n => n.id))).toBe(viewport)
 })
 
 it('keeps the positions, the viewport and its selection over a reload', async () => {
@@ -95,8 +93,6 @@ it('carries a held frame over a reload, on the new graph\'s nodes among its ids'
   while (frames.size && viewport === DEFAULT_VIEWPORT) await tick(1)
   await view.render(grown)
   await tick(1)
-  const nodes = [...view.ref.current!.getPositions()].map(([id, p]) => ({ id, ...p }))
-  const frame = (ids: string[]) => frameView(viewport, { ids }, nodes as SimNode[], { ...area, overlay: 0 })
-  expect(frame(first.nodes.map(n => n.id))).toBe(viewport)
-  expect(frame(grown.nodes.map(n => n.id))).not.toBe(viewport)
+  expect(view.frame(first.nodes.map(n => n.id))).toBe(viewport)
+  expect(view.frame(grown.nodes.map(n => n.id))).not.toBe(viewport)
 })

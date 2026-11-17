@@ -462,9 +462,8 @@ export const GraphView = React.forwardRef<GraphViewHandle, GraphViewProps>(funct
   )
   const recentlyChanged = useRecentlyChanged(filter, valuesByAxis)
 
-  // The opening frame, on a sim rebuild after a drawing of no node; invoked
-  // from useSimulation's build effect, while `visibleNodesRef` still holds the
-  // last render's drawing. Any other rebuild keeps the user's pan and zoom.
+  // The opening frame, when a rebuild follows a drawing of no node: called
+  // from useSimulation's build effect, before the new simulation is drawn.
   const onSimRebuild = () => {
     if (visibleNodesRef.current.length === 0) requestFrame({ ids: graph.nodes.map(n => n.id), when: 'warm', hold: true })
   }

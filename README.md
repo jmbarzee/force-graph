@@ -560,9 +560,7 @@ What is not built is filed as issues:
   frame that leaves hidden neighbours out
   ([#26](https://github.com/jmbarzee/force-graph/issues/26)), the keyboard and
   accessibility model ([#7](https://github.com/jmbarzee/force-graph/issues/7)),
-  positions, viewport and selection kept across a live reload
-  ([#5](https://github.com/jmbarzee/force-graph/issues/5)), animated reveals
-  ([#8](https://github.com/jmbarzee/force-graph/issues/8)), an empty state
+  animated reveals ([#8](https://github.com/jmbarzee/force-graph/issues/8)), an empty state
   when the filter hides every node
   ([#6](https://github.com/jmbarzee/force-graph/issues/6)).
 - **The control panel** — named presets

@@ -40,8 +40,7 @@ export function useSimulation(
   // simulation is built; the previous simulation's positions take precedence
   // on a rebuild, so a graph update keeps the layout the user has.
   positions: ReadonlyMap<string, { x: number; y: number }> | undefined,
-  // Called after each (re)creation, so the camera can frame the new layout.
-  // Held in a ref so its changing identity never re-triggers the rebuild.
+  // Held in a ref, so a new identity each render never rebuilds.
   onRebuild: (() => void) | undefined,
   // The force parameters as the view's layout state holds them, and the
   // writer every change goes through — the host's, when it controls the layout.
