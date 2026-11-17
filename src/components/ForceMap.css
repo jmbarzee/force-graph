@@ -1,4 +1,5 @@
 /* Force map / force curves (spring + charge maps). */
+@layer gv {
 /* ── 2D force map + force curves (shared) ──────────────────────────────────
    The 2D map (control) and the force-curve viz (read-out), shared by both the
    Pull tab (spring map: split-colour edge tokens) and the Push tab (charge
@@ -122,4 +123,4 @@
 }
 
 .gv-spring-exp-label { color: var(--gv-color-text-muted); }
-
+}

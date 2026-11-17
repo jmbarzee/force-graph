@@ -1,4 +1,5 @@
 /* Graph view: overlay, bottom controls, tooltip, search, shortcuts. */
+@layer gv {
 /* === Graph View === */
 /* The pane fills what it is given: the remaining space of a flex column
    (flex: 1, free to shrink), or the whole of a block with a height (height:
@@ -209,7 +210,7 @@
   transform: translate(14px, -50%);
   background: var(--gv-color-surface);
   border: 1px solid var(--gv-color-border);
-  border-radius: 6px;
+  border-radius: var(--gv-radius);
   padding: 8px 10px;
   /* Interactive: the tooltip carries the host's cross-view button, so it must
      capture pointer events. A grace period in GraphView keeps it open while
@@ -448,4 +449,4 @@
   font-size: 11px;
   color: var(--gv-color-text-muted);
 }
-
+}

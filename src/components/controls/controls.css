@@ -1,4 +1,5 @@
 /* Control primitives: Slider + Plot. */
+@layer gv {
 /* ── Control primitives: Slider + Plot ──────────────────────────────────────
    Slider — the one uniform range input (horizontal rows/exp/x-gutter, vertical
    y-gutter). Plot — the shared layout shell for the node plot and band plot: a
@@ -82,4 +83,4 @@
   text-align: center;
   color: var(--gv-color-text-muted);
 }
-
+}

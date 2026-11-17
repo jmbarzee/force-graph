@@ -1,4 +1,5 @@
 /* The group legend: anchored under the bar inside the pane, in the pane's theme. */
+@layer gv {
 .gv-group-legend {
   color: var(--gv-color-text);
   position: absolute;
@@ -19,3 +20,4 @@ label.gv-group-legend-row { cursor: pointer; }
 .gv-group-legend-row.off .gv-group-legend-label { color: var(--gv-color-text-muted); }
 .gv-group-legend-swatch { width: 10px; height: 10px; border-radius: 50%; border: 1px solid var(--gv-color-border); flex: none; }
 .gv-group-legend-note { color: var(--gv-color-text-muted); font-size: 11px; }
+}
