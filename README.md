@@ -176,7 +176,9 @@ from axis to value, and an opaque `payload` the view never reads
 engine compares them and never parses one.
 
 - **Containment is a tree.** A node's `parentId` names its container; the view
-  derives the containment edge from it. An entity that sits in two containers
+  derives the containment edge from it. `validateGraph` names a cycle of
+  parents (`parent-cycle`), and the view clears the parent of its first node
+  in graph order. An entity that sits in two containers
   is two nodes sharing a `copyKey`: the library indexes the copies
   (`copyGroups`), draws their halo and counts them in the hover box. A host may
   list containment edges of its own between any two nodes.
