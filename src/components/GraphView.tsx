@@ -5,8 +5,8 @@ import React from 'react'
 import './GraphView.css'
 import { intensityAt, nodesById, isContainment, peakOf, seriesOf, unitWeight, windowOf, withContainmentEdges } from '../graph/model'
 import type { Graph, GraphEdge, GraphNode } from '../graph/model'
-import type { FilterState, AxisLocks } from '../filter/types'
-import { GROUPS, changedAxes, initialFilter, filterStatesEqual, hiddenMatchesOf, isEmptySelection, listEqual, locksEqual, reseedFilter, selectionFor, selectionsEqual, selects } from '../filter/types'
+import type { AxisSelection, FilterState, AxisLocks } from '../filter/types'
+import { GROUPS, changedAxes, initialFilter, filterStatesEqual, hiddenMatchesOf, isEmptySelection, listEqual, locksEqual, reseedFilter, selectionFor, selectionsEqual, selects, withSelection } from '../filter/types'
 import { reconcileFilter } from '../filter/reconcile'
 import { toggleValue } from '../filter/toggle'
 import { NO_OVERRIDES } from '../filter/linked'
@@ -782,10 +782,14 @@ export const GraphView = React.forwardRef<GraphViewHandle, GraphViewProps>(funct
     if (glowEntry === undefined) return { shown: () => true, emphasize: setEmphasizedGroup }
     const selection = selectionFor(filter, glowEntry)
     // An `emptyMeans: 'all'` axis with nothing selected shows every value.
-    const every = isEmptySelection(selection) && taxonomy.axisFor(glowEntry)?.emptyMeans === 'all'
+    const showsEvery = (s: AxisSelection) => isEmptySelection(s) && taxonomy.axisFor(glowEntry)?.emptyMeans === 'all'
     return {
-      shown: id => every || selects(selection, id),
-      toggle: filterWritable ? id => userWriteFilter(toggleValue(filterRef.current, glowEntry, id), [glowEntry]) : undefined,
+      shown: id => showsEvery(selection) || selects(selection, id),
+      toggle: filterWritable ? id => {
+        const f = filterRef.current
+        const next = showsEvery(selectionFor(f, glowEntry)) ? withSelection(f, glowEntry, { except: new Set([id]) }) : toggleValue(f, glowEntry, id)
+        userWriteFilter(next, [glowEntry])
+      } : undefined,
       emphasize: setEmphasizedGroup,
     }
   }, [glowEntry, filter, taxonomy, filterWritable, userWriteFilter, filterRef])

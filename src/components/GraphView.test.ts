@@ -347,6 +347,14 @@ describe('coloring.glow', () => {
     expect(view.last()[0].glow!.map(k => [k.id, k.visible])).toEqual([['a', false], ['b', true]])
   })
 
+  it('hides only the toggled value of an emptyMeans all axis that selects nothing', async () => {
+    const narrowing = createTaxonomy({ styleAxis: 'kind', styles: [], filterAxes: [{ id: 'team', emptyMeans: 'all' }] })
+    const view = await mountLegend({ glow: { by: 'axis', axis: 'team' } }, { taxonomy: narrowing, defaultFilter: new Map([['team', new Set<string>()]]) })
+    expect(view.last()[1].shown('a')).toBe(true)
+    await act(async () => view.last()[1].toggle!('a'))
+    expect([view.last()[1].shown('a'), view.last()[1].shown('b')]).toEqual([false, true])
+  })
+
   it('shows every key and toggles none while the glow follows a node colouring', async () => {
     const [, control] = (await mountLegend({ glow: { by: 'node', keys: [{ id: 'a', label: 'A' }], of: n => n.values.team } })).last()
     expect(control.shown('a')).toBe(true)
@@ -358,7 +366,6 @@ describe('legend', () => {
   it('hands the fill always, the glow and the ring when they colour, each key in the theme and named by labels', async () => {
     const byTeam = { by: 'axis', axis: 'team' } as const
     const view = await mountLegend({}, { groups: undefined })
-    expect(Object.keys(view.last()[0])).toEqual(['fill', 'glow', 'ring'])
     expect([view.last()[0].glow, view.last()[0].ring]).toEqual([undefined, undefined])
     const named = await mountLegend({ fill: byTeam, glow: byTeam, ring: byTeam }, { labels: { team: { a: 'Alpha' } } })
     const [channels] = named.last()

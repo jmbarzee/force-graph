@@ -395,7 +395,7 @@ the console. Everything else is optional.
   node wears it — and a `GroupsControl` over the glow's keys: `shown(id)`,
   `toggle(id)` while the filter is writable, which writes the entry the keys
   are values of as the bar writes an axis (`GROUPS` for the groups, the axis
-  for a filter axis, none for any other), and `emphasize(id | null)`;
+  for a filter axis the view shows, none for any other), and `emphasize(id | null)`;
   `ColorLegend` is one — the `channels`, the `control`, `titles` by channel
   ("Fill", "Glow", "Ring" by default), and `children`, the host's own
   controls, held above a section per channel, which scroll once the legend
