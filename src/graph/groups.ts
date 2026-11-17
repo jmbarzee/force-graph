@@ -71,7 +71,9 @@ export interface NodeGroup {
 
 /** One key of a set-shaped channel, in the order its palette slots follow. */
 export interface LegendKey {
+  /** What `of` answers for a node in this key's group. */
   id: string
+  /** The key's name in a legend. */
   label: string
   /** The key's colour, hex or rgb(); absent, the palette's slot for its place in `keys`. */
   color?: string
@@ -83,7 +85,9 @@ export interface LegendKey {
  * answers that `keys` does not declare is ignored and reported.
  */
 export interface DerivedGroups {
+  /** Every key, in palette order. */
   keys: readonly LegendKey[]
+  /** The keys a node belongs to, by `id`. */
   of: (node: GraphNode) => readonly string[]
 }
 
