@@ -49,10 +49,10 @@ const grown = graphOf('a', 'b', 'c', 'd')
 
 async function mount(start: Graph, defaultPositions?: ReadonlyMap<string, { x: number; y: number }>) {
   const ref = React.createRef<GraphViewHandle>()
-  const selections: (string | null)[] = []
+  const selections: string[] = []
   const root = createRoot(document.createElement('div'))
   const render = (graph: Graph) => act(async () => {
-    root.render(React.createElement(GraphView, { ref, graph, taxonomy, defaultPositions, onSelectionChange: n => selections.push(n?.id ?? null) }))
+    root.render(React.createElement(GraphView, { ref, graph, taxonomy, defaultPositions, onSelectionChange: n => selections.push(n.map(x => x.id).join()) }))
   })
   await render(start)
   const frame = (ids: string[]) => {
@@ -84,7 +84,7 @@ it('keeps the positions, the viewport and its selection over a reload', async ()
   expect(view.selections).toEqual(['a'])
 
   await view.render(graphOf('b', 'c'))
-  expect(view.selections).toEqual(['a', null])
+  expect(view.selections).toEqual(['a', ''])
 })
 
 it('carries a held frame over a reload, on the new graph\'s nodes among its ids', async () => {

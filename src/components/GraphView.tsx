@@ -6,7 +6,7 @@ import './GraphView.css'
 import { intensityAt, nodesById, isContainment, peakOf, seriesOf, unitWeight, windowOf, withContainmentEdges } from '../graph/model'
 import type { Graph, GraphEdge, GraphNode } from '../graph/model'
 import type { FilterState, AxisLocks } from '../filter/types'
-import { GROUPS, changedAxes, initialFilter, filterStatesEqual, hiddenMatchesOf, listEqual, locksEqual, reseedFilter, selectionFor, selects } from '../filter/types'
+import { GROUPS, changedAxes, initialFilter, filterStatesEqual, hiddenMatchesOf, listEqual, locksEqual, reseedFilter, selectionFor, selectionsEqual, selects } from '../filter/types'
 import { reconcileFilter } from '../filter/reconcile'
 import { toggleValue } from '../filter/toggle'
 import { NO_OVERRIDES } from '../filter/linked'
@@ -191,14 +191,15 @@ export interface GraphViewProps {
   /** The search field's placeholder, for a host with its own words. */
   searchPlaceholder?: string
   /**
-   * The selected node, when the host controls the selection: the view shows
-   * this and nothing else while it is defined. A selection the user makes
-   * arrives through `onSelectionChange`; the host answers by setting this, or
-   * does not. Absent, the view keeps the selection itself.
+   * The selected nodes, when the host controls the selection: the view shows
+   * these and nothing else while it is defined, the empty set none. Compared
+   * by value, so a set rebuilt each render is no change. A selection the user
+   * makes arrives through `onSelectionChange`; the host answers by setting
+   * this, or does not. Absent, the view keeps the selection itself.
    */
-  selectedId?: string | null
+  selectedIds?: ReadonlySet<string>
   /** Where the view's own selection starts when the host does not control it. Read once. */
-  defaultSelectedId?: string | null
+  defaultSelectedIds?: ReadonlySet<string>
   /**
    * A request to reveal, frame and select a node — the declarative form of
    * the handle's `focusNode`. Compared by value: a new `id` or `key` is a new
@@ -305,13 +306,13 @@ export interface GraphViewProps {
   defaultPlayhead?: number | null
 
   /**
-   * The selection the user made — a click, Enter, Escape, a search pick, a
-   * focus landing, the handle — as the host's own node, or null when they
-   * cleared it. Not called for a change the host made through `selectedId`.
-   * When the view keeps the selection itself, also null when the selected
-   * node leaves the graph.
+   * The selection the user made — a click, a lasso, Enter, Escape, a search
+   * pick, a focus landing, the handle — as the host's own nodes in the order
+   * they were selected, empty when they cleared it. Not called for a change
+   * the host made through `selectedIds`. When the view keeps the selection
+   * itself, also when selected nodes leave the graph, with those that remain.
    */
-  onSelectionChange?: (node: GraphNode | null) => void
+  onSelectionChange?: (nodes: readonly GraphNode[]) => void
   /** The graph's diagnostics, whenever they are recomputed — the first graph's included, and an empty list is a call. */
   onDiagnostics?: (diagnostics: readonly GraphDiagnostic[]) => void
   /** A node double-clicked. */
@@ -327,6 +328,13 @@ export interface GraphViewProps {
 }
 
 const NO_GROUPS: readonly NodeGroup[] = []
+const NO_SELECTION: ReadonlySet<string> = new Set()
+
+/** The ids of `selection` the graph holds, in order: `selection` itself when it holds them all. */
+function heldBy(selection: ReadonlySet<string>, hostIndex: ReadonlyMap<string, GraphNode>): ReadonlySet<string> {
+  const held = [...selection].filter(id => hostIndex.has(id))
+  return held.length === selection.size ? selection : new Set(held)
+}
 
 /**
  * The graph view: the host's `Graph`, laid out by forces, filtered by the
@@ -351,7 +359,7 @@ export const GraphView = React.forwardRef<GraphViewHandle, GraphViewProps>(funct
   chrome,
   searchTitle = 'Search nodes (/)',
   searchPlaceholder = 'Search nodes...',
-  selectedId, defaultSelectedId = null,
+  selectedIds, defaultSelectedIds = NO_SELECTION,
   focus,
   onFocusResult,
   className,
@@ -706,35 +714,49 @@ export const GraphView = React.forwardRef<GraphViewHandle, GraphViewProps>(funct
     [visibleNodes, sprung, resolved, taxonomy, getSimNode],
   )
 
-  // The selection: the host's while `selectedId` is defined, the view's own
-  // otherwise. Everything the user does to it — a click, Enter, Escape, a
-  // search pick, a focus landing, the handle — goes through `requestSelect`,
-  // which tells the host of a change and, when the view owns the state,
-  // applies it; a host that controls the selection answers by setting the
-  // prop, or does not.
-  const controlledSelection = selectedId !== undefined
-  useControlledWarning('selectedId', controlledSelection)
-  const [ownSelected, setOwnSelected] = React.useState<string | null>(defaultSelectedId)
-  const selectedNodeId = controlledSelection ? selectedId : ownSelected
-  const selectedRef = useLatest(selectedNodeId)
+  // The selection: the host's while `selectedIds` is defined, the view's own
+  // otherwise, in the order its nodes were selected. An id the graph does not
+  // hold is not selected, so what the view shows and what it reports never
+  // disagree. Everything the user does to it — a click, a lasso, Enter,
+  // Escape, a search pick, a focus landing, the handle — goes through
+  // `requestSelect`, which tells the host of a change and, when the view owns
+  // the state, applies it; a host that controls the selection answers by
+  // setting the prop, or does not.
+  const controlledSelection = selectedIds !== undefined
+  useControlledWarning('selectedIds', controlledSelection)
+  const [ownSelected, setOwnSelected] = React.useState(defaultSelectedIds)
+  const rawSelected = useStable(controlledSelection ? selectedIds : ownSelected, selectionsEqual)
+  const selected = React.useMemo(() => heldBy(rawSelected, hostIndex), [rawSelected, hostIndex])
+  const selectedRef = useLatest(selected)
   const onSelectionChangeRef = useLatest(onSelectionChange)
   // Read through refs so the callback never goes stale: the physics loop
   // holds it across renders, and a focus landing after a graph change must
-  // report the new graph's node, not the one the loop was created with.
+  // report the new graph's nodes, not the ones the loop was created with.
   const hostIndexRef = useLatest(hostIndex)
-  const requestSelect = React.useCallback((next: string | null) => {
-    // An id the graph does not hold is not a selection: ignored, so what the
-    // view shows and what it reports never disagree.
-    if (next !== null && !hostIndexRef.current.has(next)) return
-    if (!controlledSelection) setOwnSelected(next)
-    if (next !== selectedRef.current) onSelectionChangeRef.current?.(next === null ? null : hostIndexRef.current.get(next) ?? null)
+  const requestSelect = React.useCallback((next: ReadonlySet<string>) => {
+    const held = heldBy(next, hostIndexRef.current)
+    if (!controlledSelection) setOwnSelected(held)
+    if (!selectionsEqual(held, selectedRef.current)) onSelectionChangeRef.current?.([...held].map(id => hostIndexRef.current.get(id)!))
   }, [controlledSelection, hostIndexRef, selectedRef, onSelectionChangeRef])
-  // The view's own selection does not outlive its node: a graph that no
-  // longer holds it clears the selection, and the host hears the null.
+  // A plain click: that node alone, or none with null. An id the graph does
+  // not hold is ignored.
+  const selectOnly = React.useCallback((id: string | null) => {
+    if (id === null) requestSelect(NO_SELECTION)
+    else if (hostIndexRef.current.has(id)) requestSelect(new Set([id]))
+  }, [requestSelect, hostIndexRef])
+  const handleSelectNode = React.useCallback((id: string | null, additive: boolean) => {
+    if (!additive || id === null) return selectOnly(id)
+    const next = new Set(selectedRef.current)
+    if (!next.delete(id)) next.add(id)
+    requestSelect(next)
+  }, [selectOnly, requestSelect, selectedRef])
+  const handleLassoSelect = React.useCallback((ids: string[]) => requestSelect(new Set([...selectedRef.current, ...ids])), [requestSelect, selectedRef])
+  // The view's own selection does not outlive its nodes: a graph that no
+  // longer holds some drops them, and the host hears those that remain.
   React.useEffect(() => {
-    if (controlledSelection || ownSelected === null || hostIndex.has(ownSelected)) return
-    setOwnSelected(null)
-    onSelectionChangeRef.current?.(null)
+    if (controlledSelection || selected === rawSelected) return
+    setOwnSelected(selected)
+    onSelectionChangeRef.current?.([...selected].map(id => hostIndex.get(id)!))
   }, [hostIndex]) // eslint-disable-line react-hooks/exhaustive-deps
 
   // Hover / keyboard-focus / shift + control-panel preview state, plus the
@@ -749,7 +771,7 @@ export const GraphView = React.forwardRef<GraphViewHandle, GraphViewProps>(funct
     activePushBucket, setActivePushBucket,
     activeGravityBucket, setActiveGravityBucket,
     activePullEdge, setActivePullEdge,
-  } = useHighlight(visibleNodes, visibleEdges, visibleIds, undirected, getSimNode, graph, taxonomy, selectedNodeId, hostIndex)
+  } = useHighlight(visibleNodes, visibleEdges, visibleIds, undirected, getSimNode, graph, taxonomy, selected, hostIndex)
 
   const hiddenBy = React.useMemo(() => hiddenByOf(graph.nodes, filter, groupsOf), [graph, filter, groupsOf])
 
@@ -771,8 +793,8 @@ export const GraphView = React.forwardRef<GraphViewHandle, GraphViewProps>(funct
   // moves. The modal keeps the un-boosted activeGroups (its legend colors don't
   // depend on strength).
   const glowGroups = React.useMemo(
-    () => boostGroupsForNodes(activeGroups, [hoveredNodeId, selectedNodeId]),
-    [activeGroups, hoveredNodeId, selectedNodeId],
+    () => boostGroupsForNodes(activeGroups, [hoveredNodeId, ...selected]),
+    [activeGroups, hoveredNodeId, selected],
   )
 
   // Search matches against all nodes (not just visible). When search is
@@ -800,7 +822,7 @@ export const GraphView = React.forwardRef<GraphViewHandle, GraphViewProps>(funct
     onSettled: () => onSettledRef.current?.(positions()),
     visibleIds, downstreamScores,
     filter, axes: filterAxes, groupsOf,
-    hoveredNodeId, selectedNodeId,
+    hoveredNodeId,
     requestFrame, tickFrame, releaseFrame, taxonomy,
   })
 
@@ -863,7 +885,7 @@ export const GraphView = React.forwardRef<GraphViewHandle, GraphViewProps>(funct
 
   // Select node from search result
   const handleSelectSearchResult = (nodeId: string) => {
-    requestSelect(nodeId)
+    selectOnly(nodeId)
     requestFrame({ ids: [nodeId], minScale: 0 })
   }
 
@@ -872,7 +894,7 @@ export const GraphView = React.forwardRef<GraphViewHandle, GraphViewProps>(funct
   const settle = React.useCallback((id: string, request: FocusRequest | undefined, shown: boolean) => {
     if (request) onFocusResultRef.current?.(request, shown)
     if (!shown) return
-    requestSelect(id)
+    selectOnly(id)
     // Read at each frame, so the neighbors the widened filter draws count.
     const neighborhood = { [Symbol.iterator]: () => neighborhoodOf(id, visibleEdgesRef.current).values() }
     requestFrame({ ids: neighborhood, when: 'next', hold: true, released: () => setFlashNode({ id, at: performance.now() }) })
@@ -880,7 +902,7 @@ export const GraphView = React.forwardRef<GraphViewHandle, GraphViewProps>(funct
       simRef.current?.reheat(0.1)
       setRunning(true)
     }
-  }, [onFocusResultRef, running, setRunning, simRef, requestFrame, requestSelect, visibleEdgesRef])
+  }, [onFocusResultRef, running, setRunning, simRef, requestFrame, selectOnly, visibleEdgesRef])
   const waitRef = React.useRef<{ id: string; request?: FocusRequest; from: FilterState } | null>(null)
   const focusNodeById = React.useCallback((id: string, request?: FocusRequest): boolean => {
     const waiting = waitRef.current
@@ -947,7 +969,7 @@ export const GraphView = React.forwardRef<GraphViewHandle, GraphViewProps>(funct
   }, [landing]) // eslint-disable-line react-hooks/exhaustive-deps
   React.useImperativeHandle(ref, () => ({
     focusNode: (id: string) => focusNodeById(id),
-    select: requestSelect,
+    select: selectOnly,
     fit: handleFitToView,
     getPositions: positions,
     setPositions: (next: ReadonlyMap<string, Position>) => {
@@ -966,7 +988,7 @@ export const GraphView = React.forwardRef<GraphViewHandle, GraphViewProps>(funct
       const next = fn(prev)
       if (!filterStatesEqual(prev, next)) userWriteFilter(next, changedAxes(prev, next))
     },
-  }), [focusNodeById, handleFitToView, setRunning, requestSelect, simRef, filterRef, userWriteFilter])
+  }), [focusNodeById, handleFitToView, setRunning, selectOnly, simRef, filterRef, userWriteFilter])
 
   // Keyboard, scoped by `keyboard`: on the pane, the focusable root
   // handles the keys that reach it; globally, the window does — a tab shell
@@ -1002,7 +1024,7 @@ export const GraphView = React.forwardRef<GraphViewHandle, GraphViewProps>(funct
       }
       case 'Enter': {
         e.preventDefault()
-        if (focusedNodeId) requestSelect(focusedNodeId)
+        if (focusedNodeId) selectOnly(focusedNodeId)
         break
       }
       case 'Escape': {
@@ -1010,7 +1032,7 @@ export const GraphView = React.forwardRef<GraphViewHandle, GraphViewProps>(funct
         // host's. With nothing left to close, the pane gives focus back.
         if (shortcutsOpen) { e.preventDefault(); setShortcutsOpen(false); break }
         if (searchActive) { e.preventDefault(); toggleSearch(); break }
-        if (selectedNodeId) { e.preventDefault(); requestSelect(null); break }
+        if (selected.size > 0) { e.preventDefault(); selectOnly(null); break }
         if (keyboard === 'pane') containerRef.current?.blur()
         break
       }
@@ -1066,7 +1088,7 @@ export const GraphView = React.forwardRef<GraphViewHandle, GraphViewProps>(funct
         break
       }
     }
-  }, [keyboard, visibleNodes, focusedNodeId, selectedNodeId, requestSelect, searchActive, searchQuery, setSearch, shortcutsOpen, show.search, show.shortcuts, handleFitToView, handleToggleRunning]) // eslint-disable-line react-hooks/exhaustive-deps
+  }, [keyboard, visibleNodes, focusedNodeId, selected, selectOnly, searchActive, searchQuery, setSearch, shortcutsOpen, show.search, show.shortcuts, handleFitToView, handleToggleRunning]) // eslint-disable-line react-hooks/exhaustive-deps
   React.useEffect(() => {
     if (keyboard !== 'global') return
     window.addEventListener('keydown', handleKey)
@@ -1113,13 +1135,14 @@ export const GraphView = React.forwardRef<GraphViewHandle, GraphViewProps>(funct
             onDoubleClickNode={handleDoubleClickNode}
             onFitView={handleFitToView}
             onHoverNode={handleHoverNode}
-            onSelectNode={requestSelect}
+            onSelectNode={handleSelectNode}
+            onLassoSelect={handleLassoSelect}
             highlightedNodes={highlightedNodes}
             highlightedEdges={highlightedEdges}
             hoveredNodeId={hoveredNodeId}
             hoveredEdgeId={shownEdge?.id ?? null}
             onHoverEdge={handleHoverEdge}
-            selectedNodeId={selectedNodeId}
+            selectedNodeIds={selected}
             focusedNodeId={focusedNodeId}
             flashNode={flashNode}
             searchMatchIds={visibleMatchIds}

@@ -267,7 +267,7 @@ the console. Everything else is optional.
   callback to control it, neither to let the view keep it, the callback alone
   to be told; and each has a `default*` prop for where the view's own starts
   (`defaultFilter`, `defaultLocks`, `defaultAxes`, `defaultSearch`,
-  `defaultTheme`, `defaultSelectedId`, `defaultTuning`, `defaultPlayhead`),
+  `defaultTheme`, `defaultSelectedIds`, `defaultTuning`, `defaultPlayhead`),
   read once. A controlled value is the host's: the view never rewrites it,
   and warns once if the prop flips between defined and undefined.
   `initialFilter(taxonomy, graph)` is the filter the view starts from — an
@@ -309,15 +309,17 @@ the console. Everything else is optional.
   const labels = { login: { ada: 'Ada Lovelace', gh: 'Grace Hopper' } }
   <GraphView graph={graph} labels={labels} />
   ```
-- **Selection and focus.** `selectedId` controls the selection: while it is
-  defined the view shows it and nothing else, `onSelectionChange` reports the
-  selections the user makes (never one the host made), and the host answers
-  by setting the prop, or not. Absent, the view keeps the selection and still
-  reports. `focus={{ id, key }}` reveals, frames and selects a node — the
-  declarative form of the handle's `focusNode`, for a pane that mounts lazily
-  or whose data arrives late. It is compared by value, so a new `id` or `key`
-  is a new request; it waits until its node is in the graph, and, when the
-  filter must widen, until the filter the host passes back shows the node;
+- **Selection and focus.** `selectedIds` controls the selection, a set
+  compared by value, the empty set none: while it is defined the view shows
+  it and nothing else, `onSelectionChange` reports the selections the user
+  makes (never one the host made), and the host answers by setting the prop,
+  or not. Absent, the view keeps the selection and still reports. A click
+  selects a node alone, Ctrl/Meta+click adds or removes one, and a
+  Ctrl/Meta+drag from the background lassoes. `focus={{ id, key }}` reveals,
+  frames and selects a node — the declarative form of the handle's
+  `focusNode`, for a pane that mounts lazily or whose data arrives late. It
+  is compared by value, so a new `id` or `key` is a new request; it waits
+  until its node is in the graph, and, when the filter must widen, until the filter the host passes back shows the node;
   and `onFocusResult(request, shown)` says whether it did. Null, or a newer
   request, withdraws a waiting one unreported.
   `useFocusRequest()` gives a host the request and a `requestFocus(id)` that
@@ -402,8 +404,8 @@ the console. Everything else is optional.
   holds keeps its place; one covering every node opens at rest, unsettled:
   hand back what `onSettled` kept, or call `setPositions` to settle from
   rough positions).
-- **Outputs.** `onSelectionChange(node | null)`, `onNodeActivate(node)` on a
-  double-click, `onHover(node | null)`, `onEdgeHover(edge | null)` for the
+- **Outputs.** `onSelectionChange(nodes)` in the order they were selected,
+  `onNodeActivate(node)` on a double-click, `onHover(node | null)`, `onEdgeHover(edge | null)` for the
   edge under the pointer while no node is, `onThemeResolved(theme)`,
   `onDiagnostics(diagnostics)` whenever the graph's defects are recomputed
   (the first graph's included), `onTuningChange(tuning)`,
@@ -420,8 +422,8 @@ the console. Everything else is optional.
   then flashes the node — and answers at once
   whether a filter can show the node (a value absent on a hiding axis cannot
   be revealed); a widening frames and selects once the filter shows it;
-  `select(id | null)` sets or clears the selection; `fit()` frames
-  the visible set; `getPositions()` and `setPositions()` carry a layout out
+  `select(id | null)` selects a node alone, or clears the selection; `fit()`
+  frames the visible set; `getPositions()` and `setPositions()` carry a layout out
   and back in, as `onSettled` and `defaultPositions` do across a reload;
   `updateFilter(fn)` rewrites the filter, the axes `fn` changes counting as
   the user's.

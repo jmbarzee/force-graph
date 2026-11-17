@@ -22,10 +22,15 @@ import type { EdgeStroke } from '../graph/scheme'
 const drawn = vi.hoisted(() => ({
   strokes: new Map<{ id: string }, EdgeStroke>(), simulations: [] as object[],
   hover: (_id: string | null) => {}, hoverEdge: (_hover: { id: string; x: number; y: number } | null) => {}, hoveredEdgeId: null as string | null,
+  select: (_id: string | null, _additive: boolean) => {}, lasso: (_ids: string[]) => {}, selected: new Set<string>() as ReadonlySet<string>,
 }))
 vi.mock('./GraphCanvas', () => ({
-  GraphCanvas: (props: { edgeStrokes: typeof drawn.strokes; onHoverNode: typeof drawn.hover; onHoverEdge: typeof drawn.hoverEdge; hoveredEdgeId: string | null }) => {
+  GraphCanvas: (props: {
+    edgeStrokes: typeof drawn.strokes; onHoverNode: typeof drawn.hover; onHoverEdge: typeof drawn.hoverEdge; hoveredEdgeId: string | null
+    onSelectNode: typeof drawn.select; onLassoSelect: typeof drawn.lasso; selectedNodeIds: ReadonlySet<string>
+  }) => {
     drawn.strokes = props.edgeStrokes; drawn.hover = props.onHoverNode; drawn.hoverEdge = props.onHoverEdge; drawn.hoveredEdgeId = props.hoveredEdgeId
+    drawn.select = props.onSelectNode; drawn.lasso = props.onLassoSelect; drawn.selected = props.selectedNodeIds
     return null
   },
 }))
@@ -370,5 +375,50 @@ describe('edge hover', () => {
     await mount({ onEdgeHover }, graph)
     await act(async () => drawn.hoverEdge({ id: 'in:n1', x: 0, y: 0 }))
     expect(onEdgeHover).toHaveBeenLastCalledWith({ id: 'in:n1', sourceId: 'n1', targetId: 'n0', relation: 'containment' })
+  })
+})
+
+describe('selection', () => {
+  const three = graphOf(['a', 'x'], ['b', 'y'], ['c', 'x'])
+  const idsOf = (nodes: readonly GraphNode[]) => nodes.map(n => n.id)
+
+  it('selects alone on a click, toggles on Ctrl/Meta+click, adds a lasso, and clears on the background', async () => {
+    const reported: string[][] = []
+    await mount({ onSelectionChange: nodes => reported.push(idsOf(nodes)) }, three)
+    await act(async () => drawn.select('n1', false))
+    await act(async () => drawn.select('n0', true))
+    await act(async () => drawn.lasso(['n0', 'n2']))
+    expect(drawn.selected).toEqual(new Set(['n1', 'n0', 'n2']))
+    await act(async () => drawn.select('n0', true))
+    await act(async () => drawn.select('n2', false))
+    await act(async () => drawn.select(null, false))
+    expect(reported).toEqual([['n1'], ['n1', 'n0'], ['n1', 'n0', 'n2'], ['n1', 'n2'], ['n2'], []])
+    expect(drawn.selected).toEqual(new Set())
+  })
+
+  it('reports the nodes a reload keeps of its own selection', async () => {
+    const reported: string[][] = []
+    const view = await mount({ defaultSelectedIds: new Set(['n0', 'n1']), onSelectionChange: nodes => reported.push(idsOf(nodes)) }, three)
+    expect(reported).toEqual([])
+    await view.render(graphOf(['a', 'x']))
+    expect(reported).toEqual([['n0']])
+    expect(drawn.selected).toEqual(new Set(['n0']))
+  })
+
+  it("reports nothing for the host's own change, and the user's through the handle", async () => {
+    const ref = React.createRef<GraphViewHandle>()
+    const reported: string[][] = []
+    const root = newRoot(document.createElement('div'))
+    const render = (selectedIds: ReadonlySet<string>) => act(async () => {
+      root.render(React.createElement(GraphView, { ref, graph: three, taxonomy, selectedIds, onSelectionChange: nodes => reported.push(idsOf(nodes)) }))
+    })
+    await render(new Set(['n0']))
+    await render(new Set(['n0', 'n2']))
+    const shown = drawn.selected
+    await render(new Set(['n0', 'n2']))
+    expect(drawn.selected).toBe(shown)
+    await act(async () => ref.current!.select('n1'))
+    expect(reported).toEqual([['n1']])
+    expect(drawn.selected).toEqual(new Set(['n0', 'n2']))
   })
 })

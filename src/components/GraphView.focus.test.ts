@@ -50,10 +50,10 @@ const defaultPositions = new Map([['a', { x: 0, y: 0 }], ['b', { x: 100, y: 0 }]
 
 async function mount() {
   const ref = React.createRef<GraphViewHandle>()
-  const selections: (string | null)[] = []
+  const selections: string[] = []
   const root = createRoot(document.createElement('div'))
   await act(async () => {
-    root.render(React.createElement(GraphView, { ref, graph, taxonomy, defaultPositions, onSelectionChange: n => selections.push(n?.id ?? null) }))
+    root.render(React.createElement(GraphView, { ref, graph, taxonomy, defaultPositions, onSelectionChange: n => selections.push(n.map(x => x.id).join()) }))
   })
   await tick()
   const frame = (ids: string[]) => {
@@ -106,7 +106,7 @@ async function host() {
       ref, graph: staff, taxonomy: teams, filter, focus,
       onFilterChange: (...ask) => asks.push(ask),
       onFocusResult: (request, shown) => events.push(`${request.key}:${shown}`),
-      onSelectionChange: n => events.push(`select:${n?.id}`),
+      onSelectionChange: n => events.push(`select:${n.map(x => x.id)}`),
     }))
   })
   await render(hidesN0)
@@ -184,10 +184,10 @@ it("marks the handle's widening with the node's id", async () => {
 
 it('lands a widening on the filter the view keeps itself', async () => {
   const ref = React.createRef<GraphViewHandle>()
-  const selections: (string | null)[] = []
+  const selections: string[] = []
   await act(async () => {
     createRoot(document.createElement('div')).render(React.createElement(GraphView, {
-      ref, graph: staff, taxonomy: teams, defaultFilter: hidesN0, onSelectionChange: n => selections.push(n?.id ?? null),
+      ref, graph: staff, taxonomy: teams, defaultFilter: hidesN0, onSelectionChange: n => selections.push(n.map(x => x.id).join()),
     }))
   })
   await act(async () => { ref.current!.focusNode('n0') })

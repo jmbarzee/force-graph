@@ -30,8 +30,8 @@ export function useControllable<T>(
 /**
  * Says once, on the console, when a prop goes from defined to undefined or
  * back after the mount: the view then switches between the host's value and
- * its own, which is never what the host meant (`selectedId={sel?.id}` for a
- * selection that may be empty — `sel?.id ?? null` keeps it controlled).
+ * its own, which is never what the host meant (`playhead={at}` for a
+ * playhead that may be unset — `at ?? null` keeps it controlled).
  */
 export function useControlledWarning(name: string, controlled: boolean): void {
   const wasRef = React.useRef(controlled)
