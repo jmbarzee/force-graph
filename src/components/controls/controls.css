@@ -73,3 +73,11 @@
 .gv-ctl-plot-bottom { grid-area: bottom; display: flex; flex-direction: column; row-gap: 2px; }
 .gv-ctl-plot-xlabel { color: var(--gv-color-text-muted); text-align: center; }
 
+/* In place of a map or plot whose axis the visible set leaves empty. */
+.gv-ctl-nothing-visible {
+  margin: 10px 0;
+  padding: 24px 8px;
+  text-align: center;
+  color: var(--gv-color-text-muted);
+}
+

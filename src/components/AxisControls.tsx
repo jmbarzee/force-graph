@@ -13,6 +13,7 @@ import { bandRangeFor, isScalarAxis } from '../graph/forces'
 import { useTaxonomy } from './graph-view/useTaxonomy'
 import { bucketColor } from './controls/bucketColor'
 import { Plot } from './controls/Plot'
+import { NothingVisible } from './controls/NothingVisible'
 import { Slider } from './controls/Slider'
 import { Equation } from './controls/Equation'
 import { FormulaValue } from './controls/PopContext'
@@ -126,7 +127,8 @@ export function AxisControls({ axis, params, resolved, axes, present, onParamCha
         {ignored && <span className="gv-axis-note">ignored in radial</span>}
       </div>
 
-      {/* The resolved axis decides the kind; the tuning is narrowed to match, loudly. */}
+      {/* The resolved axis decides the kind; the tuning is narrowed to match, loudly.
+          A scalar's gradient needs no visible node; a mapping's columns do. */}
       {isScalarAxis(table) ? (
         <ScalarPlot
           axis={axis}
@@ -138,6 +140,8 @@ export function AxisControls({ axis, params, resolved, axes, present, onParamCha
           onStrength={v => onParamChange(strengthPatch(axis, v))}
           onSpan={span => onParamChange(tuningPatch(axis, { scalar: table.scalar.id, span }))}
         />
+      ) : present.size === 0 ? (
+        <NothingVisible />
       ) : (
         <AxisPlot
           axis={axis}

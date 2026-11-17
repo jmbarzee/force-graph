@@ -130,7 +130,10 @@ lights the global slider it names. Every control is live.
 **A control offers what the visible set holds**: a push token per bucket a
 visible node falls in, a pull token per spring category a sprung edge falls in,
 a column per bucket on each layout axis. Hiding a chip removes its tokens and
-keeps their tuning for when they return. The axis dropdowns alone measure the
+keeps their tuning for when they return. A push or pull map with its curves, or
+a layout axis's band plot, that the visible set leaves empty gives way to one
+line, "Nothing visible on this axis — turn a chip on."; the equation stays. The
+axis dropdowns alone measure the
 whole graph, so an axis's availability never flips with a filter.
 
 **The token ceiling is 24** push tokens and 24 pull tokens. The push axis
