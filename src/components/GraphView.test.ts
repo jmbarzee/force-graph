@@ -1,7 +1,7 @@
 // @vitest-environment jsdom
 import React, { act } from 'react'
 import { createRoot } from 'react-dom/client'
-import { beforeEach, expect, it } from 'vitest'
+import { beforeEach, expect, it, vi } from 'vitest'
 import { GraphView } from './GraphView'
 import type { GraphViewHandle } from './GraphView'
 import { createTaxonomy } from '../graph/taxonomy'
@@ -14,6 +14,20 @@ import { GROUPS, initialFilter, selectionFor, withSelection } from '../filter/ty
 import { GroupLegend } from './GroupLegend'
 import type { ActiveGroup, NodeGroup } from '../graph/groups'
 import { PALETTE } from '../graph/scheme'
+import type { EdgeStroke } from '../graph/scheme'
+
+// What the canvas was last handed, and every simulation the view built.
+const drawn = vi.hoisted(() => ({ strokes: new Map<{ id: string }, EdgeStroke>(), simulations: [] as object[] }))
+vi.mock('./GraphCanvas', () => ({
+  GraphCanvas: (props: { edgeStrokes: typeof drawn.strokes }) => { drawn.strokes = props.edgeStrokes; return null },
+}))
+vi.mock('../graph/simulation', async importOriginal => {
+  const actual = await importOriginal<typeof import('../graph/simulation')>()
+  class Simulation extends actual.Simulation {
+    constructor(...args: ConstructorParameters<typeof actual.Simulation>) { super(...args); drawn.simulations.push(this) }
+  }
+  return { ...actual, Simulation }
+})
 
 beforeEach(() => {
   ;(globalThis as { IS_REACT_ACT_ENVIRONMENT?: boolean }).IS_REACT_ACT_ENVIRONMENT = true
@@ -130,4 +144,60 @@ it("runs a layout scalar's compute once per edit, for the panel, the overlay and
   computed = 0
   await render(tuningAt(2))
   expect(computed).toBe(1)
+})
+
+// Two edges over two buckets: `a` peaks the graph at 4; `b` has no series.
+const played: Graph = {
+  ...graphOf(['a', 'x'], ['b', 'y']),
+  window: { since: 0, until: 2 * 86_400_000, buckets: 2 },
+  edges: [{ id: 'a', sourceId: 'n0', targetId: 'n1', weight: 1, series: [0, 4] }, { id: 'b', sourceId: 'n1', targetId: 'n0', weight: 0.5 }],
+}
+const strokeOf = (id: string) => [...drawn.strokes].find(([edge]) => edge.id === id)![1]
+
+it('strokes an edge at the playhead by its series over the peak, and leaves the simulation be', async () => {
+  const onPlayheadChange = vi.fn()
+  const root = createRoot(document.createElement('div'))
+  const render = (playhead: number | null) => act(async () => {
+    root.render(React.createElement(GraphView, { graph: played, taxonomy, playhead, onPlayheadChange }))
+  })
+  await render(null)
+  const built = drawn.simulations.length
+  expect(strokeOf('a').width).toBeCloseTo(2.4)
+  expect(strokeOf('a').alpha).toBeCloseTo(0.7)
+  await render(0.5)
+  expect(strokeOf('a').width).toBeCloseTo(1.2 * 1.5)
+  expect(strokeOf('a').alpha).toBeCloseTo(0.7 * 0.5)
+  expect(strokeOf('b').width).toBeCloseTo(1.2 * 1.5)
+  await render(7)
+  expect(strokeOf('a').alpha).toBeCloseTo(0.7)
+  expect(drawn.simulations.length).toBe(built)
+  expect(onPlayheadChange).not.toHaveBeenCalled()
+})
+
+it('keeps its own playhead from defaultPlayhead, moved by the scrubber', async () => {
+  const onPlayheadChange = vi.fn()
+  const view = await mount({ defaultPlayhead: 0, onPlayheadChange }, played)
+  expect(strokeOf('a').alpha).toBe(0)
+  await act(async () => view.el.querySelector<HTMLButtonElement>('[aria-label="Whole window"]')!.click())
+  expect(onPlayheadChange).toHaveBeenLastCalledWith(null)
+  expect(strokeOf('a').alpha).toBeCloseTo(0.7)
+})
+
+it('shows no scrubber for a graph without a window, or when chrome turns it off', async () => {
+  expect((await mount({}, played)).el.querySelector('.gv-scrubber')).not.toBeNull()
+  expect((await mount({ chrome: { scrubber: false } }, played)).el.querySelector('.gv-scrubber')).toBeNull()
+  expect((await mount({}, { ...played, window: undefined })).el.querySelector('.gv-scrubber')).toBeNull()
+})
+
+it('reads a new graph as unchanged only when its window and series are', async () => {
+  const warn = vi.spyOn(console, 'warn').mockImplementation(() => {})
+  const said = () => warn.mock.calls.some(([m]) => String(m).includes('nothing in it did'))
+  const view = await mount({}, played)
+  await view.render({ ...played, window: { ...played.window! }, edges: played.edges.map(e => ({ ...e, series: e.series && [3, 4] })) })
+  expect(said()).toBe(false)
+  await view.render({ ...played, window: { ...played.window!, buckets: 3 } })
+  expect(said()).toBe(false)
+  await view.render({ ...played, window: { ...played.window!, buckets: 3 }, edges: played.edges.map(e => ({ ...e })) })
+  expect(said()).toBe(true)
+  warn.mockRestore()
 })

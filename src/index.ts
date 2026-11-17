@@ -28,7 +28,7 @@ export type { AxisDescriptor, AxisId, AxisValues, AxisValue, FilterChip, Relatio
 export type { ActiveGroup, DerivedGroups, Groups, LegendKey, NodeGroup } from './graph/groups'
 export type { Coloring, SetColoring } from './graph/coloring'
 export { copyGroups, copyKeyOf, isContainment, nodesById, payloadNumber, payloadString } from './graph/model'
-export type { Graph, GraphEdge, GraphNode, ReadableGraph } from './graph/model'
+export type { Graph, GraphEdge, GraphNode, ReadableGraph, TimeWindow } from './graph/model'
 export { createTaxonomy } from './graph/taxonomy'
 export type { ContextLine, Highlight, HighlightDirection, HighlightGraph, Taxonomy, TaxonomySpec } from './graph/taxonomy'
 export { schemeStylesheet, schemeVars } from './graph/scheme'
