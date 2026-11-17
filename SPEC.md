@@ -17,7 +17,7 @@ the energy (alpha) cools, and ticking pauses below a threshold.
 | Force | Acts on | Behaviour |
 |---|---|---|
 | Push | every pair of visible nodes | `F = charge / (d² + r²)^exp`, a charge and a core radius `r` per bucket of the push axis |
-| Pull | every sprung edge | `F = α × stiffness × Δ^exp / d`, `Δ = d − length` (signed), a stiffness and a rest length per spring category |
+| Pull | every sprung edge | `F = α × stiffness × Δ^exp / d`, `Δ = d − length` (signed), a stiffness and a rest length per spring category; `groupCohesion` multiplies the stiffness of an edge whose ends share a visible group |
 | Band | every node, on X and on Y | none inside its rest band; outside it, `strength × dᵉˣᵖ` back toward it |
 | Topological | every node | an inward pull scaled by reach, the depth of its dependency chain, propagated up containment so no node is pulled above its container |
 | Center | every node | a pull to the origin, only while no band axis and no topological pull acts |
@@ -41,9 +41,9 @@ the energy (alpha) cools, and ticking pauses below a threshold.
   parent's X (in radial, on its ring near its parent's angle). A node with a
   kept position (`defaultPositions`, or the last graph's layout) starts there.
   A changed graph keeps the camera and the tuning.
-- **Reheat.** A changed graph, a filter change, a force edit and a dragged
-  node each re-energise the layout; there is no Reheat button. A node
-  scaling edit only redraws.
+- **Reheat.** A changed graph, a filter change, a force edit, a changed
+  `groupCohesion` and a dragged node each re-energise the layout; there is no
+  Reheat button. A node scaling edit only redraws.
 
 ## Which nodes are visible
 
@@ -266,10 +266,14 @@ group. Membership is settled once per graph and groups; a key the function
 answers that the keys do not declare is ignored and reported. Each visible
 member gets a radial halo in its group's colour that fuses with its
 neighbours' into one blob; an edge glows when both ends are in one group. A
-group without a `color` takes a small cycling palette's slot for its place in
-the host's list or keys, so hiding one group recolours no other. A focused
-group — the one `emphasize` names, or the one holding the active node —
-brightens and swells. In the catalog each degree programme is a group.
+group without a `color` takes a small cycling palette's slot, settled in list
+or key order over the whole graph: its own place, or the next slot no earlier
+group joined to it by an edge holds — so touching groups differ in hue while
+the palette has a slot free, and hiding one group recolours no other. A
+group's `weight` (0..1) swells its halo and corridor, up to double; hue and
+brightness stay. A focused group — the one `emphasize` names, or the one
+holding the active node — brightens and swells. In the catalog each degree
+programme is a group.
 
 ## Appearance
 

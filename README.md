@@ -280,13 +280,16 @@ the console. Everything else is optional.
 - **Inputs.** `counts` (chip badges; the graph's entity counts unless given,
   the copies of one `copyKey` once),
   `findings` under the bar, `groups` to glow (derived from the data as
-  `{ keys, of }` — the `LegendKey`s, `{ id, label, color? }`, and a function
-  answering each node's keys — or listed as `NodeGroup`s, each an id and the
-  node ids it covers; membership is settled once per graph and groups, and a
-  key or group with no `color` takes the palette's slot for its place in the
-  list, so a filter that hides one recolours no other), `groupsControl` for a
-  legend inside the pane (anchor it under
-  `--gv-toolbar-height`, and handed the groups as drawn and `emphasize`;
+  `{ keys, of }` — the `LegendKey`s, `{ id, label, color?, weight? }`, and a
+  function answering each node's keys — or listed as `NodeGroup`s, each an id
+  and the node ids it covers; membership is settled once per graph and
+  groups, a key or group with no `color` takes a palette slot no earlier group
+  joined to it by an edge holds, so a filter that hides one recolours no
+  other, and `weight`, 0..1, swells its glow, up to double), `groupCohesion`
+  (a multiplier, default 1, on the stiffness of every edge whose ends share a
+  visible group, so members drift together), `groupsControl` for a legend
+  inside the pane (anchor it under `--gv-toolbar-height`, and handed the
+  groups as drawn and `emphasize`;
   `GroupLegend` is one — items, the active groups, a toggle and the
   emphasis), `markedEdges` (edge ids drawn with a dashed band behind their
   stroke, a graduated edge when the edge it stands for is), a `nodeAction`
@@ -487,9 +490,8 @@ What is not built is filed as issues:
   pair-axis mappings ([#32](https://github.com/jmbarzee/force-graph/issues/32)),
   a node drawn as a stack of ghosts
   ([#19](https://github.com/jmbarzee/force-graph/issues/19)).
-- **Groups** — structural colouring, a metric channel and a cohesion pull
-  ([#27](https://github.com/jmbarzee/force-graph/issues/27)); hiding through
-  the legend, one emphasis path, colours validated on arrival
+- **Groups** — hiding through the legend, one emphasis path, colours
+  validated on arrival
   ([#17](https://github.com/jmbarzee/force-graph/issues/17)).
 - **Interaction** — selecting several nodes
   ([#28](https://github.com/jmbarzee/force-graph/issues/28)), edge hover and

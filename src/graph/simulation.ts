@@ -570,6 +570,10 @@ export class Simulation {
   // buckets and the pair mapping, none of which change between ticks. Built on
   // first use and dropped whenever the tables are re-resolved.
   private springByEdge: Map<string, EdgeCategory> | null = null
+  // The multiplier on each edge's stiffness the view's group cohesion asks
+  // for, by edge id; an edge absent is unchanged. Folded into the
+  // classification above, so it costs nothing per tick.
+  private cohesion: ReadonlyMap<string, number> = new Map()
 
   // `taxonomy` is REQUIRED, deliberately: a default here would let one
   // construction site resolve through a taxonomy every component ignores,
@@ -779,12 +783,21 @@ export class Simulation {
     this.springByEdge = null
   }
 
+  /** Multiply each listed edge's stiffness, by edge id; every other edge springs as its category says. */
+  setCohesion(cohesion: ReadonlyMap<string, number>): void {
+    this.cohesion = cohesion
+    this.springByEdge = null
+  }
+
   private classifyEdges(): Map<string, EdgeCategory> {
     const byEdge = new Map<string, EdgeCategory>()
     for (const edge of this.edges) {
       const src = this.nodeMap.get(edge.sourceId)
       const tgt = this.nodeMap.get(edge.targetId)
-      if (src && tgt) byEdge.set(edge.id, springFor(this.resolved.spring, edge, src, tgt))
+      if (!src || !tgt) continue
+      const cat = springFor(this.resolved.spring, edge, src, tgt)
+      const k = this.cohesion.get(edge.id)
+      byEdge.set(edge.id, k === undefined ? cat : { ...cat, strength: cat.strength * k })
     }
     return byEdge
   }

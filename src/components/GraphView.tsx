@@ -32,7 +32,7 @@ import { zoomAt } from '../graph/viewport'
 import { GraphCanvas } from './GraphCanvas'
 import { CanvasErrorBoundary } from './CanvasErrorBoundary'
 import { GraphControlPanel } from './GraphControlPanel'
-import { activeGroupsOf, boostGroupsForNodes, nodeGroupsOf, type ActiveGroup, type Groups, type NodeGroup } from '../graph/groups'
+import { activeGroupsOf, boostGroupsForNodes, cohesionOf, groupSlotsOf, nodeGroupsOf, type ActiveGroup, type Groups, type NodeGroup } from '../graph/groups'
 import { FilterBar } from './FilterBar'
 import type { SearchState } from './FilterBar'
 export type { SearchState } from './FilterBar'
@@ -143,6 +143,8 @@ export interface GraphViewProps {
   findings?: React.ReactNode
   /** Groups to glow, over the whole graph: derived from the data, or listed. The view settles membership once per graph and groups, then restricts each to the visible set and colours it. */
   groups?: Groups
+  /** A multiplier on the stiffness of every edge whose two ends share a visible group, so members drift together. Default 1, off. */
+  groupCohesion?: number
   /** The host's control for its groups (`GroupLegend`, or its own), rendered inside the pane — which sets `--gv-toolbar-height` on its root so a control can anchor under the bar — and handed the groups as drawn, colours included, and the view's `emphasize`. */
   groupsControl?: (active: readonly ActiveGroup[], control: GroupsControl) => React.ReactNode
   /** Edges to mark, by id, with a dashed band behind their stroke; a graduated edge is marked when the edge it stands for is. */
@@ -280,6 +282,7 @@ export const GraphView = React.forwardRef<GraphViewHandle, GraphViewProps>(funct
   counts: hostCounts,
   findings,
   groups,
+  groupCohesion = 1,
   groupsControl,
   markedEdges,
   nodeAction,
@@ -389,6 +392,7 @@ export const GraphView = React.forwardRef<GraphViewHandle, GraphViewProps>(funct
     return { diagnostics: [...own, ...derivedContainmentDiagnostics(drawn, hostGraph, taxonomy)], graph: drawn }
   }, [hostGraph, taxonomy])
   const { groups: nodeGroups, diagnostics: groupDiagnostics } = React.useMemo(() => nodeGroupsOf(groups ?? NO_GROUPS, graph.nodes), [groups, graph])
+  const groupSlots = React.useMemo(() => groupSlotsOf(nodeGroups, graph.edges), [nodeGroups, graph])
   const diagnostics = React.useMemo(() => groupDiagnostics.length ? [...graphDiagnostics, ...groupDiagnostics] : graphDiagnostics, [graphDiagnostics, groupDiagnostics])
   const graphIndex = React.useMemo(() => nodesById(graph.nodes), [graph])
   // The chip badges: the host's reading of its own data, or a count of the
@@ -610,6 +614,11 @@ export const GraphView = React.forwardRef<GraphViewHandle, GraphViewProps>(funct
   // The pull half is read over the edges the simulation springs (the graph's
   // own, both ends visible), not over the graduated edges it draws.
   const sprung = React.useMemo(() => sprungEdges(graph.edges, visibleIds), [graph, visibleIds])
+  // Group cohesion: settled when the groups or the visible set change, never
+  // per tick; a changed multiplier warms the layout it retunes.
+  const cohesion = React.useMemo(() => cohesionOf(nodeGroups, sprung, groupCohesion), [nodeGroups, sprung, groupCohesion])
+  React.useEffect(() => simRef.current?.setCohesion(cohesion), [cohesion, simVersion, simRef])
+  React.useEffect(() => handleForceAdjust(), [groupCohesion, handleForceAdjust])
   const present = React.useMemo<PresentSets>(
     () => presentSetsOf(visibleNodes, sprung, resolved, getSimNode),
     [visibleNodes, sprung, resolved, taxonomy, getSimNode],
@@ -661,11 +670,11 @@ export const GraphView = React.forwardRef<GraphViewHandle, GraphViewProps>(funct
   } = useHighlight(visibleNodes, visibleEdges, visibleIds, getSimNode, graph, taxonomy, selectedNodeId, hostIndex)
 
   // The groups as drawn: the host's, restricted to the visible set and
-  // coloured in order, the one its control emphasises glowing stronger.
+  // coloured by slot, the one its control emphasises glowing stronger.
   // Drives the canvas glow and the host's control.
   const [emphasizedGroup, setEmphasizedGroup] = React.useState<string | null>(null)
   const groupsHandle = React.useMemo<GroupsControl>(() => ({ emphasize: setEmphasizedGroup }), [])
-  const activeGroups = React.useMemo(() => activeGroupsOf(nodeGroups, visibleIds, theme, emphasizedGroup), [nodeGroups, visibleIds, theme, emphasizedGroup])
+  const activeGroups = React.useMemo(() => activeGroupsOf(nodeGroups, groupSlots, visibleIds, theme, emphasizedGroup), [nodeGroups, groupSlots, visibleIds, theme, emphasizedGroup])
 
   // Canvas glow set: the active groups with the group under the hovered/selected
   // node strengthened, so one group surfaces from many faint ones as the pointer

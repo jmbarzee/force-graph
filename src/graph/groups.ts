@@ -1,13 +1,13 @@
 // Group overlay — the glow groups the Graph view draws. A host hands the view
 // groups over the WHOLE graph: either derived, keys it declares and a function
 // answering each node's keys, or listed, an id and the node ids each covers.
-// The view settles membership once per graph and groups, then restricts each
-// group to the visible set on every render, drops the empty, and colours each
-// by its place in the host's list — so a group keeps its colour when a filter
-// hides the groups before it. What a group IS — the host's chunking, what the
-// user has drilled into — is the host's.
+// The view settles membership and palette slots once per graph and groups,
+// then restricts each group to the visible set on every render and drops the
+// empty — so a group keeps its colour when a filter hides others. What a
+// group IS — the host's chunking, what the user has drilled into — is the
+// host's.
 
-import type { GraphNode } from './model'
+import type { GraphEdge, GraphNode } from './model'
 import type { Theme } from './scheme'
 import type { GraphDiagnostic } from './validate'
 
@@ -15,7 +15,7 @@ import type { GraphDiagnostic } from './validate'
 // so colours only need to separate the handful of sibling groups shown at
 // once — not be globally unique. The light set is the same ten hues a few
 // stops deeper, so a glow reads on a pale canvas.
-/** The cycling glow palette per theme; a group with no `color` of its own takes the slot for its place in the list. */
+/** The cycling glow palette per theme; a group with no `color` of its own takes a slot by `groupSlotsOf`. */
 export const GROUP_PALETTE: Readonly<Record<Theme, readonly string[]>> = {
   dark: [
     '#2DD4BF', // teal
@@ -65,8 +65,10 @@ export interface NodeGroup {
   nodeIds: ReadonlySet<string>
   /** Whether the host emphasises this group; the view glows it stronger. A host's legend inside the pane uses `groupsControl`'s `emphasize` instead and leaves this out. */
   emphasized?: boolean
-  /** The glow's colour, hex or rgb(); absent, the palette's slot for this group's place in the list. */
+  /** The glow's colour, hex or rgb(); absent, a palette slot no group joined to it by an edge holds. */
   color?: string
+  /** 0..1: how far the glow's halo and corridor swell; absent, they do not. */
+  weight?: number
 }
 
 /** One key of a set-shaped channel, in the order its palette slots follow. */
@@ -75,8 +77,10 @@ export interface LegendKey {
   id: string
   /** The key's name in a legend. */
   label: string
-  /** The key's colour, hex or rgb(); absent, the palette's slot for its place in `keys`. */
+  /** The key's colour, hex or rgb(); absent, a palette slot no key joined to it by an edge holds. */
   color?: string
+  /** 0..1: how far the key's glow swells; absent, it does not. */
+  weight?: number
 }
 
 /**
@@ -103,7 +107,7 @@ const NO_DIAGNOSTICS: readonly GraphDiagnostic[] = []
  */
 export function nodeGroupsOf(groups: Groups, nodes: readonly GraphNode[]): { groups: readonly NodeGroup[]; diagnostics: readonly GraphDiagnostic[] } {
   if (!('of' in groups)) return { groups, diagnostics: NO_DIAGNOSTICS }
-  const listed = groups.keys.map(k => ({ id: k.id, nodeIds: new Set<string>(), color: k.color }))
+  const listed = groups.keys.map(k => ({ id: k.id, nodeIds: new Set<string>(), color: k.color, weight: k.weight }))
   const members = new Map(listed.map(g => [g.id, g.nodeIds]))
   const diagnostics: GraphDiagnostic[] = []
   const undeclared = new Set<string>()
@@ -120,6 +124,47 @@ export function nodeGroupsOf(groups: Groups, nodes: readonly GraphNode[]): { gro
   return { groups: listed, diagnostics: diagnostics.length ? diagnostics : NO_DIAGNOSTICS }
 }
 
+/**
+ * Each group's palette slot, over the whole graph: in list order, the group's
+ * own place in the palette, or the next one no earlier group joined to it by
+ * an edge holds; its own place again once every slot is held. Never reads the
+ * visible set, so a filter recolours nothing.
+ */
+export function groupSlotsOf(groups: readonly NodeGroup[], edges: readonly GraphEdge[]): number[] {
+  const size = GROUP_PALETTE.dark.length
+  const groupsOf = new Map<string, number[]>()
+  groups.forEach((g, i) => {
+    for (const id of g.nodeIds) {
+      const of = groupsOf.get(id) ?? []
+      if (of.length === 0) groupsOf.set(id, of)
+      of.push(i)
+    }
+  })
+  const joined = groups.map(() => new Set<number>())
+  for (const e of edges) {
+    for (const a of groupsOf.get(e.sourceId) ?? []) {
+      for (const b of groupsOf.get(e.targetId) ?? []) if (a !== b) { joined[a].add(b); joined[b].add(a) }
+    }
+  }
+  const slots: number[] = []
+  groups.forEach((_, i) => {
+    const held = new Set([...joined[i]].filter(j => j < i && groups[j].color === undefined).map(j => slots[j]))
+    const free = Array.from({ length: size }, (_, k) => (i + k) % size).find(s => !held.has(s))
+    slots.push(free ?? i % size)
+  })
+  return slots
+}
+
+const NO_COHESION: ReadonlyMap<string, number> = new Map()
+
+/** `factor` for each edge whose two ends share a group; none when the factor is 1. */
+export function cohesionOf(groups: readonly NodeGroup[], edges: readonly GraphEdge[], factor: number): ReadonlyMap<string, number> {
+  if (factor === 1) return NO_COHESION
+  const out = new Map<string, number>()
+  for (const e of edges) if (groups.some(g => g.nodeIds.has(e.sourceId) && g.nodeIds.has(e.targetId))) out.set(e.id, factor)
+  return out
+}
+
 /** A group as drawn. */
 export interface ActiveGroup {
   /** The host's group id. */
@@ -132,20 +177,25 @@ export interface ActiveGroup {
   nodeIds: ReadonlySet<string>
 }
 
+/** An active group with the `weight` its glow swells by; the canvas reads it, a host's control sees an `ActiveGroup`. */
+export interface GlowGroup extends ActiveGroup {
+  /** The host's `weight`. */
+  weight?: number
+}
+
 /**
  * The groups as drawn: each restricted to the visible set
- * (filter-as-source-of-truth), the empty dropped, each coloured by its place
- * in the host's list in the theme's palette — so hiding one group recolours
- * none of the others.
+ * (filter-as-source-of-truth), the empty dropped, each coloured by its slot
+ * in the theme's palette — so hiding one group recolours none of the others.
  */
-export function activeGroupsOf(groups: readonly NodeGroup[], visibleIds: ReadonlySet<string>, theme: Theme = 'dark', emphasized: string | null = null): ActiveGroup[] {
+export function activeGroupsOf(groups: readonly NodeGroup[], slots: readonly number[], visibleIds: ReadonlySet<string>, theme: Theme = 'dark', emphasized: string | null = null): GlowGroup[] {
   const palette = GROUP_PALETTE[theme]
-  const out: ActiveGroup[] = []
+  const out: GlowGroup[] = []
   groups.forEach((g, i) => {
     const nodeIds = new Set<string>()
     for (const id of g.nodeIds) if (visibleIds.has(id)) nodeIds.add(id)
     if (nodeIds.size === 0) return
-    out.push({ id: g.id, strength: g.emphasized || g.id === emphasized ? HOVER_STRENGTH : 1, nodeIds, color: g.color ?? palette[i % palette.length] })
+    out.push({ id: g.id, strength: g.emphasized || g.id === emphasized ? HOVER_STRENGTH : 1, nodeIds, color: g.color ?? palette[slots[i]], weight: g.weight })
   })
   return out
 }
@@ -155,10 +205,10 @@ export function activeGroupsOf(groups: readonly NodeGroup[], visibleIds: Readonl
 // surfaces out of a field of many faint ones. Returns the same array when no
 // focus node lands in any group, so the common case allocates nothing.
 /** The active groups with any that holds one of the given nodes glowing at `NODE_FOCUS_STRENGTH`; the same array when none does. */
-export function boostGroupsForNodes(
-  groups: ActiveGroup[],
+export function boostGroupsForNodes<G extends ActiveGroup>(
+  groups: G[],
   focusIds: Array<string | null>,
-): ActiveGroup[] {
+): G[] {
   const ids = focusIds.filter((id): id is string => !!id)
   if (ids.length === 0) return groups
   let changed = false
