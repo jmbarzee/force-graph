@@ -3,6 +3,7 @@
 import { isContainment } from './model'
 import type { GraphEdge, GraphNode } from './model'
 import type { Highlight, HighlightGraph, Taxonomy } from './taxonomy'
+import { engineOf } from './taxonomy'
 
 import type { HighlightDirection } from './taxonomy'
 export type { HighlightDirection } from './taxonomy'
@@ -73,7 +74,7 @@ export function highlightOf(
   undirected: ReadonlySet<string>,
 ): { nodes: Set<string>; edges: Set<string> } {
   const walked = getTransitiveDeps(active.id, [...graph.visibleEdges], new Set(graph.visibleIds), direction, undirected)
-  const lit: Highlight = taxonomy.highlight(active, { nodes: walked }, graph, direction)
+  const lit: Highlight = engineOf(taxonomy).highlight(active, { nodes: walked }, graph, direction)
   const nodes = new Set(lit.nodes)
   const edges = lit.edges ? new Set(lit.edges) : getHighlightedEdgeIds(nodes, [...graph.visibleEdges])
   return { nodes, edges }

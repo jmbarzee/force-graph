@@ -35,7 +35,7 @@ export interface ScalarAxis {
   readonly normalize?: 'max' | 'range' | 'none'
 }
 
-/** A scalar with its words filled in — what `Taxonomy.scalars` carries. */
+/** A scalar with its words filled in: what a layout axis keys on. */
 export interface ResolvedScalarAxis extends ScalarAxis {
   /** The declared label, else the id. */
   readonly label: string

@@ -12,6 +12,7 @@ import type { Viewport } from '../graph/viewport'
 import { screenToWorld, worldToScreen } from '../graph/viewport'
 import { nodeSizeMul, type NodeScaleParams } from '../graph/node-scale'
 import type { Taxonomy } from '../graph/taxonomy'
+import { engineOf } from '../graph/taxonomy'
 import type { GlowGroup } from '../graph/groups'
 import { useTaxonomy } from './graph-view/useTaxonomy'
 import { useLatest } from './graph-view/useControllable'
@@ -324,7 +325,7 @@ export function GraphCanvas({
       // convert to world units by dividing by scale, plus a small slop. A
       // cardinality badge (parameterized family) sits above the body, so grow
       // the target by its extent to keep the badge part of the clickable node.
-      const screenR = taxonomy.nodeStyleOf(n).size.r * mul + badgeExtent(n, mul)
+      const screenR = engineOf(taxonomy).nodeStyleOf(n).size.r * mul + badgeExtent(n, mul)
       const r = screenR / viewport.scale + 4
       if ((wx - n.x) ** 2 + (wy - n.y) ** 2 <= r * r) return n
     }
@@ -504,7 +505,7 @@ export function GraphCanvas({
           const node = d.nodeMap.get(id)
           if (!node) continue
           const [sx, sy] = worldToScreen(vp, node.x, node.y)
-          const gr = d.taxonomy.nodeStyleOf(node).size.r * mul + GROUP_GLOW_PAD * glowSwell(g)
+          const gr = engineOf(d.taxonomy).nodeStyleOf(node).size.r * mul + GROUP_GLOW_PAD * glowSwell(g)
           if (sx + gr < 0 || sx - gr > w || sy + gr < 0 || sy - gr > h) continue
           const a = Math.min(0.92, GROUP_GLOW_CENTER_ALPHA * g.strength)
           const grad = ctx.createRadialGradient(sx, sy, 0, sx, sy, gr)
@@ -573,7 +574,7 @@ export function GraphCanvas({
           const angle = Math.atan2(ty - sy, tx - sx)
           // Stop the arrowhead at the target's on-screen edge (screen radius =
           // def.r × nodeSizeMul(scale)) so it tracks the zoom-scaled node body.
-          const tgtR = d.taxonomy.nodeStyleOf(tgt).size.r * nodeSizeMul(vp.scale, d.nodeScale)
+          const tgtR = engineOf(d.taxonomy).nodeStyleOf(tgt).size.r * nodeSizeMul(vp.scale, d.nodeScale)
           const offset = tgtR + 2
           const ax = tx - Math.cos(angle) * offset
           const ay = ty - Math.sin(angle) * offset
@@ -634,7 +635,7 @@ export function GraphCanvas({
           const baseAlpha = highlighted ? 0.28 : 0.05
           const stepAlpha = highlighted ? 0.06 : 0.015
 
-          const color = d.taxonomy.nodeStyleOf(node).color[d.theme].fill
+          const color = engineOf(d.taxonomy).nodeStyleOf(node).color[d.theme].fill
           ctx.strokeStyle = color
 
           const effectiveCharge = Math.abs(chargeFor(d.resolved.push, node)) * pushMul
@@ -863,12 +864,12 @@ export function GraphCanvas({
       // label may collide with a node drawn later in the same loop.
       const nodeCircles = d.nodes.map(n => {
         const [nx, ny] = worldToScreen(vp, n.x, n.y)
-        return { x: nx, y: ny, r: d.taxonomy.nodeStyleOf(n).size.r * mul }
+        return { x: nx, y: ny, r: engineOf(d.taxonomy).nodeStyleOf(n).size.r * mul }
       })
 
       for (const node of d.nodes) {
         const [sx, sy] = worldToScreen(vp, node.x, node.y)
-        const def = d.taxonomy.nodeStyleOf(node)
+        const def = engineOf(d.taxonomy).nodeStyleOf(node)
         const r = def.size.r * mul
         const hw = r  // nodes are circles: half-width = half-height = r
 

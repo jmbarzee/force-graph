@@ -116,9 +116,9 @@ export interface NodeStyle {
 /**
  * A node style with every default filled in — what `Taxonomy.styleOf` answers.
  *
- * Reached through `Taxonomy.nodeStyleOf`, never by key lookup from the
- * engine — a miss has to resolve to the fallback rather than throw, because
- * the resolution happens per node per frame inside the draw loop where an
+ * Reached through the taxonomy, never by key lookup from the engine — a
+ * miss has to resolve to the fallback rather than throw, because the
+ * resolution happens per node per frame inside the draw loop where an
  * exception stops the canvas repainting for good.
  */
 export interface ResolvedNodeStyle {

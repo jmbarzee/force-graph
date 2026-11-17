@@ -8,7 +8,7 @@
 
 import React from 'react'
 import {
-  GraphView, GroupLegend, TaxonomyContext, copyGroups, initialFilter, nodesById, payloadNumber, payloadString, useFocusRequest, useScheme, withSelection,
+  GraphView, GroupLegend, TaxonomyContext, copyGroups, copyKeyOf, initialFilter, nodesById, payloadNumber, payloadString, useFocusRequest, useScheme, withSelection,
 } from '@jmbarzee/force-graph'
 import type {
   FilterState, GraphNode, ThemeChoice,
@@ -125,7 +125,7 @@ function Details({ node, themeChoice, onReveal, onOnlyCampus, onClose }: {
   const entity = node.values[ENTITY] as Entity | undefined
   const campus = node.values[CAMPUS] as Campus | undefined
   const { scopeProps } = useScheme(taxonomy, { choice: themeChoice })
-  const listings = [...(copies.get(node.copyKey ?? node.id) ?? [node.id])].flatMap(id => nodeById.get(id) ?? [])
+  const listings = [...(copies.get(copyKeyOf(node)) ?? [node.id])].flatMap(id => nodeById.get(id) ?? [])
   const first = listings[0]
   const course = catalog.courses.find(c => c.id === (first && payloadString(first, 'courseId')))
   const credits = first && payloadNumber(first, 'credits')

@@ -15,6 +15,7 @@ import type { SpringPhysics } from './shapes'
 import type { BandRange, ForceParams, LayoutTuning, PairTuning, PushPhysics } from './simulation'
 import { defaultParamsFor, namerFor, styleIdentityMapping } from './simulation'
 import type { Taxonomy } from './taxonomy'
+import { engineOf } from './taxonomy'
 
 /** The tuning opened: the forces and the node scale. */
 export interface OpenTuning extends Tuning {
@@ -167,7 +168,7 @@ class Reader {
     if (typeof json.scalar === 'string') {
       this.record(json, path, ['scalar', 'span'])
       const scalar = json.scalar
-      if (this.strict && !this.taxonomy.scalars.some(sc => sc.id === scalar)) this.fail(at(path, 'scalar'), `no scalar "${scalar}"`)
+      if (this.strict && !engineOf(this.taxonomy).scalars.some(sc => sc.id === scalar)) this.fail(at(path, 'scalar'), `no scalar "${scalar}"`)
       if (json.span === undefined) return { scalar }
       const span = this.record(json.span, at(path, 'span'), ['zero', 'one'])
       return { scalar, span: { zero: this.number(span.zero, at(path, 'span.zero')), one: this.number(span.one, at(path, 'span.one')) } }

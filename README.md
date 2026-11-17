@@ -183,17 +183,18 @@ spring map, and `validateGraph` says so.
 
 `Graph` is `nodes` (an array, in layout order; the view indexes it, and
 `nodesById` does the same for a host) and `edges`. Both carry `values`, a map
-from axis to value, and an opaque `payload` the view never reads
-(`payloadString` and `payloadNumber` read it for you). Ids are opaque: the
-engine compares them and never parses one.
+from axis to value (a string; `internValue` folds a composite into one), and
+an opaque `payload` the view never reads (`payloadString` and `payloadNumber`
+read it for you). Ids are opaque: the engine compares them and never parses
+one.
 
 - **Containment is a tree.** A node's `parentId` names its container; the view
   derives the containment edge from it. `validateGraph` names a cycle of
   parents (`parent-cycle`), and the view clears the parent of its first node
   in graph order. An entity that sits in two containers is two nodes sharing
-  a `copyKey`: the library indexes the copies (`copyGroups`), draws their halo
-  and counts them in the hover box. A host may list containment edges of its
-  own between any two nodes.
+  a `copyKey`: the library indexes the copies (`copyGroups`, by `copyKeyOf`),
+  draws their halo and counts them in the hover box. A host may list
+  containment edges of its own between any two nodes.
 - **An edge's `relation`** is `'containment'` or `'dependency'` (the default;
   `isContainment(edge)` reads it). A containment edge from a node to its
   `parentId` is derived; one a host lists itself, to any node, is drawn in
@@ -216,12 +217,12 @@ engine compares them and never parses one.
   dangling endpoint, an unknown relation, a type the rule returns that the
   table lacks, a duplicate node or edge id, a parent not in the graph, a
   weight outside 0..1 or not finite (`'edge-weight-invalid'`, a warning: the
-  view clamps it, and draws one not finite as no weight). The
+  view clamps it, and draws one not finite as no weight), a containment edge
+  derived from `parentId` that no type claims (`'containment-untyped'`). The
   view runs it, lists the diagnostics under the bar, hands them to
-  `onDiagnostics` and draws what remains — adding three warnings of its own:
-  `'containment-untyped'`, when a containment edge it derived from `parentId`
-  has no declared type, `'key-undeclared'`, once per key a derived
-  group's `of` answers that its `keys` do not declare, and
+  `onDiagnostics` and draws what remains — adding two warnings of its own:
+  `'key-undeclared'`, once per key a derived group's `of` answers that its
+  `keys` do not declare, and
   `'key-color-invalid'`, once per group or key whose `color` is not hex,
   `rgb()` or `hsl()`, which takes a palette colour instead. A host that wants
   to refuse a bad graph calls it first.
@@ -549,8 +550,7 @@ layout controls bound their tokens by a ceiling
 What is not built is filed as issues:
 
 - **The graph and taxonomy** — colour by another axis
-  ([#9](https://github.com/jmbarzee/force-graph/issues/9)), an opaque
-  `Taxonomy` ([#10](https://github.com/jmbarzee/force-graph/issues/10)),
+  ([#9](https://github.com/jmbarzee/force-graph/issues/9)),
   undirected edges ([#11](https://github.com/jmbarzee/force-graph/issues/11)),
   an edge time series played back
   ([#33](https://github.com/jmbarzee/force-graph/issues/33)), host-declared

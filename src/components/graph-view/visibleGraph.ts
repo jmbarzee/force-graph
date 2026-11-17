@@ -22,6 +22,7 @@ import { isContainment, relationOf } from '../../graph/model'
 import type { SimNode } from '../../graph/simulation'
 import type { GraphEdge, ReadableGraph } from '../../graph/model'
 import type { Taxonomy } from '../../graph/taxonomy'
+import { engineOf } from '../../graph/taxonomy'
 import type { ResolvedAxisDescriptor } from '../../graph/axis'
 import type { EdgeTypeId } from '../../graph/shapes'
 import type { LayoutSubject } from '../../graph/forces'
@@ -107,7 +108,7 @@ function resolveDepEndpoint(
   if (visited.has(nodeId)) return []
   visited.add(nodeId)
   const node = getNode(nodeId)
-  if (node && taxonomy.nodeStyleOf(node).whenHidden === 'splice') {
+  if (node && engineOf(taxonomy).nodeStyleOf(node).whenHidden === 'splice') {
     const out: string[] = []
     for (const e of sim.edges) {
       if (isContainment(e)) continue
@@ -132,7 +133,8 @@ function computeGraphNodeSummary(
   nodeMap: Map<string, SimNode>,
   taxonomy: Taxonomy,
 ): string {
-  const { summaryKind } = taxonomy.nodeStyleOf(node)
+  const engine = engineOf(taxonomy)
+  const { summaryKind } = engine.nodeStyleOf(node)
 
   if (summaryKind === 'none') return ''
 
@@ -144,13 +146,13 @@ function computeGraphNodeSummary(
       if (!isContainment(e) || e.targetId !== node.id) continue
       const child = nodeMap.get(e.sourceId)
       if (!child) continue
-      const value = taxonomy.styleValueOf(child)
+      const value = engine.styleValueOf(child)
       if (value === undefined) continue
       counts.set(value, (counts.get(value) ?? 0) + 1)
     }
     return taxonomy.styleValues
       .filter(k => counts.has(k))
-      .map(k => `${counts.get(k)} ${taxonomy.abbreviationFor(k)}`)
+      .map(k => `${counts.get(k)} ${engine.abbreviationFor(k)}`)
       .join(' · ')
   }
 
@@ -193,6 +195,7 @@ export function passesFilter(
  * no type here and draws neutral.
  */
 function classifyEdges(sim: VisibleGraphSource, taxonomy: Taxonomy): Map<string, EdgeTypeId | undefined> {
+  const engine = engineOf(taxonomy)
   const declared = new Map(taxonomy.edgeTypes.map(e => [e.id, e]))
   const out = new Map<string, EdgeTypeId | undefined>()
   for (const edge of sim.edges) {
@@ -200,7 +203,7 @@ function classifyEdges(sim: VisibleGraphSource, taxonomy: Taxonomy): Map<string,
     const tgt = sim.getNode(edge.targetId)
     let id: EdgeTypeId | undefined
     try {
-      id = taxonomy.edgeTypeOf(edge, src && taxonomy.styleValueOf(src), tgt && taxonomy.styleValueOf(tgt))
+      id = engine.edgeTypeOf(edge, src && engine.styleValueOf(src), tgt && engine.styleValueOf(tgt))
     } catch {
       id = undefined
     }
@@ -300,7 +303,7 @@ export function computeVisibleGraph(
         // nodes that now read as one reach; the taxonomy says which survives,
         // and the one met first does when it does not say.
         const existing = graduated.get(key)
-        if (existing && taxonomy.collapse(existing.origin, edge) === existing.origin) continue
+        if (existing && engineOf(taxonomy).collapse(existing.origin, edge) === existing.origin) continue
         graduated.set(key, { origin: edge, edge: { ...edge, sourceId: rs, targetId: rt, id: `grad:${key}` } })
       }
     }
