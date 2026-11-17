@@ -44,7 +44,7 @@ export interface LegendKey {
   id: string
   /** The key's name in a legend. */
   label: string
-  /** The key's colour, one for both themes or a hue per theme: hex, `rgb()` or `hsl()`; absent or any other, a palette slot no key joined to it by an edge holds. */
+  /** The key's colour, one for both themes or a hue per theme: hex, `rgb()` or `hsl()`; absent or any other, a palette slot. */
   color?: string | ThemedHue
   /** 0..1: how far the key's glow swells; absent, it does not. */
   weight?: number

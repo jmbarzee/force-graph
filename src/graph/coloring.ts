@@ -1,7 +1,3 @@
-// A colouring names where a channel's colours come from, and resolves once
-// per graph and colouring to each node's keys and each key's hue, so a frame
-// reads two map lookups and allocates nothing.
-
 import { valuesOn } from './axis'
 import type { AxisId, AxisValue } from './axis'
 import { checkedKey, groupsByNode, nodeGroupsOf } from './groups'
@@ -50,7 +46,7 @@ export function resolveColoring(coloring: SetColoring, graph: Graph, taxonomy: T
     const listed = nodeGroupsOf(groups, graph.nodes)
     diagnostics.push(...listed.diagnostics)
     const labels = new Map('of' in groups ? groups.keys.map(k => [k.id, k.label]) : [])
-    for (const g of listed.groups) if (!keys.has(g.id)) keys.set(g.id, { label: labels.get(g.id) ?? g.id, hue: hueOf(g.color, keys.size) })
+    declare(listed.groups.map(g => ({ id: g.id, label: labels.get(g.id) ?? g.id, color: g.color })))
     const byNode = groupsByNode(listed.groups)
     for (const node of graph.nodes) of.set(node.id, byNode.get(node.id) ?? NONE)
     return { keys, of, diagnostics }
