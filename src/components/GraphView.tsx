@@ -41,6 +41,7 @@ import { useViewport } from './graph-view/useViewport'
 import { useHighlight } from './graph-view/useHighlight'
 import { useSimulation } from './graph-view/useSimulation'
 import { useVisibleGraph } from './graph-view/useVisibleGraph'
+import { neighborhoodOf } from './graph-view/visibleGraph'
 import { useSimulationLoop } from './graph-view/useSimulationLoop'
 import { useControllable, useControlledWarning, useLatest, useStable } from './graph-view/useControllable'
 import { sameFocusRequest } from './graph-view/focus'
@@ -712,21 +713,10 @@ export const GraphView = React.forwardRef<GraphViewHandle, GraphViewProps>(funct
 
   // Double-click node: center and zoom to neighbors, and tell the host.
   const handleDoubleClickNode = React.useCallback((id: string) => {
-    const sim = simRef.current
-    if (!sim) return
-    const node = sim.getNode(id)
-    if (!node) return
     const hostNode = hostIndex.get(id)
     if (hostNode) onNodeActivateRef.current?.(hostNode)
-    const neighborIds = new Set<string>([id])
-    for (const edge of sim.edges) {
-      if (edge.sourceId === id) neighborIds.add(edge.targetId)
-      if (edge.targetId === id) neighborIds.add(edge.sourceId)
-    }
-    if (!show.activateZoom) return
-    const neighbors = sim.nodes.filter(n => neighborIds.has(n.id))
-    fit(neighbors, 80)
-  }, [fit, hostIndex, show.activateZoom])
+    if (show.activateZoom) fit(neighborhoodOf(id, visibleNodes, visibleEdges), 80)
+  }, [fit, hostIndex, show.activateZoom, visibleNodes, visibleEdges])
 
   // Fit-to-view
   const handleFitToView = React.useCallback(() => {

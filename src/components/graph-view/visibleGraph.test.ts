@@ -1,5 +1,5 @@
 import { describe, expect, it } from 'vitest'
-import { computeVisibleGraph } from './visibleGraph'
+import { computeVisibleGraph, neighborhoodOf } from './visibleGraph'
 import { createTaxonomy } from '../../graph/taxonomy'
 import { initialFilter, withSelection } from '../../filter/types'
 import type { NodeStyle } from '../../graph/shapes'
@@ -39,5 +39,12 @@ describe('computeVisibleGraph origins', () => {
     expect(grad).toBeDefined()
     expect(grad!.id).not.toBe('call')
     expect(vg.origins.get(grad!.id)).toBe('call')
+  })
+})
+
+describe('neighborhoodOf', () => {
+  it('leaves out a hidden neighbor', () => {
+    const vg = computeVisibleGraph(sim, withSelection(initialFilter(taxonomy, graph), 'kind', new Set(['parent'])), taxonomy)
+    expect(neighborhoodOf('p1', vg.visibleNodes, vg.visibleEdges).map(n => n.id)).toEqual(['p1', 'p2'])
   })
 })
