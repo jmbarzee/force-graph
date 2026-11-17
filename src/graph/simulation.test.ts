@@ -33,3 +33,23 @@ describe('Simulation.setCohesion', () => {
     expect(tripled.get('c')).toBe(plain.get('c'))
   })
 })
+
+// Ticks until the simulation reports stable, or -1 past 100.
+const ticksToStop = (alphaMin: number): number => {
+  const sim = new Simulation(graph, { alphaDecay: 0.25, alphaMin }, () => 0.5, taxonomy)
+  for (let n = 0; n <= 100; n++) {
+    if (sim.isStable()) return n
+    sim.tick()
+  }
+  return -1
+}
+
+describe('Simulation', () => {
+  it('stops at the tick alpha reaches 0 when the threshold is 0', () => {
+    expect(ticksToStop(0)).toBe(4)
+  })
+
+  it('stops at the first tick alpha falls below any other threshold', () => {
+    expect(ticksToStop(0.3)).toBe(3)
+  })
+})
