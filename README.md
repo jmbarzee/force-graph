@@ -450,9 +450,10 @@ the console. Everything else is optional.
   or clears the `parentId`, it names. The pane's theme observer watches every
   `data-theme` in the document unless `systemTheme` is given.
 - **Keyboard.** `keyboard` scopes the shortcuts: `'pane'` (the default — the
-  focusable root handles the keys that reach it, so a page keeps Tab and
-  Space for its own controls), `'global'` (the window — a page that is the
-  pane, or a tab shell's active tab) or `'none'` (a hidden tab). The keys are
+  root handles the keys that reach it, so a page keeps Tab and Space for its
+  own controls), `'global'` (the window — a page that is the pane, or a tab
+  shell's active tab) or `'none'` (a hidden tab). The root is focusable under
+  `'pane'` and `'global'` alike. The keys are
   [SPEC § Keyboard](SPEC.md#keyboard).
 
 ## Two views sharing a bar
@@ -651,8 +652,7 @@ What is not built is filed as issues:
   ([#28](https://github.com/jmbarzee/force-graph/issues/28)), edge hover and
   its outputs ([#16](https://github.com/jmbarzee/force-graph/issues/16)), a
   neighbourhood frame that leaves hidden neighbours out
-  ([#26](https://github.com/jmbarzee/force-graph/issues/26)), the keyboard and
-  accessibility model ([#7](https://github.com/jmbarzee/force-graph/issues/7)),
+  ([#26](https://github.com/jmbarzee/force-graph/issues/26)),
   animated reveals ([#8](https://github.com/jmbarzee/force-graph/issues/8)).
 - **The package** — the pane's strings in other languages
   ([#13](https://github.com/jmbarzee/force-graph/issues/13)), the React 19

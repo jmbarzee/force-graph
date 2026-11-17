@@ -188,6 +188,16 @@
   flex-direction: column;
 }
 
+/* The focus's announcement: read, not shown. */
+.gv-graph-announce {
+  position: absolute;
+  width: 1px;
+  height: 1px;
+  overflow: hidden;
+  clip-path: inset(50%);
+  white-space: nowrap;
+}
+
 .gv-graph-empty {
   position: absolute;
   inset: var(--gv-toolbar-height, 0px) 0 0;
