@@ -34,7 +34,7 @@ function countsOf(data: Catalog, campuses: AxisSelection): ReadonlyMap<string, R
   const bump = (m: Map<string, number>, k: string, by = 1) => m.set(k, (m.get(k) ?? 0) + by)
   for (const c of data.courses) {
     bump(campus, c.campus)
-    if (campuses.size > 0 && !campuses.has(c.campus)) continue
+    if ('except' in campuses ? campuses.except.has(c.campus) : campuses.size > 0 && !campuses.has(c.campus)) continue
     bump(entity, 'course')
     bump(entity, 'lab', c.labs?.length ?? 0)
   }

@@ -31,13 +31,13 @@ describe('axesOpenedBy', () => {
     expect(axesOpenedBy(before, new Map(before), [])).toEqual([])
   })
 
-  // An allow-list axis, whose seed is every value it presents.
+  // An allow-list axis, whose seed excludes nothing.
   const taxonomy = createTaxonomy({ styleAxis: 'kind', styles: [], filterAxes: [{ id: 'team', emptyMeans: 'none' }] })
   const none = new Map([['team', []]])
   const thirty = new Map([['team', Array.from({ length: 30 }, (_, i) => `team ${i}`)]])
 
   it('leaves an axis as it is when a re-seed follows values that arrived', () => {
-    const seeded: FilterState = new Map([['team', new Set(thirty.get('team'))]])
+    const seeded: FilterState = new Map([['team', { except: new Set() }]])
     expect(axesOpenedBy(new Map(), seeded, axesReseeded(taxonomy, none, thirty, seeded))).toEqual([])
   })
 
