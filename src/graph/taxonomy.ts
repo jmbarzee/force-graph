@@ -59,16 +59,12 @@ export type StyleSubject = { values: AxisValues }
 export type ContextLine = ReactNode | readonly ReactNode[]
 
 /**
- * The built taxonomy: what the view resolves every style, edge type, axis
- * policy and host hook through. Built once by `createTaxonomy`; derive a
- * variant from the spec, never by spreading this object.
- *
- * What a host reads: `filterAxes` and `axisFor` to filter its own records the
- * way the view does, through `passesSelection`; `styleOf`, `styleValues` and
- * `colorVar` for chrome of its own in the scheme's colours; `edgeTypes` for a
- * legend; `searchText` to match as the view matches. The rest is the engine's
- * interface — resolution for the draw loop — and a host has no call to read
- * it.
+ * The built taxonomy: what a host reads to filter its own records the way the
+ * view does (`filterAxes` and `axisFor`, through `passesSelection`), to draw
+ * chrome of its own in the scheme's colours (`styleOf`, `styleValues`,
+ * `colorVar`), to show a legend (`edgeTypes`) and to match as the view
+ * matches (`searchText`). Built once by `createTaxonomy`; derive a variant
+ * from the spec, never by spreading this object.
  */
 export interface Taxonomy {
   /**
@@ -101,10 +97,6 @@ export interface Taxonomy {
   readonly styleValues: readonly AxisValue[]
   /** Every edge type, in control-panel order, its defaults filled in. */
   readonly edgeTypes: readonly ResolvedEdgeType[]
-  /** Every computed scalar a layout axis may key on, its words filled in: the built-ins, then the host's. */
-  readonly scalars: readonly ResolvedScalarAxis[]
-  /** How the canvas strokes an edge of this type; the neutral stroke, said once, for an id the taxonomy does not declare. */
-  edgeStrokeFor(id: EdgeTypeId): EdgeStroke
   /**
    * The custom property a value's fill is published under (`-border` for its
    * border): `--gv-node-` and the value id in kebab case, or a numbered name
@@ -113,19 +105,26 @@ export interface Taxonomy {
    * `schemeStylesheet`.
    */
   colorVar(value: AxisValue): string
-  /** The hover box's context line(s) for a node — the host's, or its parent's name. */
-  contextLine(node: GraphNode, parent: GraphNode | undefined): ContextLine
   /** What the search control matches against for a node — the host's text, or the name. */
   searchText(node: GraphNode): string
-  /** The highlight for an active node — the host's refinement of the library's transitive walk in the given direction. */
-  highlight(active: GraphNode, base: Highlight, graph: HighlightGraph, direction: HighlightDirection): Highlight
-
   /**
    * Style, size, physics and summary metadata for a value. Never throws — a
    * value the taxonomy does not declare, and an ABSENT value, both resolve to
    * the fallback.
    */
   styleOf(value: AxisValue | undefined): ResolvedNodeStyle
+}
+
+/** The engine's half of a taxonomy: resolution for the draw loop, and the host's hooks. */
+export interface TaxonomyEngine {
+  /** Every computed scalar a layout axis may key on, its words filled in: the built-ins, then the host's. */
+  readonly scalars: readonly ResolvedScalarAxis[]
+  /** How the canvas strokes an edge of this type; the neutral stroke, said once, for an id the taxonomy does not declare. */
+  edgeStrokeFor(id: EdgeTypeId): EdgeStroke
+  /** The hover box's context line(s) for a node — the host's, or its parent's name. */
+  contextLine(node: GraphNode, parent: GraphNode | undefined): ContextLine
+  /** The highlight for an active node — the host's refinement of the library's transitive walk in the given direction. */
+  highlight(active: GraphNode, base: Highlight, graph: HighlightGraph, direction: HighlightDirection): Highlight
   /** Where a node sits on the style axis, or undefined if it sits nowhere. */
   styleValueOf(subject: StyleSubject): AxisValue | undefined
   /**
@@ -147,6 +146,15 @@ export interface Taxonomy {
   edgeTypeOf(edge: GraphEdge, src: AxisValue | undefined, tgt: AxisValue | undefined): EdgeTypeId | undefined
   /** Which of two graduated edges on one visible pair survives: the host's choice, or the one kept so far. */
   collapse(kept: GraphEdge, candidate: GraphEdge): GraphEdge
+}
+
+const engines = new WeakMap<Taxonomy, TaxonomyEngine>()
+
+/** The engine's half of a taxonomy `createTaxonomy` built; any other object throws. */
+export function engineOf(taxonomy: Taxonomy): TaxonomyEngine {
+  const engine = engines.get(taxonomy)
+  if (engine === undefined) throw new Error('[graph] this taxonomy was not built by createTaxonomy; build a variant from its spec, never by spreading')
+  return engine
 }
 
 /**
@@ -454,18 +462,21 @@ export function createTaxonomy(spec: TaxonomySpec): Taxonomy {
   }
   const resolvedAxes = filterAxes.map(d => resolveDescriptor(d, namer))
   const byAxis = new Map(resolvedAxes.map(d => [d.id, d]))
-  return {
+  const taxonomy: Taxonomy = {
     styleAxis: () => styleAxis,
     styleLabel: () => spec.styleLabel ?? styleAxis,
     filterAxes: resolvedAxes,
     axisFor: id => byAxis.get(id),
-    abbreviationFor,
     styleValues: values,
     edgeTypes,
-    scalars,
-    edgeStrokeFor,
     colorVar: value => `--gv-node-${suffixOf.get(value) ?? (cssSuffix(value) || 'undeclared')}`,
     styleOf,
+    searchText: spec.searchText ?? (node => node.name),
+  }
+  engines.set(taxonomy, {
+    abbreviationFor,
+    scalars,
+    edgeStrokeFor,
     styleValueOf,
     // Hot path: one property read, one record lookup, one branch. No allocation
     // — this runs per node per frame in the draw loop.
@@ -473,7 +484,7 @@ export function createTaxonomy(spec: TaxonomySpec): Taxonomy {
     edgeTypeOf,
     collapse: spec.collapse ?? (kept => kept),
     contextLine: spec.contextLine ?? ((_node, parent) => parent?.name),
-    searchText: spec.searchText ?? (node => node.name),
     highlight: spec.highlight ?? ((_active, base) => base),
-  }
+  })
+  return taxonomy
 }

@@ -21,6 +21,7 @@ import { normalized, rangeNormalized } from './scalar'
 import { isScalarTuning } from './scalar'
 import type { ReadableGraph } from './model'
 import type { Taxonomy } from './taxonomy'
+import { engineOf } from './taxonomy'
 import type { AxisMapping } from './axis'
 import type { EdgeTypeId, ResolvedEdgeType, SpringPhysics } from './shapes'
 import { MIDDLING_SPRING } from './shapes'
@@ -183,7 +184,7 @@ export function resolvePhysics(params: ChargeParams & GravityParams & LinkParams
     : () => declaredBand(taxonomy, taxonomy.styleValues, axis)
   const layout = (t: LayoutTuning, axis: 'x' | 'y'): ResolvedLayoutAxis => {
     if (!isScalarTuning(t)) return resolveAxis(t.mapping, t.overrides, bandOn(t.mapping, axis))
-    const scalar = taxonomy.scalars.find(sc => sc.id === t.scalar)
+    const scalar = engineOf(taxonomy).scalars.find(sc => sc.id === t.scalar)
     // Loud: a tuning naming a scalar the taxonomy does not know is a host bug.
     // The view never holds one — it reads params retuned for the taxonomy
     // (`retunedFor` falls the axis back on a swap), so this is unreachable
@@ -553,7 +554,7 @@ export function resolveSprings(pair: PairTuning, taxonomy: Taxonomy): ResolvedSp
       mapping,
       classify: (edge, src, tgt) => {
         const relation = relationOf(edge)
-        const id = taxonomy.edgeTypeOf(edge, src, tgt)
+        const id = engineOf(taxonomy).edgeTypeOf(edge, src, tgt)
         if (id !== undefined && table.get(id)?.relation === relation) return id
         return src === undefined || tgt === undefined ? undefined : untypedId(relation)
       },

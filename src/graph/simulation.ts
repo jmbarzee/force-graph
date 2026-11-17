@@ -22,6 +22,7 @@ import { isScalarTuning } from './scalar'
 import type { AxisNamer, AxisId, AxisValue, AxisMapping } from './axis'
 import { identityMapping, valuesOn } from './axis'
 import type { Taxonomy } from './taxonomy'
+import { engineOf } from './taxonomy'
 
 // The force helpers now live in ./forces; re-export them so existing consumers
 // (GraphCanvas, GraphControlPanel, ChargeControls) keep importing them here.
@@ -144,7 +145,7 @@ export function styleIdentityMapping(taxonomy: Taxonomy): AxisMapping {
     id: taxonomy.styleAxis(),
     label: taxonomy.styleLabel(),
     labelFor: value => taxonomy.styleOf(value).label,
-    abbreviationFor: value => taxonomy.abbreviationFor(value),
+    abbreviationFor: value => engineOf(taxonomy).abbreviationFor(value),
   }, taxonomy.styleValues)
 }
 
@@ -253,7 +254,7 @@ export type LayoutAxisOption =
 export function layoutAxisOptions(axes: readonly AxisOption[], taxonomy: Taxonomy): LayoutAxisOption[] {
   return [
     ...axes.map(option => ({ kind: 'mapping' as const, option })),
-    ...taxonomy.scalars.map(scalar => ({ kind: 'scalar' as const, scalar })),
+    ...engineOf(taxonomy).scalars.map(scalar => ({ kind: 'scalar' as const, scalar })),
   ]
 }
 
@@ -290,7 +291,7 @@ export function retunedFor(params: ForceParams, taxonomy: Taxonomy, graph: Graph
   // the check reads only the taxonomy, so a stored layout naming a scalar
   // since renamed never reaches the kernels, even while the graph is empty.
   const knownScalar = (t: LayoutTuning): LayoutTuning =>
-    isScalarTuning(t) && !taxonomy.scalars.some(sc => sc.id === t.scalar) ? identityTuning<BandRange>(taxonomy) : t
+    isScalarTuning(t) && !engineOf(taxonomy).scalars.some(sc => sc.id === t.scalar) ? identityTuning<BandRange>(taxonomy) : t
   if (graph.nodes.length === 0) {
     const bandX = knownScalar(params.bandX)
     const bandY = knownScalar(params.bandY)
@@ -330,7 +331,7 @@ export function retunedFor(params: ForceParams, taxonomy: Taxonomy, graph: Graph
   // taxonomy no longer knows the scalar (a swap), with the style identity.
   const refreshLayout = (tuning: LayoutTuning): LayoutTuning =>
     isScalarTuning(tuning)
-      ? (taxonomy.scalars.some(sc => sc.id === tuning.scalar) ? tuning : identityTuning<BandRange>(taxonomy))
+      ? (engineOf(taxonomy).scalars.some(sc => sc.id === tuning.scalar) ? tuning : identityTuning<BandRange>(taxonomy))
       : refresh(tuning, m => ({ mapping: m, overrides: new Map() }), bucketsFit)
   const pair = refresh(params.pair, pairTuning, pairFits)
   const bandX = refreshLayout(params.bandX)

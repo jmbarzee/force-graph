@@ -39,3 +39,10 @@ describe('an edge weight', () => {
     expect(dropInvalid(weighted, diagnostics).edges).toHaveLength(weights.length)
   })
 })
+
+describe('a parentId pair no type claims', () => {
+  it('is one containment-untyped warning, naming the derived edge', () => {
+    const diagnostics = validateGraph({ nodes: [node('p'), node('c', 'p')], edges: [] }, taxonomy)
+    expect(diagnostics.filter(d => d.code === 'containment-untyped').map(d => [d.severity, d.edgeId])).toEqual([['warning', 'in:c']])
+  })
+})

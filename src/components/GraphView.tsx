@@ -30,6 +30,7 @@ import { defaultTuningFor, tuningsEqual, makeTuning, openTuning } from '../graph
 import type { Tuning } from '../graph/tuning'
 import { TaxonomyContext, useTaxonomy } from './graph-view/useTaxonomy'
 import type { Taxonomy } from '../graph/taxonomy'
+import { engineOf } from '../graph/taxonomy'
 import { worldToScreen } from '../graph/viewport'
 import type { Viewport } from '../graph/viewport'
 import { zoomAt } from '../graph/viewport'
@@ -53,7 +54,7 @@ import { namesNode, sameFocusRequest } from './graph-view/focus'
 import type { FocusRequest } from './graph-view/focus'
 export type { FocusRequest } from './graph-view/focus'
 import { useIsomorphicLayoutEffect } from './graph-view/useIsomorphicLayoutEffect'
-import { validateGraph, derivedContainmentDiagnostics, dropInvalid } from '../graph/validate'
+import { validateGraph, dropInvalid } from '../graph/validate'
 import type { GraphDiagnostic } from '../graph/validate'
 
 /** A node's position in the layout, in world units. */
@@ -395,14 +396,12 @@ export const GraphView = React.forwardRef<GraphViewHandle, GraphViewProps>(funct
     themeToggle: chrome?.themeToggle ?? true,
   }
   // The host's graph, checked once: every defect named, the edges an error
-  // names left out of what is drawn, the containment edge each `parentId`
-  // implies added where the host listed none, and the one warning the drawn
-  // graph adds (a derived edge no type claims). The list is shown under the
-  // bar and handed to `onDiagnostics`.
+  // names left out of what is drawn, and the containment edge each `parentId`
+  // implies added where the host listed none. The list is shown under the bar
+  // and handed to `onDiagnostics`.
   const { diagnostics: graphDiagnostics, graph } = React.useMemo(() => {
-    const own = validateGraph(hostGraph, taxonomy)
-    const drawn = withContainmentEdges(dropInvalid(hostGraph, own))
-    return { diagnostics: [...own, ...derivedContainmentDiagnostics(drawn, hostGraph, taxonomy)], graph: drawn }
+    const diagnostics = validateGraph(hostGraph, taxonomy)
+    return { diagnostics, graph: withContainmentEdges(dropInvalid(hostGraph, diagnostics)) }
   }, [hostGraph, taxonomy])
   const { groups: nodeGroups, diagnostics: groupDiagnostics } = React.useMemo(() => nodeGroupsOf(groups ?? NO_GROUPS, graph.nodes), [groups, graph])
   const groupSlots = React.useMemo(() => groupSlotsOf(nodeGroups, graph.edges), [nodeGroups, graph])
@@ -577,7 +576,7 @@ export const GraphView = React.forwardRef<GraphViewHandle, GraphViewProps>(funct
     const strokes = new Map<GraphEdge, EdgeStroke>()
     for (const edge of visibleEdges) {
       const type = edgeTypes.get(edge.id)
-      const base = type !== undefined ? taxonomy.edgeStrokeFor(type) : isContainment(edge) ? CONTAINMENT_STROKE : NEUTRAL_STROKE
+      const base = type !== undefined ? engineOf(taxonomy).edgeStrokeFor(type) : isContainment(edge) ? CONTAINMENT_STROKE : NEUTRAL_STROKE
       strokes.set(edge, weighted(base, edge))
     }
     return strokes
@@ -1096,7 +1095,7 @@ export const GraphView = React.forwardRef<GraphViewHandle, GraphViewProps>(funct
                 className="gv-graph-search-result"
                 onClick={() => handleSelectSearchResult(n.id)}
               >
-                <span className="gv-graph-search-result-type">{taxonomy.nodeStyleOf(n).label}</span>
+                <span className="gv-graph-search-result-type">{engineOf(taxonomy).nodeStyleOf(n).label}</span>
                 <span className="gv-graph-search-result-name">{n.name}</span>
               </button>
             ))}
@@ -1232,7 +1231,7 @@ interface GraphHoverTooltipProps {
 function GraphHoverTooltip({ hoveredNodeId, simRef, visibleEdges, undirected, visibleIds, viewport, shiftHeld, directionLine, copies, nodeSummaries, nodeAction, hostNodeOf, onMouseEnter, onMouseLeave }: GraphHoverTooltipProps) {
   // Before the early returns: this is a hook, and the component bails out four
   // different ways below.
-  const taxonomy = useTaxonomy()
+  const engine = engineOf(useTaxonomy())
   if (!hoveredNodeId) return null
   const sim = simRef.current
   if (!sim) return null
@@ -1244,16 +1243,16 @@ function GraphHoverTooltip({ hoveredNodeId, simRef, visibleEdges, undirected, vi
   // several; the library's default is the parent's name. The hook is handed
   // the host's own node and parent. The icon is the value's own.
   const parent = node.parentId === undefined ? undefined : hostNodeOf(node.parentId) ?? sim.getNode(node.parentId)
-  const context = taxonomy.contextLine(hostNodeOf(node.id) ?? node, parent)
+  const context = engine.contextLine(hostNodeOf(node.id) ?? node, parent)
   const contextLines: React.ReactNode[] = context === undefined || context === null ? []
     : Array.isArray(context) ? [...(context as readonly React.ReactNode[])] : [context as React.ReactNode]
   const action = nodeAction(node)
-  const icon = taxonomy.nodeStyleOf(node).icon
+  const icon = engine.nodeStyleOf(node).icon
 
   // The composition line for a node that summarises its children (counted
   // per style value, named by its abbreviation). Degree nodes are covered by
   // the connection counts row below, so the box does not say it twice.
-  const summaryKind = taxonomy.nodeStyleOf(node).summaryKind
+  const summaryKind = engine.nodeStyleOf(node).summaryKind
   const compositionLine =
     summaryKind === 'children'
       ? nodeSummaries.get(hoveredNodeId) || undefined

@@ -1,5 +1,5 @@
 import { describe, expect, it } from 'vitest'
-import { createTaxonomy } from './taxonomy'
+import { createTaxonomy, engineOf } from './taxonomy'
 import { PALETTE, THEMES, pairOf } from './scheme'
 import type { EdgeType, NodeStyle } from './shapes'
 import type { GraphEdge } from './model'
@@ -15,9 +15,9 @@ const dependency = (id: string, ends: Pick<EdgeType, 'sourceValue' | 'targetValu
 describe('edgeTypeOf', () => {
   it('lets a type with no targetValue claim an edge to any value', () => {
     const taxonomy = createTaxonomy({ styleAxis: 'kind', styles, edgeTypes: [dependency('fromService', { sourceValue: 'service' })] })
-    expect(taxonomy.edgeTypeOf(edge, 'service', 'queue')).toBe('fromService')
-    expect(taxonomy.edgeTypeOf(edge, 'service', 'store')).toBe('fromService')
-    expect(taxonomy.edgeTypeOf(edge, 'queue', 'store')).toBeUndefined()
+    expect(engineOf(taxonomy).edgeTypeOf(edge, 'service', 'queue')).toBe('fromService')
+    expect(engineOf(taxonomy).edgeTypeOf(edge, 'service', 'store')).toBe('fromService')
+    expect(engineOf(taxonomy).edgeTypeOf(edge, 'queue', 'store')).toBeUndefined()
   })
 
   it('ranks a type naming both ends over one naming one, over one naming neither, whatever the declaration order', () => {
@@ -28,9 +28,9 @@ describe('edgeTypeOf', () => {
         dependency('serviceToQueue', { sourceValue: 'service', targetValue: 'queue' }),
       ],
     })
-    expect(taxonomy.edgeTypeOf(edge, 'service', 'queue')).toBe('serviceToQueue')
-    expect(taxonomy.edgeTypeOf(edge, 'service', 'store')).toBe('fromService')
-    expect(taxonomy.edgeTypeOf(edge, 'queue', 'store')).toBe('any')
+    expect(engineOf(taxonomy).edgeTypeOf(edge, 'service', 'queue')).toBe('serviceToQueue')
+    expect(engineOf(taxonomy).edgeTypeOf(edge, 'service', 'store')).toBe('fromService')
+    expect(engineOf(taxonomy).edgeTypeOf(edge, 'queue', 'store')).toBe('any')
   })
 
   it('drops a type whose match the edge lacks before ranking by ends named', () => {
@@ -40,7 +40,7 @@ describe('edgeTypeOf', () => {
         dependency('fromService', { sourceValue: 'service' }),
       ],
     })
-    expect(taxonomy.edgeTypeOf({ ...edge, values: { kind: 'signal' } }, 'service', 'queue')).toBe('fromService')
+    expect(engineOf(taxonomy).edgeTypeOf({ ...edge, values: { kind: 'signal' } }, 'service', 'queue')).toBe('fromService')
   })
 
   it('refuses two types naming as many ends that nothing tells apart', () => {
@@ -68,8 +68,8 @@ describe('edgeTypeOf', () => {
       styleAxis: 'kind', styles, edgeTypes: [dependency('calls', { sourceValue: 'service', targetValue: 'queue' })],
       classifyEdge: e => (e.id === 'skip' ? null : undefined),
     })
-    expect(taxonomy.edgeTypeOf({ ...edge, id: 'skip' }, 'service', 'queue')).toBeUndefined()
-    expect(taxonomy.edgeTypeOf(edge, 'service', 'queue')).toBe('calls')
+    expect(engineOf(taxonomy).edgeTypeOf({ ...edge, id: 'skip' }, 'service', 'queue')).toBeUndefined()
+    expect(engineOf(taxonomy).edgeTypeOf(edge, 'service', 'queue')).toBe('calls')
   })
 })
 
