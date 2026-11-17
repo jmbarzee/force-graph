@@ -7,7 +7,7 @@ import { useIsomorphicLayoutEffect } from './useIsomorphicLayoutEffect'
 
 /** The canvas's tokens, by role: `focusRingColor` reads `--gv-focus-ring-color`. */
 const ROLES = [
-  'colorGraphLabel', 'colorText', 'colorTextMuted', 'colorSurface',
+  'colorGraphLabel', 'colorText', 'colorTextMuted',
   'focusRingColor', 'selectionRingColor', 'badgeFill', 'badgeText',
   'tensionStretch', 'tensionCompress', 'tensionRest',
 ] as const

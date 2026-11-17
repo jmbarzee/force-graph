@@ -55,6 +55,8 @@ const MARK_DASH = [6, 4]
 const MARK_WIDTH = 6
 const MARK_ALPHA = 0.55
 
+// White, not the surface token: a glyph sits on its node's fill, not on the surface.
+const GLYPH_COLOR = 'white'
 const ICON_FONT_FAMILY = '-apple-system, BlinkMacSystemFont, "Segoe UI", Roboto, sans-serif'
 const LABEL_FONT_PX = 11
 // Slight translucency on node labels so they don't read as the only bright
@@ -892,7 +894,7 @@ export function GraphCanvas({
         if (vp.scale >= LABEL_ELIDE_SCALE && icon) {
           ctx.save()
           ctx.font = `${def.size.iconSize * mul}px ${ICON_FONT_FAMILY}`
-          ctx.fillStyle = p.colorSurface
+          ctx.fillStyle = GLYPH_COLOR
           ctx.globalAlpha = (nodeDimmed ? dimAlpha : 1) * 0.92
           ctx.fillText(icon, sx, sy + 0.5)
           ctx.restore()
