@@ -60,18 +60,6 @@ export function useViewport(drawn: React.RefObject<readonly SimNode[]>): Viewpor
     sizeRef.current = { width, height }
     return { width, height }
   }, [])
-  React.useEffect(() => {
-    const container = containerRef.current
-    if (!container || typeof ResizeObserver === 'undefined') return
-    const ro = new ResizeObserver(() => {
-      const prev = sizeRef.current
-      const size = measure()
-      if (size) setViewport(vp => followResize(vp, prev, size))
-    })
-    ro.observe(container)
-    return () => ro.disconnect()
-  }, [measure])
-
   const apply = React.useCallback((request: FrameRequest): boolean => {
     const size = measure()
     if (!size?.width || !size.height) return false
@@ -81,6 +69,18 @@ export function useViewport(drawn: React.RefObject<readonly SimNode[]>): Viewpor
   }, [measure, drawn, overlayHeightRef])
 
   const queue = React.useMemo(() => frameQueue(apply), [apply])
+  React.useEffect(() => {
+    const container = containerRef.current
+    if (!container || typeof ResizeObserver === 'undefined') return
+    const ro = new ResizeObserver(() => {
+      const prev = sizeRef.current
+      const size = measure()
+      if (size) setViewport(vp => followResize(vp, prev, size))
+      queue.measured()
+    })
+    ro.observe(container)
+    return () => ro.disconnect()
+  }, [measure, queue])
   const moveViewport = React.useCallback((action: React.SetStateAction<Viewport>) => {
     queue.release()
     setViewport(action)

@@ -394,7 +394,9 @@ the console. Everything else is optional.
   `systemTheme` (what `'system'` means, for a host that knows its own
   theme), `className`, `style`, and `defaultPositions` (kept positions,
   read whenever the simulation is built; a node the live layout already
-  holds keeps its place).
+  holds keeps its place; one covering every node opens at rest, unsettled:
+  hand back what `onSettled` kept, or call `setPositions` to settle from
+  rough positions).
 - **Outputs.** `onSelectionChange(node | null)`, `onNodeActivate(node)` on a
   double-click, `onHover(node | null)`, `onThemeResolved(theme)`,
   `onDiagnostics(diagnostics)` whenever the graph's defects are recomputed

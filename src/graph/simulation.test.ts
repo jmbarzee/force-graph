@@ -44,9 +44,15 @@ describe('Simulation.setCohesion', () => {
   })
 })
 
-// Ticks until the simulation reports stable, or -1 past 100.
-const ticksToStop = (alphaMin: number): number => {
+// A simulation that cools fast to the given threshold, from the start or cool.
+const simAt = (alphaMin: number, cool = false): Simulation => {
   const sim = new Simulation(graph, layoutOf({ alphaDecay: 0.25, alphaMin }), () => 0.5)
+  if (cool) sim.cool()
+  return sim
+}
+
+// Ticks until the simulation reports stable, or -1 past 100.
+const ticksToStop = (sim: Simulation): number => {
   for (let n = 0; n <= 100; n++) {
     if (sim.isStable()) return n
     sim.tick()
@@ -56,11 +62,19 @@ const ticksToStop = (alphaMin: number): number => {
 
 describe('Simulation', () => {
   it('stops at the tick alpha reaches 0 when the threshold is 0', () => {
-    expect(ticksToStop(0)).toBe(4)
+    expect(ticksToStop(simAt(0))).toBe(4)
   })
 
   it('stops at the first tick alpha falls below any other threshold', () => {
-    expect(ticksToStop(0.3)).toBe(3)
+    expect(ticksToStop(simAt(0.3))).toBe(3)
+  })
+
+  it('ticks once from cool, at the threshold', () => {
+    expect(ticksToStop(simAt(0.3, true))).toBe(1)
+  })
+
+  it('ticks not at all from cool when the threshold is 0', () => {
+    expect(ticksToStop(simAt(0, true))).toBe(0)
   })
 })
 
