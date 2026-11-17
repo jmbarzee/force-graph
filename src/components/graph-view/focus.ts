@@ -21,3 +21,8 @@ export interface FocusRequest {
 export function sameFocusRequest(a: FocusRequest | null, b: FocusRequest | null): boolean {
   return a === b || (a !== null && b !== null && a.id === b.id && a.key === b.key)
 }
+
+/** Whether a request names a node: one carrying a target's values alone does not, and the view leaves it to the switch that widened its filter. */
+export function namesNode(request: Partial<FocusRequest> | null | undefined): request is FocusRequest {
+  return request?.id !== undefined
+}

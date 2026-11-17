@@ -1,7 +1,12 @@
-import { describe, expect, it } from 'vitest'
-import { axesOpenedBy, axesReseeded, firstLine } from './FilterBar'
+// @vitest-environment jsdom
+import React, { act } from 'react'
+import { createRoot } from 'react-dom/client'
+import { afterEach, beforeEach, describe, expect, it, vi } from 'vitest'
+import { FilterBar, axesOpenedBy, axesReseeded, firstLine } from './FilterBar'
+import type { FilterBarProps } from './FilterBar'
 import { createTaxonomy } from '../graph/taxonomy'
 import type { FilterState } from '../filter/types'
+import { withLock } from '../filter/types'
 
 describe('firstLine', () => {
   it('counts the items that wrap past the first line, and measures to its lowest', () => {
@@ -48,5 +53,75 @@ describe('axesOpenedBy', () => {
   it('opens an axis whose values arrived when the change is not their seed', () => {
     const one: FilterState = new Map([['team', new Set(['team 3'])]])
     expect(axesOpenedBy(new Map(), one, axesReseeded(taxonomy, none, thirty, one))).toEqual(['team'])
+  })
+})
+
+describe('FilterBar', () => {
+  beforeEach(() => {
+    ;(globalThis as { IS_REACT_ACT_ENVIRONMENT?: boolean }).IS_REACT_ACT_ENVIRONMENT = true
+    window.matchMedia = () => ({ matches: false }) as MediaQueryList
+    window.ResizeObserver = class { observe() {} unobserve() {} disconnect() {} }
+  })
+  afterEach(() => { document.body.innerHTML = '' })
+
+  const taxonomy = createTaxonomy({ styleAxis: 'kind', styles: [], filterAxes: [{ id: 'team', emptyMeans: 'none' }] })
+  const values = new Map([['team', ['a', 'b']]])
+  const onlyA: FilterState = new Map([['team', new Set(['a'])]])
+  type Row = { id: string; name: string; values: { team: string } }
+  type Props = Partial<Omit<FilterBarProps<Row>, 'values' | 'graph'>>
+
+  /** Mount a bar in the document; `render` re-renders it with new props. */
+  async function mount(props: Props) {
+    const host = document.body.appendChild(document.createElement('div'))
+    const root = createRoot(host)
+    const render = (next: Props) => act(async () => {
+      root.render(React.createElement(FilterBar<Row>, { taxonomy, filter: onlyA, onFilterChange: () => {}, ...next, values }))
+    })
+    await render(props)
+    return { host, render }
+  }
+  const slash = () => act(async () => { document.body.dispatchEvent(new KeyboardEvent('keydown', { key: '/', bubbles: true })) })
+
+  it('badges the matches its records hide, on their chip and as the search\'s +N', async () => {
+    const records: Row[] = [{ id: '1', name: 'xa', values: { team: 'a' } }, { id: '2', name: 'xb', values: { team: 'b' } }, { id: '3', name: 'yb', values: { team: 'b' } }]
+    const { host } = await mount({ records, matches: (r, q) => r.name.includes(q), search: { query: 'x', active: true } })
+    const chipB = [...host.querySelectorAll('.gv-chip')].find(c => c.querySelector('.gv-chip-label')?.textContent === 'b')!
+    expect(chipB.querySelector('.gv-header-hidden-badge')?.textContent).toBe('1')
+    expect(host.querySelector('.gv-header-search-badge')?.textContent).toBe('+1')
+  })
+
+  it('opens its search on / when shown, and says so', async () => {
+    const { host } = await mount({})
+    expect(host.querySelector('.gv-header-search-toggle')?.getAttribute('title')).toBe('Search (/)')
+    await slash()
+    expect(host.querySelector('.gv-header-search-input')).not.toBeNull()
+  })
+
+  it('leaves / alone when hidden', async () => {
+    const { host } = await mount({})
+    host.style.display = 'none'
+    await slash()
+    expect(host.querySelector('.gv-header-search-input')).toBeNull()
+  })
+
+  it('leaves / to a host that focuses the input itself, and names no key', async () => {
+    const { host } = await mount({ searchInputRef: React.createRef<HTMLInputElement>() })
+    expect(host.querySelector('.gv-header-search-toggle')?.getAttribute('title')).toBe('Search')
+    await slash()
+    expect(host.querySelector('.gv-header-search-input')).toBeNull()
+  })
+
+  it('flashes the overridden locks once per key, not per set', async () => {
+    vi.useFakeTimers()
+    const locked = { locks: withLock(new Map(), 'team', true), onLocksChange: () => {} }
+    const { host, render } = await mount({ ...locked, overriddenLocks: { axes: new Set(['team']), key: 1 } })
+    const flashing = () => host.querySelector('.gv-lock-toggle')!.classList.contains('flashing')
+    expect(flashing()).toBe(true)
+    await act(async () => { vi.advanceTimersByTime(600) })
+    await render({ ...locked, overriddenLocks: { axes: new Set(['team']), key: 1 } })
+    expect(flashing()).toBe(false)
+    await render({ ...locked, overriddenLocks: { axes: new Set(['team']), key: 2 } })
+    expect(flashing()).toBe(true)
+    vi.useRealTimers()
   })
 })

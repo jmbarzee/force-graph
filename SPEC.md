@@ -315,6 +315,8 @@ A host with a second view links them through `useLinkedViews`
   alone; the bar flashes the overridden lock and the chips that turned on.
   There is no switch that copies one view's filter onto another past its
   locks.
+- **`/`** opens the search of the bar on screen, unless focus is in a field
+  the key types into.
 - **A lock** holds one view's axis against manual switches. Unlocking resumes
   adoption from the next switch.
 - **Focus into the graph** is `focusNode`
