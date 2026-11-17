@@ -292,6 +292,18 @@ the console. Everything else is optional.
   const saved = filterFromJSON(JSON.parse(localStorage.getItem('filter') ?? 'null'))
   <GraphView graph={graph} taxonomy={taxonomy} defaultFilter={saved} />
   ```
+- **Labels.** `labels` names values per axis, beside the graph, for names
+  that arrive with the data: a chip, a control's bucket (and, off the style
+  axis, its abbreviation), and a search result's style read a value's label
+  from `labels`, then from the descriptor's `labelFor`, then the value. The
+  value stays the filter's key, the chip's identity and what `filterToJSON`
+  writes, so two values sharing a name stay two chips. Keep one object until
+  a name changes.
+
+  ```tsx
+  const labels = { login: { ada: 'Ada Lovelace', gh: 'Grace Hopper' } }
+  <GraphView graph={graph} labels={labels} />
+  ```
 - **Selection and focus.** `selectedId` controls the selection: while it is
   defined the view shows it and nothing else, `onSelectionChange` reports the
   selections the user makes (never one the host made), and the host answers
@@ -433,7 +445,8 @@ export function TwoViews({ taxonomy, graph }: { taxonomy: Taxonomy; graph: Graph
 ```
 
 `linked.of(view)` is the view's `filter`, `locks`, `axes`, their callbacks,
-`overriddenLocks`, the shared `search` with its callback, and the `focus` the
+`overriddenLocks`, the shared `search` with its callback, the `labels` the hook
+was given, and the `focus` the
 last `linked.focus` asked of it with `onFocusResult` (a `FilterBar` ignores
 those two); it throws for a view the hook was not given (`views` is read
 once). `linked.active` is the view shown.

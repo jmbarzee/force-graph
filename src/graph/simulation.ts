@@ -19,8 +19,8 @@ import type { Rng } from './rng'
 import type { EdgeCategory, LayoutFrame, LayoutSubject, ResolvedPhysics } from './forces'
 import type { ResolvedScalarAxis, ScalarTuning } from './scalar'
 import { isScalarTuning } from './scalar'
-import type { AxisNamer, AxisId, AxisValue, AxisMapping } from './axis'
-import { identityMapping, mappingKey, valuesOn } from './axis'
+import type { AxisLabels, AxisNamer, AxisId, AxisValue, AxisMapping } from './axis'
+import { identityMapping, isIdentityMapping, labelled, labelledBy, mappingKey, valuesOn } from './axis'
 import type { Taxonomy } from './taxonomy'
 import { engineOf } from './taxonomy'
 
@@ -135,16 +135,12 @@ export function withSpringOverride(pair: PairTuning, id: EdgeTypeId, value: Spri
   return { ...pair, spring }
 }
 
-/**
- * The identity bucketing of the taxonomy's style axis — one bucket per declared
- * value. The style axis has no descriptor (it is not a filter), so its labels
- * come from the taxonomy rather than through `identityMapping`.
- */
-export function styleIdentityMapping(taxonomy: Taxonomy): AxisMapping {
+/** The identity bucketing of the taxonomy's style axis: one bucket per declared value, named by `styleLabelFor`. */
+export function styleIdentityMapping(taxonomy: Taxonomy, labels?: AxisLabels): AxisMapping {
   return identityMapping({
     id: taxonomy.styleAxis(),
     label: taxonomy.styleLabel(),
-    labelFor: value => taxonomy.styleOf(value).label,
+    labelFor: styleLabelFor(taxonomy, labels),
     abbreviationFor: value => engineOf(taxonomy).abbreviationFor(value),
   }, taxonomy.styleValues)
 }
@@ -236,14 +232,31 @@ function nodeAxes(taxonomy: Taxonomy, graph: Graph): AxisId[] {
   return out
 }
 
-/** How an axis names itself and its values: its descriptor's way, or — for an axis no descriptor declares — the id and the value. */
-export function namerFor(taxonomy: Taxonomy, axis: AxisId): AxisNamer {
-  return taxonomy.axisFor(axis) ?? {
+/** A style value's name: `labels`, then the style axis's `labelFor`, then the style's label. */
+export function styleLabelFor(taxonomy: Taxonomy, labels?: AxisLabels): (value: AxisValue) => string {
+  const style = taxonomy.styleAxis()
+  return labelled(taxonomy.axisFor(style), labels)?.labelFor ?? labelledBy(labels, style, value => taxonomy.styleOf(value).label)
+}
+
+/** How an axis names itself and its values: `labels`, then its descriptor's way, or — for an axis no descriptor declares — the id and the value. */
+export function namerFor(taxonomy: Taxonomy, axis: AxisId, labels?: AxisLabels): AxisNamer {
+  const labelFor = labelledBy(labels, axis, (v: AxisValue) => v)
+  return labelled(taxonomy.axisFor(axis), labels) ?? {
     id: axis,
     label: axis,
-    labelFor: (v: AxisValue) => v,
-    abbreviationFor: (v: AxisValue) => v.slice(0, 2),
+    labelFor,
+    abbreviationFor: v => labelFor(v).slice(0, 2),
   }
+}
+
+/** The parameters with every identity mapping's buckets named by `labels`, for the controls that show them; the forces read no name. */
+export function labelledParams(params: ForceParams, taxonomy: Taxonomy, labels: AxisLabels | undefined): ForceParams {
+  if (labels === undefined) return params
+  const named = (m: AxisMapping): AxisMapping => !isIdentityMapping(m) ? m
+    : m.axis === taxonomy.styleAxis() ? styleIdentityMapping(taxonomy, labels)
+    : identityMapping(namerFor(taxonomy, m.axis, labels), m.buckets.map(b => b.id))
+  const layout = (t: LayoutTuning): LayoutTuning => (isScalarTuning(t) ? t : { ...t, mapping: named(t.mapping) })
+  return { ...params, pair: { ...params.pair, mapping: named(params.pair.mapping) }, bandX: layout(params.bandX), bandY: layout(params.bandY) }
 }
 
 /** One choice for a layout axis: a mapping (with its cost) or a computed scalar. */

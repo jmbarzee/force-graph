@@ -203,3 +203,14 @@ it('reads a new graph as unchanged only when its window, weights and series are'
   expect(said()).toBe(true)
   warn.mockRestore()
 })
+
+it('names a search result\'s style by labels, then by labelFor, then by the style\'s label', async () => {
+  const styled = createTaxonomy({
+    styleAxis: 'kind',
+    styles: ['svc', 'db', 'queue'].map(id => ({ id, label: `${id} style`, color: { light: { fill: '#000000', border: '#000000' }, dark: { fill: '#ffffff', border: '#ffffff' } } })),
+    filterAxes: [{ id: 'kind', emptyMeans: 'none', labelFor: v => (v === 'db' ? 'Database' : `${v} style`) }],
+  })
+  const graph: Graph = { nodes: ['svc', 'db', 'queue'].map((kind, i): GraphNode => ({ id: `n${i}`, name: `match ${kind}`, values: { kind } })), edges: [] }
+  const view = await mount({ taxonomy: styled, labels: { kind: { svc: 'Service' } }, search: { query: 'match', active: true }, onSearchChange: () => {} }, graph)
+  expect([...view.el.querySelectorAll('.gv-graph-search-result-type')].map(e => e.textContent)).toEqual(['Service', 'Database', 'queue style'])
+})

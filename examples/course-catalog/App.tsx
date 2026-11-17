@@ -13,11 +13,11 @@ import {
 import type {
   FilterState, GraphNode, ThemeChoice, TuningPreset,
 } from '@jmbarzee/force-graph'
-import { catalog } from './data'
+import { CAMPUS_LABEL, catalog } from './data'
 import type { Campus, Catalog } from './data'
 import { buildGraph, programmeGroups } from './graph'
 import { loadPositions, savePositions } from './positions'
-import { CAMPUS, CAMPUS_LABEL, ENTITY, taxonomy } from './taxonomy'
+import { CAMPUS, ENTITY, taxonomy } from './taxonomy'
 import type { Entity } from './taxonomy'
 import './app.css'
 
@@ -26,6 +26,7 @@ const nodeById = nodesById(graph.nodes)
 const nodeByCode = new Map(graph.nodes.map(n => [payloadString(n, 'code') ?? n.id, n]))
 const copies = copyGroups(graph)
 const groups = programmeGroups(catalog)
+const labels = { [CAMPUS]: CAMPUS_LABEL }
 
 /** Data-quality warnings the registrar should see. */
 function findingsOf(data: Catalog): string[] {
@@ -71,6 +72,7 @@ export function App({ initialTheme = 'system' }: { initialTheme?: ThemeChoice })
         <div className="catalog-pane">
           <GraphView
             graph={graph}
+            labels={labels}
             counts="faceted"
             findings={FINDINGS.length > 0 && <Findings messages={FINDINGS} />}
             groups={groups}

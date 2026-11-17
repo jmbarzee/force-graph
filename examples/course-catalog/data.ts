@@ -2,6 +2,7 @@
 // Nothing here knows about graphs: `graph.ts` is the translation step.
 
 export type Campus = 'north' | 'south' | 'online'
+export const CAMPUS_LABEL: Record<Campus, string> = { north: 'North campus', south: 'South campus', online: 'Online' }
 export type Term = 'Autumn' | 'Spring' | 'Summer'
 export type RequirementKind = 'prerequisite' | 'corequisite' | 'recommended'
 

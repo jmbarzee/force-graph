@@ -80,3 +80,9 @@ it('keys the locks a focus overrides, and a manual switch clears them under a ne
   await act(async () => { hook.linked().switchTo('graph') })
   expect(hook.linked().of('graph').overriddenLocks).toEqual({ axes: new Set(), key: 2 })
 })
+
+it('hands every view the same labels', async () => {
+  const labels = { team: { a: 'Alpha' } }
+  const hook = await mount({ graph: { list: first }, labels })
+  expect([hook.linked().of('list').labels, hook.linked().of('graph').labels]).toEqual([labels, labels])
+})

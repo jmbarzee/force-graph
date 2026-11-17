@@ -4,7 +4,7 @@
 // view's `GraphView` or `FilterBar` takes, one `switchTo`, one `focus`.
 
 import React from 'react'
-import type { AxisId } from '../../graph/axis'
+import type { AxisId, AxisLabels } from '../../graph/axis'
 import type { Graph, GraphNode } from '../../graph/model'
 import type { Taxonomy } from '../../graph/taxonomy'
 import { NO_OVERRIDES, linkedSwitch } from '../../filter/linked'
@@ -41,6 +41,8 @@ export interface LinkedViewProps {
   focus: { id?: string; key: number; target: FocusTarget } | null
   /** The pane's report on `focus`, which clears it. */
   onFocusResult: (request: Partial<FocusRequest>, shown: boolean) => void
+  /** The hook's `labels`, the same in every view's props. */
+  labels?: AxisLabels
 }
 
 /** What `useLinkedViews` is given. */
@@ -57,6 +59,8 @@ export interface LinkedViewsOptions<V extends string> {
   start?: V
   /** Where the shared search starts — a persisted query, say. Default: closed and empty. Read once. */
   initialSearch?: SearchState
+  /** Names for values, per axis, handed to every view. */
+  labels?: AxisLabels
 }
 
 /** The state two or more views share through one bar: each view's props, the view shown, the switch and the focus between views, and the whole for persistence. */
@@ -112,7 +116,7 @@ function recordOver<V extends string, T>(views: readonly V[], make: (view: V) =>
  * `initial` gave did not differ from the default — so a host that mounts
  * empty is not left blank and the user's own selections stand.
  */
-export function useLinkedViews<V extends string>({ taxonomy, views, initial, graph, start, initialSearch }: LinkedViewsOptions<V>): LinkedViews<V> {
+export function useLinkedViews<V extends string>({ taxonomy, views, initial, graph, start, initialSearch, labels }: LinkedViewsOptions<V>): LinkedViews<V> {
   // The axes the user has touched, per view: state, not an inference — a
   // selection that happens to equal a graph's opening one is not thereby
   // untouched. A filter `initial` gave starts touched where it differs from
@@ -154,7 +158,7 @@ export function useLinkedViews<V extends string>({ taxonomy, views, initial, gra
     onFocusResult: request => setFocusRequests(prev => (prev[view] === request ? { ...prev, [view]: null } : prev)),
   })), [viewKey]) // eslint-disable-line react-hooks/exhaustive-deps
 
-  const props = React.useMemo(() => recordOver(views, (view): LinkedViewProps => ({ ...state[view], ...callbacks[view], search, focus: focusRequests[view] })), [state, callbacks, search, focusRequests]) // eslint-disable-line react-hooks/exhaustive-deps
+  const props = React.useMemo(() => recordOver(views, (view): LinkedViewProps => ({ ...state[view], ...callbacks[view], search, focus: focusRequests[view], labels })), [state, callbacks, search, focusRequests, labels]) // eslint-disable-line react-hooks/exhaustive-deps
 
   // A graph that arrives for a view after the mount re-seeds that view on the
   // axes the user has not touched — so a host that mounts empty while its

@@ -154,9 +154,9 @@ export interface AxisDescriptor {
    * the style axis, none elsewhere.
    */
   order?: readonly AxisValue[]
-  /** A value's display name. Absent: the style's label on the style axis, else the value itself. */
+  /** A value's display name, for a value the host's `labels` does not name. Absent: the style's label on the style axis, else the value itself. */
   labelFor?(value: AxisValue): string
-  /** One or two characters for a token. Absent: the style's abbreviation on the style axis, else the first two characters of `labelFor`'s answer. */
+  /** One or two characters for a token. Absent: the style's abbreviation on the style axis, else the first two characters of the value's label. */
   abbreviationFor?(value: AxisValue): string
   /** A chip's hover text, when the label alone does not identify the value (a file's full path under its basename). Absent: none. */
   tooltipFor?(value: AxisValue): string
@@ -215,15 +215,31 @@ export interface StyleNamer {
   iconFor(value: AxisValue): string
 }
 
+/** A host's names for values, per axis, passed beside the graph as `labels`. */
+export type AxisLabels = Readonly<Record<AxisId, Readonly<Record<AxisValue, string>>>>
+
+/** `labelFor`, with every value `labels` names on `axis` called by that name. */
+export function labelledBy(labels: AxisLabels | undefined, axis: AxisId, labelFor: (value: AxisValue) => string): (value: AxisValue) => string {
+  const named = labels !== undefined && hasOwn(labels, axis) ? labels[axis] : undefined
+  return named === undefined ? labelFor : value => (hasOwn(named, value) ? named[value] : labelFor(value))
+}
+
+const relabel = new WeakMap<ResolvedAxisDescriptor, (labels: AxisLabels) => ResolvedAxisDescriptor>()
+
+/** The axis as though resolved with `labels`: the values they name on it called by those names. */
+export function labelled(axis: ResolvedAxisDescriptor | undefined, labels: AxisLabels | undefined): ResolvedAxisDescriptor | undefined {
+  return axis === undefined || labels === undefined || !hasOwn(labels, axis.id) ? axis : relabel.get(axis)?.(labels) ?? axis
+}
+
 /**
  * A declared axis with every default filled in. The policies follow from
- * `emptyMeans`; the names follow from the style axis when this is it, and
- * from the value itself otherwise.
+ * `emptyMeans`; the names follow from `labels`, then from the style axis when
+ * this is it, and from the value itself otherwise.
  */
-export function resolveDescriptor(d: AxisDescriptor, style: StyleNamer): ResolvedAxisDescriptor {
+export function resolveDescriptor(d: AxisDescriptor, style: StyleNamer, labels?: AxisLabels): ResolvedAxisDescriptor {
   const allow = d.emptyMeans === 'none'
   const onStyle = d.id === style.axis
-  const labelFor = d.labelFor ?? (onStyle ? style.labelFor : (v: AxisValue) => v)
+  const labelFor = labelledBy(labels, d.id, d.labelFor ?? (onStyle ? style.labelFor : (v: AxisValue) => v))
   const abbreviationFor = d.abbreviationFor ?? (onStyle ? style.abbreviationFor : (v: AxisValue) => labelFor(v).slice(0, 2))
   const keepCamera = d.keepCamera ?? !allow
   const iconFor = d.iconFor ?? (onStyle ? style.iconFor : () => '')
@@ -236,7 +252,7 @@ export function resolveDescriptor(d: AxisDescriptor, style: StyleNamer): Resolve
     tooltip: d.tooltipFor?.(v),
     values: [v],
   })))
-  return {
+  const resolved: ResolvedAxisDescriptor = {
     id: d.id,
     label: d.label ?? d.id,
     emptyMeans: d.emptyMeans,
@@ -254,6 +270,8 @@ export function resolveDescriptor(d: AxisDescriptor, style: StyleNamer): Resolve
     initialSelection: d.initialSelection ?? (values => (allow ? values : [])),
     presentation: d.presentation ?? 'chip',
   }
+  relabel.set(resolved, next => resolveDescriptor(d, style, next))
+  return resolved
 }
 
 /** Where a node sits on one axis, or undefined when it carries no value there. */

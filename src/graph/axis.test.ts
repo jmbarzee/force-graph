@@ -1,5 +1,5 @@
 import { describe, expect, it } from 'vitest'
-import { countsOn, valuesOn } from './axis'
+import { countsOn, identityMapping, labelled, valuesOn } from './axis'
 import { createTaxonomy } from './taxonomy'
 import type { NodeStyle } from './shapes'
 import type { AxisSelection, FilterState } from '../filter/types'
@@ -31,6 +31,40 @@ describe('chipsFor', () => {
     expect(taxonomy.axisFor('site')!.chipsFor(['y', 'x', 'w', 'z']).map(c => c.id)).toEqual(['z', 'x', 'y', 'w'])
     taxonomy.axisFor('team')!.chipsFor(['a', 'b'])
     expect(seen).toEqual([['b', 'a']])
+  })
+})
+
+describe('labels', () => {
+  const taxonomy = createTaxonomy({
+    styleAxis: 'kind', styles: [style('service')],
+    filterAxes: [
+      { id: 'login', emptyMeans: 'all', labelFor: v => `@${v}` },
+      { id: 'repo', emptyMeans: 'all', abbreviationFor: v => v.toUpperCase() },
+      { id: 'kind', emptyMeans: 'none' },
+    ],
+  })
+  const labels = { login: { ada: 'Ada Lovelace', al: 'Ada Lovelace' }, repo: { fg: 'force-graph' }, kind: { service: 'Svc' } }
+
+  it('names a value by labels, then by labelFor, then by itself', () => {
+    expect(['ada', 'grace'].map(labelled(taxonomy.axisFor('login'), labels)!.labelFor)).toEqual(['Ada Lovelace', '@grace'])
+    expect(['fg', 'x'].map(labelled(taxonomy.axisFor('repo'), labels)!.labelFor)).toEqual(['force-graph', 'x'])
+    expect(labelled(taxonomy.axisFor('kind'), labels)!.labelFor('service')).toBe('Svc')
+  })
+
+  it('abbreviates from the resolved label, unless the descriptor abbreviates', () => {
+    expect(labelled(taxonomy.axisFor('login'), labels)!.abbreviationFor('ada')).toBe('Ad')
+    expect(labelled(taxonomy.axisFor('repo'), labels)!.abbreviationFor('fg')).toBe('FG')
+  })
+
+  it('keeps a chip its value: two values sharing a label stay two chips, and two buckets', () => {
+    const login = labelled(taxonomy.axisFor('login'), labels)!
+    expect(login.chipsFor(['ada', 'al']).map(c => [c.id, c.label, c.values])).toEqual([['ada', 'Ada Lovelace', ['ada']], ['al', 'Ada Lovelace', ['al']]])
+    expect(identityMapping(login, ['ada', 'al']).buckets.map(b => [b.id, b.abbreviation])).toEqual([['ada', 'Ad'], ['al', 'Ad2']])
+  })
+
+  it('leaves an axis labels does not name as the taxonomy resolved it', () => {
+    expect(labelled(taxonomy.axisFor('login'), { repo: {} })).toBe(taxonomy.axisFor('login'))
+    expect(labelled(taxonomy.axisFor('login'), undefined)).toBe(taxonomy.axisFor('login'))
   })
 })
 
