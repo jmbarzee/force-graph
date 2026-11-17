@@ -338,15 +338,18 @@ filter.
 - **Nodes.** A disc of the value's `size.r` in its fill and border for the
   resolved theme, its icon inside and its name below, in
   `--gv-color-graph-label`, semibold and slightly translucent. Names over 15
-  characters show 12 and an ellipsis. Badges sit above the node; a `dashed`
-  ring circles it. Size follows Node scaling.
+  characters show 12 and an ellipsis. Badges sit above the node. Its rings
+  stack outward, 2 px apart, an absent one leaving no gap: the
+  `coloring.ring` key's colour, dashed for a `dashed` node and in its fill
+  when keyless; the copy halo; the selection; the focus. Size follows Node
+  scaling.
 - **Labels by density.** Below a zoom of 0.25 labels and icons hide, except
   the hovered and selected nodes'. Above it, a label is drawn only where it
   overlaps no label already placed and no node body, greedily in node order,
   so a settled layout does not flicker; the hovered and selected nodes always
   win.
-- **Detail by zoom.** Below a zoom of 0.1 the decorative rings drop. A node
-  stays hoverable and clickable at every zoom.
+- **Detail by zoom.** A node's rings draw at every zoom, and it stays
+  hoverable and clickable at every zoom.
 - **Edges.** Stroked by their resolved type (`EdgeType.style`), widened by
   `weight`, up to double — a graduated edge keeps the type and weight of the
   edge it stands for. Dependency edges carry an
