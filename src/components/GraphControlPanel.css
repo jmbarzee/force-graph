@@ -264,30 +264,6 @@
   text-align: center;
 }
 
-/* ── Type colour theming ───────────────────────────────────────────────────
-   Per-type rows (charges, bands, edge endpoints) read from --gv-type-color,
-   which each typed row sets inline from the pane's --gv-node-<suffix>.
-*/
-
-/* Rows that carry a single node type get a coloured left-accent and tint
-   their label + slider thumb to match. Applied to both per-type charge
-   sliders (PUSH section) and gravity Y-band sliders (GRAVITY section). */
-.gv-graph-control-typed-row {
-  padding-left: 6px;
-  border-left: 2px solid var(--gv-type-color, transparent);
-}
-
-.gv-graph-control-typed-row input[type="range"] {
-  accent-color: var(--gv-type-color);
-}
-
-.gv-graph-control-typed-row .gv-graph-control-slider-label,
-.gv-graph-control-typed-row .gv-graph-control-band-label {
-  color: var(--gv-type-color);
-  opacity: 0.95;
-  font-weight: 500;
-}
-
 /* Gravity Y-band row — label, dual-handle slider, two readouts. */
 .gv-graph-control-band-row {
   display: flex;

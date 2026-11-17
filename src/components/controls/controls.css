@@ -83,4 +83,11 @@
   text-align: center;
   color: var(--gv-color-text-muted);
 }
+
+/* Curve: a read-only line plot inside a Plot frame. */
+.gv-ctl-curve { display: block; width: 100%; height: auto; overflow: visible; }
+.gv-ctl-curve-frame { fill: none; stroke: var(--gv-color-border); stroke-width: 1; }
+.gv-ctl-curve-line { fill: none; stroke: var(--gv-accent); stroke-width: 2; }
+.gv-ctl-curve-mark { stroke: var(--gv-color-text-muted); stroke-width: 1; stroke-dasharray: 2 2; opacity: 0.6; }
+.gv-ctl-curve-mark-label { font-family: var(--gv-font-mono); font-size: 10px; fill: var(--gv-color-text-muted); }
 }
