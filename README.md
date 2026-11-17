@@ -2,15 +2,14 @@
 
 A force-directed graph view with composable axes, as a React component.
 
-A host declares what its graph is made of — the **axes** its nodes carry values on,
-the **values** on each, and for the style axis a colour per value — through
-`createTaxonomy(spec)`. It builds a `Graph` of nodes and edges carrying
-their values on those axes, and mounts `GraphView`. The view lays the graph out (push and
-pull on any axis the nodes carry, two layout axes keyed on an axis or a
-computed scalar), filters it on any declared axis, highlights it, and lets the
-user tune the forces — without knowing what any node or edge means. The host's
-vocabulary never enters this package. What the user sees and does is
-[SPEC.md](SPEC.md).
+A host declares what its graph is made of — the **axes** its nodes carry
+values on, the **values** on each — through `createTaxonomy(spec)`. It builds
+a `Graph` of nodes and edges carrying their values on those axes, and mounts
+`GraphView`. The view lays the graph out (push and pull on any axis the nodes
+carry, two layout axes keyed on an axis or a computed scalar), filters it on
+any declared axis, highlights it, and lets the user tune the forces — without
+knowing what any node or edge means. The host's vocabulary never enters this
+package. What the user sees and does is [SPEC.md](SPEC.md).
 
 ## Install
 
@@ -85,12 +84,13 @@ never by spreading the built object.
 - **The style axis and its values.** `styleAxis` names the axis every
   node is styled on; `styles` lists its values' styles, top of the hierarchy
   first.
-  A `NodeStyle` needs its `id`, `label` and `color` (fill and border, per
-  theme: hex, `rgb()` or `hsl()`); everything else has a default, and a
+  A `NodeStyle` needs only its `id`; everything else has a default, and a
   value that restates one says nothing:
 
   | field | default |
   |---|---|
+  | `label` | the id |
+  | `color` | the palette's hue at the value's position; declared, a fill and border per theme: hex, `rgb()` or `hsl()` |
   | `abbreviation` | the label's first two characters |
   | `icon` | none |
   | `size.r` / `size.iconSize` | 12 / nine tenths of `r`, rounded, at least 9 |
