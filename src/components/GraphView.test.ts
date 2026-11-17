@@ -4,7 +4,7 @@ import { createRoot } from 'react-dom/client'
 import type { Root } from 'react-dom/client'
 import { afterEach, beforeEach, describe, expect, it, vi } from 'vitest'
 import { GraphView } from './GraphView'
-import type { Coloring, SetColoring } from '../graph/coloring'
+import type { Coloring, ResolvedColoring, SetColoring } from '../graph/coloring'
 import type { GraphViewHandle, GroupsControl } from './GraphView'
 import { createTaxonomy } from '../graph/taxonomy'
 import { createTuning } from '../graph/tuning'
@@ -23,14 +23,15 @@ const drawn = vi.hoisted(() => ({
   strokes: new Map<{ id: string }, EdgeStroke>(), simulations: [] as object[],
   hover: (_id: string | null) => {}, hoverEdge: (_hover: { id: string; x: number; y: number } | null) => {}, hoveredEdgeId: null as string | null,
   select: (_id: string | null, _additive: boolean) => {}, lasso: (_ids: string[]) => {}, selected: new Set<string>() as ReadonlySet<string>,
+  ring: null as ResolvedColoring | null,
 }))
 vi.mock('./GraphCanvas', () => ({
   GraphCanvas: (props: {
     edgeStrokes: typeof drawn.strokes; onHoverNode: typeof drawn.hover; onHoverEdge: typeof drawn.hoverEdge; hoveredEdgeId: string | null
-    onSelectNode: typeof drawn.select; onLassoSelect: typeof drawn.lasso; selectedNodeIds: ReadonlySet<string>
+    onSelectNode: typeof drawn.select; onLassoSelect: typeof drawn.lasso; selectedNodeIds: ReadonlySet<string>; ring: ResolvedColoring | null
   }) => {
     drawn.strokes = props.edgeStrokes; drawn.hover = props.onHoverNode; drawn.hoverEdge = props.onHoverEdge; drawn.hoveredEdgeId = props.hoveredEdgeId
-    drawn.select = props.onSelectNode; drawn.lasso = props.onLassoSelect; drawn.selected = props.selectedNodeIds
+    drawn.select = props.onSelectNode; drawn.lasso = props.onLassoSelect; drawn.selected = props.selectedNodeIds; drawn.ring = props.ring
     return null
   },
 }))
@@ -290,6 +291,23 @@ describe('coloring.fill', () => {
     const view = await mountFilled(byTeam)
     await view.render({ ...byTeam })
     expect(view.reported().filter(d => d.code === 'tint-undeclared')).toHaveLength(1)
+  })
+})
+
+describe('coloring.ring', () => {
+  it('hands the canvas a new ring without rebuilding the simulation, and reports its undeclared key', async () => {
+    let reported: readonly GraphDiagnostic[] = []
+    const root = newRoot(document.createElement('div'))
+    const render = (ring?: Coloring) => act(async () => {
+      root.render(React.createElement(GraphView, { graph: first, taxonomy, coloring: { ring }, onDiagnostics: d => { reported = d } }))
+    })
+    await render()
+    expect(drawn.ring).toBeNull()
+    const built = drawn.simulations.length
+    await render({ by: 'node', keys: [{ id: 'a', label: 'A' }], of: n => n.values.team })
+    expect([...drawn.ring!.keys.keys()]).toEqual(['a'])
+    expect(drawn.simulations.length).toBe(built)
+    expect(reported.filter(d => d.code === 'key-undeclared')).toHaveLength(1)
   })
 })
 

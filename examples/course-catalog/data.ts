@@ -277,11 +277,11 @@ export const catalog: Catalog = {
       requires: [pre('COMP 240'), pre('MATH 210'), pre('MATH 220')],
     },
 
-    // Listed under a subject no department owns.
+    // Listed under a subject no department owns, and cross-listed in Philosophy.
     {
       id: 'ethicsai',
       title: 'Ethics of AI',
-      listings: ['IDST 300'],
+      listings: ['IDST 300', 'PHIL 300'],
       credits: 2,
       campus: 'online',
       term: 'Summer',

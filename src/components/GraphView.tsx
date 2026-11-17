@@ -15,7 +15,7 @@ import type { ForceParams, SimNode, Simulation } from '../graph/simulation'
 import { bandOverlay, resolvePhysics } from '../graph/forces'
 import { countsOn, mappingKey, valuesOn } from '../graph/axis'
 import type { AxisId, AxisLabels, AxisMapping } from '../graph/axis'
-import { coloringsEqual, fillOf, glowOf } from '../graph/coloring'
+import { coloringsEqual, fillOf, glowOf, resolveColoring } from '../graph/coloring'
 import type { Coloring, SetColoring } from '../graph/coloring'
 import { FillContext, useFill } from './graph-view/useFill'
 import { bucketsFill } from './controls/bucketColor'
@@ -178,8 +178,9 @@ export interface GraphViewProps {
    * alike; absent, the style axis's. Icon, size and physics stay on the style
    * axis, and a new colouring repaints without relaying the layout. `glow`
    * glows each key's nodes as one group; absent, it follows `groups`.
+   * `ring` rings each keyed node in its key's colour.
    */
-  coloring?: { fill?: Coloring; glow?: SetColoring }
+  coloring?: { fill?: Coloring; glow?: SetColoring; ring?: Coloring }
   /** Edges to mark, by id, with a dashed band behind their stroke; a graduated edge is marked when the edge it stands for is. */
   markedEdges?: ReadonlySet<string>
   /** The host's action for a node, offered in the hover box: one for every node, or the host's answer per node (null for none). */
@@ -475,10 +476,12 @@ export const GraphView = React.forwardRef<GraphViewHandle, GraphViewProps>(funct
   const fill = React.useMemo(() => fillOf(fillColoring, graph, taxonomy), [fillColoring, graph, taxonomy])
   const glowColoring = useStable(coloring?.glow, coloringsEqual)
   const glow = React.useMemo(() => glowOf(glowColoring, graph, taxonomy, groups ?? NO_GROUPS), [glowColoring, graph, taxonomy, groups])
+  const ringColoring = useStable(coloring?.ring, coloringsEqual)
+  const ring = React.useMemo(() => (ringColoring ? resolveColoring(ringColoring, graph, taxonomy, NO_GROUPS) : null), [ringColoring, graph, taxonomy])
   const diagnostics = React.useMemo(() => {
-    const added = [...groupDiagnostics, ...fill.diagnostics, ...glow.diagnostics, ...tintDiagnostics(taxonomy, valuesByAxis, fill)]
+    const added = [...groupDiagnostics, ...fill.diagnostics, ...glow.diagnostics, ...(ring?.diagnostics ?? []), ...tintDiagnostics(taxonomy, valuesByAxis, fill)]
     return added.length ? [...graphDiagnostics, ...added] : graphDiagnostics
-  }, [graphDiagnostics, groupDiagnostics, fill, glow, taxonomy, valuesByAxis])
+  }, [graphDiagnostics, groupDiagnostics, fill, glow, ring, taxonomy, valuesByAxis])
   const graphIndex = React.useMemo(() => nodesById(graph.nodes), [graph])
   // Every edge by id: the host's own, and the containment edges derived from `parentId`.
   const edgeIndex = React.useMemo(() => new Map(graph.edges.map(e => [e.id, e])), [graph])
@@ -1150,6 +1153,7 @@ export const GraphView = React.forwardRef<GraphViewHandle, GraphViewProps>(funct
             activePullEdge={activePullEdge}
             nodeScale={nodeScale}
             groupGlows={glowGroups}
+            ring={ring}
             markedEdges={visibleMarked}
           />
         </CanvasErrorBoundary>

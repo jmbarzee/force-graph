@@ -169,6 +169,12 @@ export function pairFor(fill: Fill, id: string, fallback: ThemedColor): ThemedCo
   return (key !== undefined && fill.keys.get(key)?.color) || fallback
 }
 
+/** A node's hue: its first key's, else undefined. Allocates nothing, for the draw loop. */
+export function hueFor(coloring: ResolvedColoring, id: string): ThemedHue | undefined {
+  const key = coloring.of.get(id)?.[0]
+  return key === undefined ? undefined : coloring.keys.get(key)?.hue
+}
+
 /**
  * What the glow follows: one source per key of a set colouring, its members
  * the nodes holding the key, coloured by the key's hue and swelling by its
