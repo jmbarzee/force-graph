@@ -28,17 +28,23 @@ import type { EdgeStroke } from './scheme'
 import { cssSuffix, isSchemeColor } from './scheme'
 import { BUILT_IN_SCALARS, resolveScalarAxis } from './scalar'
 
-/** A highlight: the node ids lit and the edge ids lit. Edges absent means "every visible edge between lit nodes". */
+/** A highlight: the node ids lit and the edge ids lit. */
 export interface Highlight {
+  /** The node ids lit. */
   readonly nodes: ReadonlySet<string>
+  /** The edge ids lit; absent, every visible edge between lit nodes. */
   readonly edges?: ReadonlySet<string>
 }
 
 /** What a highlight rule may read: the visible graph, and a lookup for any node. */
 export interface HighlightGraph {
+  /** The nodes the filter shows. */
   readonly visibleNodes: readonly GraphNode[]
+  /** The edges drawn between them. */
   readonly visibleEdges: readonly GraphEdge[]
+  /** The ids of `visibleNodes`. */
   readonly visibleIds: ReadonlySet<string>
+  /** Any node by id, visible or not. */
   getNode(id: string): GraphNode | undefined
 }
 

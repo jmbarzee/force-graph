@@ -40,9 +40,13 @@ export type GraphDiagnosticCode =
 export interface GraphDiagnostic {
   /** An error names something the view cannot draw as given; a warning, something it draws but the host should know. */
   severity: 'error' | 'warning'
+  /** Which defect, stable for a host to match on. */
   code: GraphDiagnosticCode
+  /** The defect in words, for a person. */
   message: string
+  /** The node the defect names, if any. */
   nodeId?: string
+  /** The edge the defect names, if any. */
   edgeId?: string
 }
 

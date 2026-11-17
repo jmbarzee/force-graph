@@ -9,7 +9,9 @@ import type { AxisLocks, FilterState, ReconcileResult, ViewTransition } from './
 
 /** One view's share of the linked state: what it filters on, what it holds against adoption, and what the last focus into it overrode. */
 export interface LinkedViewState {
+  /** The view's selections. */
   filter: FilterState
+  /** The axes the view holds against adoption. */
   locks: AxisLocks
   /** The axes this view shows, in order — the ones a switch reconciles. */
   axes: readonly AxisId[]

@@ -19,6 +19,7 @@ export interface GraphNode {
    * one axis each and read it from here; nothing composes across axes.
    */
   values: AxisValues
+  /** The node's display name. */
   name: string
   /**
    * Metadata the host owns and the library does not interpret.
@@ -108,8 +109,11 @@ export function payloadNumber(
 
 /** An edge of the host's graph: two node ids, a relation, the edge's own axis values and an opaque payload. */
 export interface GraphEdge {
+  /** Stable identity, opaque like a node's. */
   id: string
+  /** The node the edge runs from. */
   sourceId: string
+  /** The node the edge runs to. */
   targetId: string
   /**
    * What the edge means to the engine: a `containment` edge runs from a node
@@ -184,8 +188,11 @@ export function withContainmentEdges(graph: Graph): Graph {
  * derivation all read. A `Simulation` satisfies it structurally.
  */
 export interface ReadableGraph {
+  /** Every node. */
   readonly nodes: readonly GraphNode[]
+  /** Every edge. */
   readonly edges: readonly GraphEdge[]
+  /** The node with this id, if any. */
   getNode(id: string): GraphNode | undefined
 }
 
@@ -200,7 +207,9 @@ export function readableGraph(graph: Graph): ReadableGraph {
  * Read, never written, by the view, which indexes the nodes itself.
  */
 export interface Graph {
+  /** The nodes, in layout order. */
   readonly nodes: readonly GraphNode[]
+  /** The edges. */
   readonly edges: readonly GraphEdge[]
 }
 

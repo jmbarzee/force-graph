@@ -44,7 +44,12 @@ import { SearchIcon } from './icons/SearchIcon'
 const NO_LOCKS: ReadonlySet<string> = new Set()
 
 /** The search control's state: the query, and whether the control is open. */
-export interface SearchState { query: string; active: boolean }
+export interface SearchState {
+  /** The text searched for. */
+  query: string
+  /** Whether the control is open. */
+  active: boolean
+}
 
 /** Which of the bar's own controls are offered: the search on by default, the lock toggles when the host controls `locks` or asks here. */
 export interface FilterBarChrome {

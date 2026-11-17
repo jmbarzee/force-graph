@@ -22,15 +22,21 @@ export interface ColorPair {
 
 /** A value's colour in both themes — declared together, so no half can go missing. */
 export interface ThemedColor {
+  /** The fill and border in the light theme. */
   readonly light: ColorPair
+  /** The fill and border in the dark theme. */
   readonly dark: ColorPair
 }
 
 /** How an edge type is stroked: its colour per theme, base alpha, dash pattern and width. */
 export interface EdgeStroke {
+  /** The stroke's colour per theme. */
   readonly color: { readonly light: string; readonly dark: string }
+  /** The stroke's base opacity, 0 to 1. */
   readonly alpha: number
+  /** The canvas dash pattern; empty is solid. */
   readonly dash: readonly number[]
+  /** The stroke's width. */
   readonly width: number
 }
 

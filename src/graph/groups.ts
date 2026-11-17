@@ -59,7 +59,9 @@ export const NODE_FOCUS_STRENGTH = 2.2
 
 /** A group as the host asks for it: over the whole graph, visible or not. */
 export interface NodeGroup {
+  /** Unique among the host's groups. */
   id: string
+  /** The nodes in the group, visible or not. */
   nodeIds: ReadonlySet<string>
   /** Whether the host emphasises this group; the view glows it stronger. A host's legend inside the pane uses `groupsControl`'s `emphasize` instead and leaves this out. */
   emphasized?: boolean
@@ -116,10 +118,13 @@ export function nodeGroupsOf(groups: Groups, nodes: readonly GraphNode[]): { gro
 
 /** A group as drawn: the visible node ids it covers and its palette colour. */
 export interface ActiveGroup {
+  /** The host's group id. */
   id: string
+  /** The glow's colour. */
   color: string
   /** The glow's intensity: 1, or more for a group that is emphasised or holds the hovered or selected node. */
   strength: number
+  /** The group's visible nodes. */
   nodeIds: ReadonlySet<string>
 }
 

@@ -97,8 +97,8 @@ never by spreading the built object.
   | `physics.charge` / `physics.coreRadius` | −40 r / 4 r |
   | `physics.band.y` | the value's slice of the stack, by its position in the order |
   | `physics.band.x` | 0 to 380 (`BAND_FRAME.x`) |
-  | `whenHidden` | `ascend`: a dependency edge touching a hidden node re-points to its nearest visible ancestor; `splice` follows the node's own edges through |
-  | `summaryKind` | `degree` (`→3 ←2` in the hover box); `children` counts what the node contains; `none` shows neither |
+  | `whenHidden` | `'ascend'`: a dependency edge touching a hidden node re-points to its nearest visible ancestor; `'splice'` follows the node's own edges through |
+  | `summaryKind` | `'degree'` (`→3 ←2` in the hover box); `'children'` counts what the node contains; `'none'` shows neither |
 
   `fallbackStyle` draws a value nobody declared; `styleLabel` names the axis
   in the controls.

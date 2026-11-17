@@ -1,11 +1,11 @@
-.PHONY: help check typecheck typecheck-example test build release
+.PHONY: help check typecheck typecheck-example test build docs readme release
 
 ## help — print the targets
 help:
 	@sed -n 's/^## //p' Makefile
 
 ## check — everything CI runs
-check: typecheck typecheck-example test build
+check: typecheck typecheck-example test build docs readme
 
 ## typecheck — the library's types
 typecheck:
@@ -23,6 +23,14 @@ test:
 ## build — the library artifact in dist-lib/
 build:
 	npm run build:lib
+
+## docs — every declaration the build ships carries a doc comment
+docs: build
+	node verify/dts-docs.mjs
+
+## readme — the README names nothing src/ exports that the entry does not
+readme:
+	node verify/readme-names.mjs
 
 TYPE ?= minor
 

@@ -37,6 +37,7 @@ export interface ReconcileInput {
   source: FilterState
   /** The destination's locks. */
   locks: AxisLocks
+  /** A manual switch, or a focus and its target. */
   transition: ViewTransition
   /** Resolves the axes' policies. */
   taxonomy: Pick<Taxonomy, 'axisFor'>

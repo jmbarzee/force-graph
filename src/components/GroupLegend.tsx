@@ -20,7 +20,9 @@ export interface GroupLegendProps {
   onToggle?: (id: string) => void
   /** Hover emphasis — hand it `groupsControl`'s `emphasize`. */
   onEmphasize?: (id: string | null) => void
+  /** The legend's heading. */
   title?: string
+  /** A class on the legend's root, for the host's styling. */
   className?: string
 }
 
