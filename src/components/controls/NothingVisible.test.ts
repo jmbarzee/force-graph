@@ -64,6 +64,7 @@ describe('a force tab over an empty visible set', () => {
 
   it('says why in place of the push and pull maps and each axis plot', () => {
     expect(count(empty, LINE)).toBe(4)
+    expect(count(empty, 'gv-spring-curves-svg')).toBe(count(full, 'gv-spring-curves-svg') - 2)
   })
 
   it('keeps every equation and every slider', () => {

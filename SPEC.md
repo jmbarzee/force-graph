@@ -132,9 +132,10 @@ visible node falls in, a pull token per spring category a sprung edge falls in,
 a column per bucket on each layout axis. Hiding a chip removes its tokens and
 keeps their tuning for when they return. A push or pull map, or a layout axis's
 band plot, that the visible set leaves empty gives way to one line, "Nothing
-visible on this axis — turn a chip on.", and its curves to their `exp` slider;
-the equation and every slider stay. The axis dropdowns alone measure the whole
-graph, so an axis's availability never flips with a filter.
+visible on this axis — turn a chip on.", and a push or pull map's curves to
+their `exp` slider; the equation and every slider stay. The axis dropdowns
+alone measure the whole graph, so an axis's availability never flips with a
+filter.
 
 **The token ceiling is 24** push tokens and 24 pull tokens. The push axis
 dropdown shows an axis's push and pull token counts beside its name, a layout

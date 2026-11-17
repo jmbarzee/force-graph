@@ -74,8 +74,11 @@
 .gv-ctl-plot-xlabel { color: var(--gv-color-text-muted); text-align: center; }
 
 .gv-ctl-nothing-visible {
-  margin: 10px 0;
-  padding: 24px 8px;
+  aspect-ratio: 3 / 2;
+  display: grid;
+  place-items: center;
+  margin: 0;
+  padding: 0 8px;
   text-align: center;
   color: var(--gv-color-text-muted);
 }
