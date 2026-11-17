@@ -170,7 +170,7 @@ export interface EdgeType {
    * value or several at each end, or left out for any declared value: the
    * type runs between every source value and every target value, in either
    * orientation. Read off the edge's original endpoint nodes when an edge is
-   * classified; the first of each is the split-colour token's two halves.
+   * classified.
    */
   sourceValue?: AxisValue | readonly AxisValue[]
   /** The endpoint values at the other end, as `sourceValue` reads them. */
@@ -196,10 +196,12 @@ export interface EdgeType {
 export interface ResolvedEdgeType extends EdgeType {
   /** The declared label, else the id. */
   label: string
-  /** The first source value — one half of the split-colour token. */
-  sourceValue: AxisValue
-  /** The first target value — the other half. */
-  targetValue: AxisValue
+  /** Every value the source end claims: every declared value where it is left out. */
+  sources: readonly AxisValue[]
+  /** Every value the target end claims, likewise. */
+  targets: readonly AxisValue[]
+  /** The split-colour token's two halves: each end's first value, `null` where the type leaves that end out. */
+  swatch: readonly [AxisValue | null, AxisValue | null]
   /** Every (source, target) pair the type runs between: each source value with each target value, in declaration order. */
   pairs: readonly (readonly [AxisValue, AxisValue])[]
   /** The declared spring, else the middling one. */
@@ -280,19 +282,22 @@ export function resolveNodeStyle(style: NodeStyle, i: number, n: number): Resolv
 
 /**
  * A declared edge type with its defaults filled in, given `every` declared
- * value: the id as label, the first value at each end beside every pair, the
- * middling spring, its relation's stroke field by field, the label as
+ * value: the id as label, every value at each end, the swatch, every pair,
+ * the middling spring, its relation's stroke field by field, the label as
  * tooltip. The taxonomy has refused an end that lists no value before this
  * runs.
  */
 export function resolveEdgeType(type: EdgeType, every: readonly AxisValue[]): ResolvedEdgeType {
   const start = type.relation === 'containment' ? CONTAINMENT_STROKE : NEUTRAL_STROKE
   const label = type.label ?? type.id
+  const sources = endpointValues(type.sourceValue, every)
+  const targets = endpointValues(type.targetValue, every)
   return {
     ...type,
     label,
-    sourceValue: endpointValues(type.sourceValue, every)[0]!,
-    targetValue: endpointValues(type.targetValue, every)[0]!,
+    sources,
+    targets,
+    swatch: [type.sourceValue === undefined ? null : sources[0]!, type.targetValue === undefined ? null : targets[0]!],
     pairs: edgePairs(type, every),
     physics: type.physics ?? { ...MIDDLING_SPRING },
     style: { ...start, ...type.style, color: { ...start.color, ...type.style?.color } },

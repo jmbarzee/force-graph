@@ -485,7 +485,7 @@ export const ABSENT_EDGE_PHYSICS: SpringPhysics = { strength: 0, distance: 0 }
  * a pair category synthesises it — and neither needs physics or a stroke here
  * (physics is `physicsFor`, and a pair is a spring, never a stroke).
  */
-export type EdgeCategoryDescription = Pick<ResolvedEdgeType, 'id' | 'label' | 'sourceValue' | 'targetValue' | 'relation' | 'tooltip'>
+export type EdgeCategoryDescription = Pick<ResolvedEdgeType, 'id' | 'label' | 'sources' | 'targets' | 'swatch' | 'relation' | 'tooltip'>
 
 
 /**
@@ -571,8 +571,9 @@ export function resolveSprings(pair: PairTuning, taxonomy: Taxonomy): ResolvedSp
       return {
         id,
         label: `${A.abbreviation}↔${B.abbreviation}`,
-        sourceValue: a,
-        targetValue: b,
+        sources: [a],
+        targets: [b],
+        swatch: [a, b],
         relation,
         physics: typical,
         tooltip: `${A.label} ↔ ${B.label} ${relation}`,

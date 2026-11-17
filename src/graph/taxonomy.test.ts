@@ -57,3 +57,12 @@ describe('edgeTypeOf', () => {
     expect(taxonomy.edgeTypeOf(edge, 'service', 'queue')).toBe('calls')
   })
 })
+
+describe('edgeTypes', () => {
+  it('resolves an end left out to every declared value, and its swatch half to null', () => {
+    const [fromService] = createTaxonomy({ styleAxis: 'kind', styles, edgeTypes: [dependency('fromService', { sourceValue: 'service' })] }).edgeTypes
+    expect(fromService!.sources).toEqual(['service'])
+    expect(fromService!.targets).toEqual(['service', 'queue', 'store'])
+    expect(fromService!.swatch).toEqual(['service', null])
+  })
+})
