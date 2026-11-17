@@ -99,6 +99,7 @@ never by spreading the built object.
   | `physics.band.x` | 0 to 380 (`BAND_FRAME.x`) |
   | `whenHidden` | `'ascend'`: a dependency edge touching a hidden node re-points to its nearest visible ancestor; `'splice'` follows the node's own edges through |
   | `summaryKind` | `'degree'` (`→3 ←2` in the hover box); `'children'` counts what the node contains; `'none'` shows neither |
+  | `ladder` | none: the value is a rung of no ladder |
 
   `fallbackStyle` draws a value nobody declared; `styleLabel` names the axis
   in the controls.
