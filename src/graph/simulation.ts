@@ -1,7 +1,7 @@
 // Force-directed simulation engine.
 
 import type { GraphNode, GraphEdge, Graph } from './model'
-import { nodesById, readableGraph } from './model'
+import { nodesById } from './model'
 import type { EdgeTypeId, SpringPhysics } from './shapes'
 import {
   applyChargeForce,
@@ -10,10 +10,8 @@ import {
   applyTopologicalGravity,
   applyCenterGravity,
   bandAxesActing,
-  layoutFrame,
   presentSpringCategories,
   topologicalActing,
-  resolvePhysics,
   resolveSprings,
   springFor,
 } from './forces'
@@ -534,6 +532,13 @@ export function sprungEdges(edges: readonly GraphEdge[], visibleIds: ReadonlySet
   return edges.filter(e => visibleIds.has(e.sourceId) && visibleIds.has(e.targetId))
 }
 
+/** The force parameters, the tables they resolve to, and the frame those place the simulation's graph in. */
+export interface Layout {
+  readonly params: ForceParams
+  readonly resolved: ResolvedPhysics
+  readonly frame: LayoutFrame
+}
+
 export class Simulation {
   nodes: SimNode[]
   edges: readonly GraphEdge[]
@@ -551,17 +556,11 @@ export class Simulation {
   // jitter. Defaults to the platform generator, so app behaviour is unchanged.
   private rng: Rng
 
-  // The taxonomy the link force resolves spring categories through. Held rather
-  // than imported so the engine is not bound to one set of edge categories.
-  private taxonomy: Taxonomy
-
-  // The per-bucket tables, resolved once from (params, taxonomy) and read by the
-  // kernels per pair / per node. Recomputed only when either input changes —
-  // never per tick, and never inside a loop.
+  // The per-bucket tables the kernels read per pair / per node, and the frame
+  // the band forces act in — median centres and ring radii over the WHOLE node
+  // set — shared by seeding, the kernels and the overlay. Both arrive with the
+  // params (`Layout`).
   private resolved: ResolvedPhysics
-  // The frame the band forces act in — median centres and ring radii over the
-  // WHOLE node set — shared by seeding, the kernels and (through the view) the
-  // overlay, so they agree by construction. Recomputed with the tables.
   private frame: LayoutFrame
   // Each edge's spring category, classified once per (edges, resolved) rather
   // than per tick: an edge's category depends on the edge, its endpoints'
@@ -573,23 +572,20 @@ export class Simulation {
   // classification above, so it costs nothing per tick.
   private cohesion: ReadonlyMap<string, number> = new Map()
 
-  // `taxonomy` is REQUIRED, deliberately: a default here would let one
-  // construction site resolve through a taxonomy every component ignores,
-  // a split no gate can see because both halves are individually correct.
   constructor(
     graph: Graph,
-    params: Partial<ForceParams> | undefined,
+    // Framed over this graph.
+    layout: Layout,
     rng: Rng,
-    taxonomy: Taxonomy,
     // Where a node starts when something already knows: a layout the host
     // kept, or the previous simulation's. A node with an entry is not seeded.
     positions?: ReadonlyMap<string, { x: number; y: number }>,
   ) {
-    this.params = { ...defaultParamsFor(taxonomy), ...params }
+    this.params = layout.params
+    this.resolved = layout.resolved
+    this.frame = layout.frame
     this.alpha = 1.0
     this.rng = rng
-    this.taxonomy = taxonomy
-    this.resolved = resolvePhysics(this.params, taxonomy)
 
     // Seed each node in the frame the forces act in. Cartesian: inside its
     // rest band on both axes, re-centred as the force re-centres them, and
@@ -601,9 +597,7 @@ export class Simulation {
     // bucket sits at the axis's centre, or at the origin.
     this.nodes = []
     this.nodeMap = new Map()
-    const seedNodes = graph.nodes
-    this.frame = layoutFrame(readableGraph(graph), this.resolved)
-    for (const node of seedNodes) {
+    for (const node of graph.nodes) {
       const given = positions?.get(node.id)
       const [x, y] = given ? [given.x, given.y] : this.seedPosition(node, rng)
       const sim: SimNode = { ...node, x, y, vx: 0, vy: 0, pinned: false }
@@ -772,12 +766,11 @@ export class Simulation {
     }
   }
 
-  setParams(params: Partial<ForceParams>): void {
-    Object.assign(this.params, params)
-    // A patch may replace a whole tuning; the dense tables and the per-edge
-    // classification follow it.
-    this.resolved = resolvePhysics(this.params, this.taxonomy)
-    this.frame = layoutFrame(this, this.resolved)
+  /** Take new params with their tables and frame, over the same graph; the per-edge classification follows. */
+  setLayout(layout: Layout): void {
+    this.params = layout.params
+    this.resolved = layout.resolved
+    this.frame = layout.frame
     this.springByEdge = null
   }
 

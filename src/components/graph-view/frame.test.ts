@@ -1,8 +1,10 @@
 import { describe, expect, it } from 'vitest'
 import { DEFAULT_VIEWPORT, worldToScreen } from '../../graph/viewport'
-import { Simulation } from '../../graph/simulation'
+import { Simulation, defaultParamsFor } from '../../graph/simulation'
+import { layoutFrame, resolvePhysics } from '../../graph/forces'
 import type { SimNode } from '../../graph/simulation'
 import { createTaxonomy } from '../../graph/taxonomy'
+import { readableGraph } from '../../graph/model'
 import type { Graph } from '../../graph/model'
 import { frameQueue, frameView } from './frame'
 import type { FrameRequest } from './frame'
@@ -104,7 +106,9 @@ describe('a held frame over a settling layout', () => {
   const settledInView = (hold: boolean) => {
     let seed = 1
     const rng = () => (seed = (seed * 16807) % 2147483647) / 2147483647
-    const sim = new Simulation(graph, undefined, rng, taxonomy, new Map(graph.nodes.map(n => [n.id, { x: rng() * 20, y: rng() * 20 }])))
+    const params = defaultParamsFor(taxonomy)
+    const resolved = resolvePhysics(params, taxonomy)
+    const sim = new Simulation(graph, { params, resolved, frame: layoutFrame(readableGraph(graph), resolved) }, rng, new Map(graph.nodes.map(n => [n.id, { x: rng() * 20, y: rng() * 20 }])))
     sim.reheat(0.5)
     let vp = DEFAULT_VIEWPORT
     const queue = frameQueue(request => { vp = frameView(vp, request, sim.nodes, area); return true })

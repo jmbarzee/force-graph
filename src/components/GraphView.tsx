@@ -3,7 +3,7 @@
 
 import React from 'react'
 import './GraphView.css'
-import { nodesById, readableGraph, isContainment, withContainmentEdges } from '../graph/model'
+import { nodesById, isContainment, withContainmentEdges } from '../graph/model'
 import type { Graph, GraphEdge, GraphNode } from '../graph/model'
 import type { FilterState, AxisLocks } from '../filter/types'
 import { GROUPS, changedAxes, initialFilter, filterStatesEqual, hiddenMatchesOf, listEqual, locksEqual, reseedFilter, selectionFor, selects } from '../filter/types'
@@ -12,7 +12,7 @@ import { toggleValue } from '../filter/toggle'
 import { NO_OVERRIDES } from '../filter/linked'
 import type { LinkedViewState } from '../filter/linked'
 import type { ForceParams, SimNode, Simulation } from '../graph/simulation'
-import { bandOverlay, layoutFrame, resolvePhysics } from '../graph/forces'
+import { bandOverlay } from '../graph/forces'
 import { countsOn, isIdentityMapping, valuesOn } from '../graph/axis'
 import type { AxisId, AxisMapping } from '../graph/axis'
 import type { PresentSets } from './graph-view/present'
@@ -495,6 +495,8 @@ export const GraphView = React.forwardRef<GraphViewHandle, GraphViewProps>(funct
     simVersion,
     running, setRunning,
     forceParams,
+    resolved,
+    frame,
     getNode: getSimNode,
     onParamChange: handleParamChange,
     onForceAdjust: handleForceAdjust,
@@ -510,20 +512,12 @@ export const GraphView = React.forwardRef<GraphViewHandle, GraphViewProps>(funct
     handleNodeDragStart(id, wx, wy)
   }, [releaseFrame, handleNodeDragStart])
 
-
-  // The dense per-bucket tables the kernels read, resolved once per
-  // (params, taxonomy) here and handed to the canvas and every control.
-  const resolved = React.useMemo(() => resolvePhysics(forceParams, taxonomy), [forceParams, taxonomy])
-
   // What the push/pull tab offers: every axis this graph admits with its
   // measured token cost, and the spring categories some edge falls in under
   // the current one (the pull tokens). Both read the whole graph, not the
   // visible subset — tuning covers what a filter may reveal next.
   const axisChoices = React.useMemo(() => axisOptions(taxonomy, graph), [taxonomy, graph])
   const layoutAxes = React.useMemo(() => layoutAxisOptions(axisChoices, taxonomy), [axisChoices, taxonomy])
-  // The frame the band forces act in and the overlay the canvas draws, both
-  // over the WHOLE graph — the same frame the simulation seeds and ticks in.
-  const frame = React.useMemo(() => layoutFrame(readableGraph(graph), resolved), [graph, resolved])
   // The theme the pane draws in: the choice, or the host's for system. The
   // scheme rides inline as custom properties in that theme, and every
   // visible edge's stroke is resolved here once, not per frame.
