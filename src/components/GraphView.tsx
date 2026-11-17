@@ -36,6 +36,7 @@ import { zoomAt } from '../graph/viewport'
 import { GraphCanvas } from './GraphCanvas'
 import { CanvasErrorBoundary } from './CanvasErrorBoundary'
 import { GraphControlPanel } from './GraphControlPanel'
+import { hiddenByOf } from './controls/NothingVisible'
 import { activeGroupsOf, boostGroupsForNodes, cohesionOf, groupSlotsOf, groupsByNode, nodeGroupsOf, type ActiveGroup, type Groups, type NodeGroup } from '../graph/groups'
 import { FilterBar, hiddenMatchBadge } from './FilterBar'
 import type { SearchState } from './FilterBar'
@@ -660,6 +661,9 @@ export const GraphView = React.forwardRef<GraphViewHandle, GraphViewProps>(funct
     activePullEdge, setActivePullEdge,
   } = useHighlight(visibleNodes, visibleEdges, visibleIds, undirected, getSimNode, graph, taxonomy, selectedNodeId, hostIndex)
 
+  // The control a force tab names when nothing is visible.
+  const hiddenBy = React.useMemo(() => hiddenByOf(graph.nodes, filter, groupsOf), [graph, filter, groupsOf])
+
   // The groups as drawn: the ones the filter shows, restricted to the visible
   // set and coloured by slot, the one its control emphasises glowing stronger.
   // Drives the canvas glow and the host's control.
@@ -1142,6 +1146,7 @@ export const GraphView = React.forwardRef<GraphViewHandle, GraphViewProps>(funct
         axes={axisChoices}
         layoutAxes={layoutAxes}
         present={present}
+        hiddenBy={hiddenBy}
         onAxisChange={handleAxisChange}
         onActiveSection={setActiveSection}
         onActivePushBucket={setActivePushBucket}

@@ -13,6 +13,8 @@ import type { GravityHover } from './GravityControls'
 import { Slider } from './controls/Slider'
 import { EquationSection } from './controls/EquationSection'
 import { PopProvider, FormulaValue } from './controls/PopContext'
+import { HiddenByContext } from './controls/NothingVisible'
+import type { HiddenBy } from './controls/NothingVisible'
 import { Curve } from './controls/Curve'
 import type { Span } from './controls/Curve'
 import type { AxisOption, LayoutAxisOption } from '../graph/simulation'
@@ -58,6 +60,8 @@ interface GraphControlPanelProps {
   layoutAxes: readonly LayoutAxisOption[]
   /** What the post-filter visible set holds, per control: the only buckets and categories worth a token or a column. */
   present: PresentSets
+  /** The control a force tab names when nothing is visible. */
+  hiddenBy: HiddenBy
   onAxisChange: (mapping: AxisMapping) => void
   onActiveSection: (section: ForceSection) => void
   onActivePushBucket: (bucket: string | null) => void
@@ -152,7 +156,7 @@ const NODE_SCALE_EQUATION = (
 )
 
 export function GraphControlPanel({
-  params, resolved, onParamChange, onAdjust, onRelayout, axes, layoutAxes, present, onAxisChange,
+  params, resolved, onParamChange, onAdjust, onRelayout, axes, layoutAxes, present, hiddenBy, onAxisChange,
   onActiveSection,
   onActivePushBucket, onActiveGravityBucket, onActivePullEdge,
   nodeScale, onNodeScaleChange,
@@ -208,6 +212,7 @@ export function GraphControlPanel({
 
       {open && (
         <PopProvider>
+        <HiddenByContext.Provider value={hiddenBy}>
         <div className="gv-graph-control-panel-body">
           {/* Control tabs — only one section is shown at a time. */}
           <div className="gv-graph-control-tabs" role="tablist">
@@ -277,6 +282,7 @@ export function GraphControlPanel({
             </SectionSlot>
           </div>
         </div>
+        </HiddenByContext.Provider>
         </PopProvider>
       )}
     </div>
