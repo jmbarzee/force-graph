@@ -1,10 +1,10 @@
 // computeVisibleGraph — the pure derivation behind useVisibleGraph.
 //
-// Filters the graph's nodes on the axes the view shows, graduates edges across
-// hidden nodes (containment walks up to the nearest visible ancestor;
-// dependency edges project or splice, and the graduated ones collapse per
-// pair), classifies every edge once on its original endpoints, and computes
-// per-node summaries and downstream-reach scores.
+// Filters the graph's nodes on the axes the view shows and on their groups,
+// graduates edges across hidden nodes (containment walks up to the nearest
+// visible ancestor; dependency edges project or splice, and the graduated
+// ones collapse per pair), classifies every edge once on its original
+// endpoints, and computes per-node summaries and downstream-reach scores.
 //
 // Lifted out of the hook so it is callable without React, and the taxonomy
 // arrives as a parameter, so both the visibility predicate and the summary
@@ -24,9 +24,9 @@ import type { GraphEdge, ReadableGraph } from '../../graph/model'
 import type { Taxonomy } from '../../graph/taxonomy'
 import type { ResolvedAxisDescriptor } from '../../graph/axis'
 import type { EdgeTypeId } from '../../graph/shapes'
-import type { PhysicsSubject } from '../../graph/forces'
+import type { LayoutSubject } from '../../graph/forces'
 import type { FilterState } from '../../filter/types'
-import { passesDescriptors } from '../../filter/types'
+import { passesDescriptors, passesGroups } from '../../filter/types'
 
 export interface VisibleGraph {
   visibleNodes: SimNode[]
@@ -164,18 +164,23 @@ function computeGraphNodeSummary(
   return parts.join(' ')
 }
 
+const IN_NO_GROUP: ReadonlyMap<string, readonly string[]> = new Map()
+const NO_GROUP_IDS: readonly string[] = []
+
 /**
- * `passesDescriptors` for a graph node, on its own values, on the
- * axes given — the ones the view shows. Every declared axis is the default
- * for a caller that shows them all.
+ * `passesDescriptors` for a graph node, on its own values, on the axes
+ * given — the ones the view shows — and `passesGroups` on its groups, by
+ * `groupsByNode`. Every declared axis is the default for a caller that shows
+ * them all, and no groups for one that has none.
  */
 export function passesFilter(
-  node: PhysicsSubject,
+  node: LayoutSubject,
   filter: FilterState,
   taxonomy: Taxonomy,
   axes: readonly ResolvedAxisDescriptor[] = taxonomy.filterAxes,
+  groupsOf: ReadonlyMap<string, readonly string[]> = IN_NO_GROUP,
 ): boolean {
-  return passesDescriptors(filter, axes, axis => node.values[axis])
+  return passesDescriptors(filter, axes, axis => node.values[axis]) && passesGroups(filter, groupsOf.get(node.id) ?? NO_GROUP_IDS)
 }
 
 /**
@@ -217,12 +222,13 @@ export function computeVisibleGraph(
   filter: FilterState,
   taxonomy: Taxonomy,
   axes: readonly ResolvedAxisDescriptor[] = taxonomy.filterAxes,
+  groupsOf?: ReadonlyMap<string, readonly string[]>,
 ): VisibleGraph {
   const ids = new Set<string>()
   const vNodes: SimNode[] = []
 
   for (const node of sim.nodes) {
-    if (passesFilter(node, filter, taxonomy, axes)) {
+    if (passesFilter(node, filter, taxonomy, axes, groupsOf)) {
       ids.add(node.id)
       vNodes.push(node)
     }

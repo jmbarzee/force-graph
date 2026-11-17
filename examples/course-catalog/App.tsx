@@ -23,6 +23,7 @@ const graph = buildGraph(catalog)
 const nodeById = nodesById(graph.nodes)
 const nodeByCode = new Map(graph.nodes.map(n => [payloadString(n, 'code') ?? n.id, n]))
 const copies = copyGroups(graph)
+const groups = programmeGroups(catalog)
 
 /** Chip badges: distinct catalog entries per value — a cross-listed course counts once. */
 function countsOf(data: Catalog, campuses: AxisSelection): ReadonlyMap<string, ReadonlyMap<string, number>> {
@@ -62,7 +63,6 @@ export function App({ initialTheme = 'system' }: { initialTheme?: ThemeChoice })
   // Controlled: the details panel's "Show only <campus>" writes the filter.
   const [filter, setFilter] = React.useState<FilterState>(() => initialFilter(taxonomy, graph))
   const [themeChoice, setThemeChoice] = React.useState<ThemeChoice>(initialTheme)
-  const [enabled, setEnabled] = React.useState<ReadonlySet<string>>(() => new Set(catalog.programmes.map(p => p.id)))
   const [details, setDetails] = React.useState<GraphNode | null>(null)
   // Controlled: the panel's close clears it, and the view selects what it says.
   const [selected, setSelected] = React.useState<GraphNode | null>(null)
@@ -71,7 +71,6 @@ export function App({ initialTheme = 'system' }: { initialTheme?: ThemeChoice })
   const [focus, requestFocus] = useFocusRequest()
 
   const counts = React.useMemo(() => countsOf(catalog, selectionFor(filter, CAMPUS)), [filter])
-  const groups = React.useMemo(() => programmeGroups(catalog, enabled), [enabled])
 
   /** Ask the view to reveal `node`: it widens the filter just enough, centres and selects. */
   const reveal = (node: GraphNode) => requestFocus(node.id)
@@ -87,14 +86,7 @@ export function App({ initialTheme = 'system' }: { initialTheme?: ThemeChoice })
             findings={FINDINGS.length > 0 && <Findings messages={FINDINGS} />}
             groups={groups}
             groupsControl={(active, control) => (
-              <GroupLegend
-                title="Degree programmes"
-                items={groups.keys}
-                active={active}
-                enabled={enabled}
-                onToggle={id => setEnabled(prev => toggled(prev, id))}
-                onEmphasize={control.emphasize}
-              />
+              <GroupLegend title="Degree programmes" items={groups.keys} active={active} control={control} />
             )}
             nodeAction={{ label: 'Open details', onSelect: setDetails }}
             onNodeActivate={setDetails}
@@ -119,12 +111,6 @@ export function App({ initialTheme = 'system' }: { initialTheme?: ThemeChoice })
       </div>
     </TaxonomyContext.Provider>
   )
-}
-
-function toggled(set: ReadonlySet<string>, id: string): ReadonlySet<string> {
-  const next = new Set(set)
-  if (!next.delete(id)) next.add(id)
-  return next
 }
 
 function Findings({ messages }: { messages: readonly string[] }) {

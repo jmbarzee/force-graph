@@ -1,7 +1,9 @@
 import { describe, expect, it } from 'vitest'
 import { computeVisibleGraph, neighborhoodOf } from './visibleGraph'
 import { createTaxonomy } from '../../graph/taxonomy'
-import { initialFilter, withSelection } from '../../filter/types'
+import { GROUPS, initialFilter, withSelection } from '../../filter/types'
+import { toggleValue } from '../../filter/toggle'
+import { groupsByNode } from '../../graph/groups'
 import type { NodeStyle } from '../../graph/shapes'
 import type { Graph, GraphEdge, GraphNode } from '../../graph/model'
 import type { SimNode } from '../../graph/simulation'
@@ -46,5 +48,13 @@ describe('neighborhoodOf', () => {
   it('leaves out a hidden neighbor', () => {
     const vg = computeVisibleGraph(sim, withSelection(initialFilter(taxonomy, graph), 'kind', new Set(['parent'])), taxonomy)
     expect(neighborhoodOf('p1', vg.visibleNodes, vg.visibleEdges).map(n => n.id)).toEqual(['p1', 'p2'])
+  })
+})
+
+describe('computeVisibleGraph over groups', () => {
+  it("hides a group's only-members and keeps a node a shown group shares, and one in no group", () => {
+    const groupsOf = groupsByNode([{ id: 'x', nodeIds: new Set(['c1', 'c2']) }, { id: 'y', nodeIds: new Set(['c2']) }])
+    const vg = computeVisibleGraph(sim, toggleValue(initialFilter(taxonomy, graph), GROUPS, 'x'), taxonomy, taxonomy.filterAxes, groupsOf)
+    expect([...vg.visibleIds].sort()).toEqual(['c2', 'p1', 'p2'])
   })
 })

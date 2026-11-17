@@ -6,14 +6,16 @@
 // inputs (the explicit data links) rather than owning any of them.
 
 import type { FilterState } from '../../filter/types'
-import { selectionFor, selectionsEqual } from '../../filter/types'
-import { foldReheatPolicy } from '../../graph/axis'
+import { GROUPS, selectionFor, selectionsEqual } from '../../filter/types'
+import { foldReheatPolicy, reheatOf } from '../../graph/axis'
 import type { ResolvedAxisDescriptor } from '../../graph/axis'
 import { passesFilter } from './visibleGraph'
 import React from 'react'
 import type { Simulation } from '../../graph/simulation'
 import type { FrameRequest } from './frame'
 import type { Taxonomy } from '../../graph/taxonomy'
+
+const GROUPS_REHEAT = reheatOf({ emptyMeans: 'none', keepCamera: false })
 
 export interface SimulationLoopParams {
   simRef: React.MutableRefObject<Simulation | null>
@@ -24,6 +26,8 @@ export interface SimulationLoopParams {
   filter: FilterState
   /** The axes the view filters on — its chain; a change elsewhere in the filter moves nothing here. */
   axes: readonly ResolvedAxisDescriptor[]
+  /** Each node's group ids, by `groupsByNode`. */
+  groupsOf: ReadonlyMap<string, readonly string[]>
   hoveredNodeId: string | null
   selectedNodeId: string | null
   requestFrame: (request: FrameRequest) => void
@@ -34,7 +38,7 @@ export interface SimulationLoopParams {
 export function useSimulationLoop({
   simRef, running, setRunning,
   visibleIds, downstreamScores,
-  filter, axes,
+  filter, axes, groupsOf,
   hoveredNodeId, selectedNodeId,
   requestFrame, tickFrame, taxonomy,
 }: SimulationLoopParams): { fps: number } {
@@ -113,22 +117,23 @@ export function useSimulationLoop({
     const sim = simRef.current
     if (!sim) { prevFilter.current = filter; return }
 
-    const { alpha, seedRevealed, refit, resume } = foldReheatPolicy(
-      axes.filter(
+    // A group toggle reheats as an allow-list does, which no axis outdoes.
+    const { alpha, seedRevealed, refit, resume } = !selectionsEqual(selectionFor(prev, GROUPS), selectionFor(filter, GROUPS))
+      ? GROUPS_REHEAT
+      : foldReheatPolicy(axes.filter(
         dim => !selectionsEqual(selectionFor(prev, dim.id), selectionFor(filter, dim.id)),
-      ),
-    )
+      ))
 
     if (alpha > 0) {
       if (seedRevealed) {
         for (const node of sim.nodes) {
-          if (!passesFilter(node, filter, taxonomy, axes)) continue
-          if (passesFilter(node, prev, taxonomy, axes)) continue
+          if (!passesFilter(node, filter, taxonomy, axes, groupsOf)) continue
+          if (passesFilter(node, prev, taxonomy, axes, groupsOf)) continue
           let ancestorId = node.parentId
           while (ancestorId) {
             const ancestor = sim.getNode(ancestorId)
             if (!ancestor) break
-            if (passesFilter(ancestor, filter, taxonomy, axes)) {
+            if (passesFilter(ancestor, filter, taxonomy, axes, groupsOf)) {
               sim.seedAt(node.id, ancestor.x, ancestor.y)
               break
             }
