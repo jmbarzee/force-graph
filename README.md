@@ -411,7 +411,8 @@ host that wants no flash resolves the theme on the server (a cookie, say) and
 passes `systemTheme`.
 
 The pane and the bar mark the theme they resolved as `data-gv-theme` on their
-own roots, and declare their tokens there, not on `:root`. Every rule in the
+own roots, and declare their tokens there, not on `:root`; the bar inside a
+pane takes the pane's. Every rule in the
 stylesheet sits in `@layer gv`, so a host's unlayered rule wins whatever its
 specificity: a host restyles the pane by redeclaring a token on its root,
 through the `className` it passes or an ancestor, and in one theme only by

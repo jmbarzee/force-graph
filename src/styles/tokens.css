@@ -1,13 +1,15 @@
 /* The library's design tokens — the chrome's colours, the tint percentages
    color-mix() dilutes to, the fonts, the focus ring — declared on the pane's
-   and the bar's roots, which carry their resolved theme as `data-gv-theme`.
+   and the bar's roots, which carry their resolved theme as `data-gv-theme`;
+   only on the outermost, so the bar inside a pane inherits the pane's, a
+   host's overrides included.
    Every rule in the library that differs by theme reads one of these and
    keys on no ancestor class, so a pane dark in a light host, or light in a
    dark one, takes its own. In `@layer gv`, so a host's unlayered rule on the
    root wins whatever its specificity. */
 
 @layer gv {
-[data-gv-theme] {
+[data-gv-theme]:not([data-gv-theme] *) {
   /* The chrome's own tokens. The accent is the chrome's, not a node
      value's fill — they coincide by taste, not by identity. The tint
      percentages are what color-mix() dilutes an accent or a chip's tint to;
@@ -47,7 +49,7 @@
   --gv-badge-text: #ffffff;
 }
 
-[data-gv-theme="dark"] {
+[data-gv-theme="dark"]:not([data-gv-theme] *) {
   --gv-accent: #A89BD8;
   --gv-accent-tint-weak: 6%;
   --gv-accent-tint-hover: 12%;
