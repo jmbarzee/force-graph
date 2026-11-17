@@ -188,7 +188,6 @@
   flex-direction: column;
 }
 
-/* The filter drew none of the graph's nodes: centred below the overlay. */
 .gv-graph-empty {
   position: absolute;
   inset: var(--gv-toolbar-height, 0px) 0 0;
