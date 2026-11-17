@@ -32,6 +32,7 @@ export interface SimulationLoopParams {
   selectedNodeId: string | null
   requestFrame: (request: FrameRequest) => void
   tickFrame: (alpha: number) => void
+  releaseFrame: () => void
   taxonomy: Taxonomy
 }
 
@@ -40,7 +41,7 @@ export function useSimulationLoop({
   visibleIds, downstreamScores,
   filter, axes, groupsOf,
   hoveredNodeId, selectedNodeId,
-  requestFrame, tickFrame, taxonomy,
+  requestFrame, tickFrame, releaseFrame, taxonomy,
 }: SimulationLoopParams): { fps: number } {
   // Frame-rate indicator. Updated ~2×/sec from the loop.
   const [fps, setFps] = React.useState(0)
@@ -48,8 +49,9 @@ export function useSimulationLoop({
 
   // Physics animation loop. Decoupled from React rendering: the canvas has its
   // own RAF draw loop reading live SimNode.x/.y through a ref, so the physics
-  // tick does NOT trigger a React re-render each frame. We only touch React state
-  // for one-shot events (a held framing, stability, FPS).
+  // tick does NOT trigger a React re-render each frame. React state moves for
+  // stability, FPS, a waiting framing, and each tick a held frame moves a
+  // framed node half a pixel or more.
   React.useEffect(() => {
     if (!running) return
     let frameId = 0
@@ -77,6 +79,7 @@ export function useSimulationLoop({
       }
 
       if (sim.isStable()) {
+        releaseFrame()
         setRunning(false)
         return
       }
@@ -143,7 +146,7 @@ export function useSimulationLoop({
       }
       sim.reheat(alpha)
       if (resume) setRunning(true)
-      if (refit) requestFrame({ ids: sim.nodes.map(n => n.id), when: 'warm' })
+      if (refit) requestFrame({ ids: sim.nodes.map(n => n.id), when: 'warm', hold: true })
     }
     prevFilter.current = filter
   }, [filter]) // eslint-disable-line react-hooks/exhaustive-deps

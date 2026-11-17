@@ -85,7 +85,8 @@ that would animate a reveal or a hide are
 | Double-click the background | Frame the visible set |
 
 **Fit** (the button, `fit()`) frames every visible node. The first
-layout is framed once its warm-up cools, and so is a refitting filter change.
+layout is framed from when its warm-up cools until it settles, and so is a
+refitting filter change; a pan, zoom, drag or newer frame lets go at once.
 Every frame lands in the canvas below the filter bar.
 Resizing the pane keeps
 the world point at its centre fixed.
