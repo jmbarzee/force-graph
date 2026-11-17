@@ -514,7 +514,7 @@ function parsePairId(id: EdgeTypeId): [Relation, string, string] | undefined {
  * edge. On the style axis bucketed by identity, the host's declared table and
  * its prioritized rule apply verbatim: the hand-tuned springs, and a
  * precedence no pair rule reproduces — two of its categories share endpoint
- * values and differ only on the edge's own dispatch. On any other
+ * values and differ only on the edge's own kind. On any other
  * (axis, mapping) the library's pair rule applies: one category per unordered
  * bucket pair per relation, each the middling spring until tuned. The
  * pair rule enumerates nothing: a category exists when an edge falls in it,
@@ -526,8 +526,8 @@ export interface ResolvedSprings {
    * The category of an edge from its endpoints' bucket ids, or undefined when
    * an endpoint is unbucketed, or — on the style axis — when no declared type
    * of the edge's relation runs between its endpoint values and the
-   * taxonomy's `classifyEdge` names none; such an edge pulls nothing and
-   * draws in its relation's default stroke.
+   * taxonomy's `classifyEdge` names none; such an edge springs with the
+   * middling spring and draws in its relation's default stroke.
    */
   classify(edge: GraphEdge, src: string | undefined, tgt: string | undefined): EdgeTypeId | undefined
   /** Effective physics: the override where one exists, else the declared spring — the middling spring, on a pair axis. */
@@ -543,14 +543,14 @@ export function resolveSprings(pair: PairTuning, taxonomy: Taxonomy): ResolvedSp
     return {
       mapping,
       // An edge no declared type of its relation claims has no category here:
-      // it pulls nothing and draws in its relation's stroke, and the
-      // diagnostics have named it.
+      // it springs with the middling spring and draws in its relation's
+      // stroke, and the diagnostics have named it.
       classify: (edge, src, tgt) => {
         const id = taxonomy.edgeTypeOf(edge, src, tgt)
         const type = id === undefined ? undefined : table.get(id)
         return type !== undefined && type.relation === relationOf(edge) ? id : undefined
       },
-      physicsFor: id => overrides.get(id) ?? table.get(id)?.physics ?? ABSENT_EDGE_PHYSICS,
+      physicsFor: id => overrides.get(id) ?? table.get(id)?.physics ?? MIDDLING_SPRING,
       describe: id => table.get(id),
     }
   }
@@ -596,8 +596,9 @@ export interface EdgeCategory {
 }
 
 export function springFor(spring: ResolvedSprings, edge: GraphEdge, src: PhysicsSubject, tgt: PhysicsSubject): EdgeCategory {
-  const key = spring.classify(edge, bucketOf(spring, src), bucketOf(spring, tgt))
-  const ph = key === undefined ? ABSENT_EDGE_PHYSICS : spring.physicsFor(key)
+  const a = bucketOf(spring, src), b = bucketOf(spring, tgt)
+  const key = spring.classify(edge, a, b)
+  const ph = key !== undefined ? spring.physicsFor(key) : a === undefined || b === undefined ? ABSENT_EDGE_PHYSICS : MIDDLING_SPRING
   return { strength: ph.strength, distance: ph.distance, key }
 }
 

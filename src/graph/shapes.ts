@@ -137,12 +137,9 @@ export interface SpringPhysics {
  * One kind of edge, as a host declares it: which values it runs between and
  * which relation it expresses, optionally which values the edge itself must
  * carry (`match`), and — optionally — how it is stroked, its spring and its
- * hover text. An edge is classified as the declared type of its relation
- * that runs between its endpoints' values, in either orientation, and whose
- * `match` (if any) its own values satisfy; a satisfied `match` beats a type
- * without one, the declared orientation beats the reverse, and declaration
- * order settles the rest — unless the taxonomy's `classifyEdge` says
- * otherwise. A label left out is the id; a stroke left out is the neutral
+ * hover text. Which type an edge is: [the classification
+ * table](https://github.com/jmbarzee/force-graph#classifying-an-edge).
+ * A label left out is the id; a stroke left out is the neutral
  * stroke (the containment stroke for a containment type), field by field; a
  * spring left out is the middling spring; a tooltip left out is the label.
  */
@@ -153,20 +150,19 @@ export interface EdgeType {
   label?: string
   /**
    * The endpoint values on the style axis this type runs between — one
-   * value or several at each end: the type runs between every source value
-   * and every target value, in either orientation. Read off the edge's
-   * original endpoint nodes when an edge is classified; the first of each
-   * is the split-colour token's two halves. Values, not types: the engine
-   * resolves an edge's type from where its nodes sit.
+   * value or several at each end, or left out for any declared value: the
+   * type runs between every source value and every target value, in either
+   * orientation. Read off the edge's original endpoint nodes when an edge is
+   * classified; the first of each is the split-colour token's two halves.
    */
-  sourceValue: AxisValue | readonly AxisValue[]
-  targetValue: AxisValue | readonly AxisValue[]
+  sourceValue?: AxisValue | readonly AxisValue[]
+  targetValue?: AxisValue | readonly AxisValue[]
   /** Which relation an edge of this type expresses; an edge is classified only as a type of its own relation. */
   relation: 'containment' | 'dependency'
   /**
    * Values the edge itself must carry on the host's edge axes to be this
    * type — how two types on one pair are told apart (a call and a signal
-   * between the same two values, by the edge's `dispatch`). An edge lacking
+   * between the same two values, by the edge's `kind`). An edge lacking
    * one of these values is not this type. Absent, the pair alone decides,
    * and this type is the fallback for a pair other types `match` on.
    */
@@ -182,9 +178,9 @@ export interface EdgeType {
 /** An edge type with its defaults filled in — what `Taxonomy.edgeTypes` carries. */
 export interface ResolvedEdgeType extends EdgeType {
   label: string
-  /** The first declared source value — one half of the split-colour token. */
+  /** The first source value — one half of the split-colour token. */
   sourceValue: AxisValue
-  /** The first declared target value — the other half. */
+  /** The first target value — the other half. */
   targetValue: AxisValue
   /** Every (source, target) pair the type runs between: each source value with each target value, in declaration order. */
   pairs: readonly (readonly [AxisValue, AxisValue])[]
@@ -198,15 +194,15 @@ export const NEUTRAL_STROKE: EdgeStroke = { color: { light: '#94A3B8', dark: '#6
 /** The stroke a containment type starts from, and the stroke of a containment edge no type claims: the same grey, faint and dashed. */
 export const CONTAINMENT_STROKE: EdgeStroke = { color: { light: '#94A3B8', dark: '#64748B' }, alpha: 0.35, dash: [3, 4], width: 1 }
 
-/** The values declared at one end of an edge type, as a list. */
-export function endpointValues(declared: AxisValue | readonly AxisValue[]): readonly AxisValue[] {
-  return typeof declared === 'string' ? [declared] : declared
+/** The values at one end of an edge type, as a list: `every` declared value where the end is left out. */
+export function endpointValues(declared: AxisValue | readonly AxisValue[] | undefined, every: readonly AxisValue[]): readonly AxisValue[] {
+  return declared === undefined ? every : typeof declared === 'string' ? [declared] : declared
 }
 
 /** Every (source, target) pair a type runs between: each source value with each target value, in declaration order. */
-export function edgePairs(type: Pick<EdgeType, 'sourceValue' | 'targetValue'>): readonly (readonly [AxisValue, AxisValue])[] {
-  const targets = endpointValues(type.targetValue)
-  return endpointValues(type.sourceValue).flatMap(s => targets.map(t => [s, t] as const))
+export function edgePairs(type: Pick<EdgeType, 'sourceValue' | 'targetValue'>, every: readonly AxisValue[]): readonly (readonly [AxisValue, AxisValue])[] {
+  const targets = endpointValues(type.targetValue, every)
+  return endpointValues(type.sourceValue, every).flatMap(s => targets.map(t => [s, t] as const))
 }
 
 // ── Defaults ────────────────────────────────────────────────────────────────
@@ -262,20 +258,21 @@ export function resolveNodeStyle(style: NodeStyle, i: number, n: number): Resolv
 }
 
 /**
- * A declared edge type with its defaults filled in: the id as label, the
- * first declared value at each end beside every pair, the middling spring,
- * its relation's stroke field by field, the label as tooltip. The taxonomy
- * has refused an end that names no value before this runs.
+ * A declared edge type with its defaults filled in, given `every` declared
+ * value: the id as label, the first value at each end beside every pair, the
+ * middling spring, its relation's stroke field by field, the label as
+ * tooltip. The taxonomy has refused an end that lists no value before this
+ * runs.
  */
-export function resolveEdgeType(type: EdgeType): ResolvedEdgeType {
+export function resolveEdgeType(type: EdgeType, every: readonly AxisValue[]): ResolvedEdgeType {
   const start = type.relation === 'containment' ? CONTAINMENT_STROKE : NEUTRAL_STROKE
   const label = type.label ?? type.id
   return {
     ...type,
     label,
-    sourceValue: endpointValues(type.sourceValue)[0]!,
-    targetValue: endpointValues(type.targetValue)[0]!,
-    pairs: edgePairs(type),
+    sourceValue: endpointValues(type.sourceValue, every)[0]!,
+    targetValue: endpointValues(type.targetValue, every)[0]!,
+    pairs: edgePairs(type, every),
     physics: type.physics ?? { ...MIDDLING_SPRING },
     style: { ...start, ...type.style, color: { ...start.color, ...type.style?.color } },
     tooltip: type.tooltip ?? label,

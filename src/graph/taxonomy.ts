@@ -131,14 +131,11 @@ export interface Taxonomy {
   nodeStyleOf(subject: StyleSubject): ResolvedNodeStyle
   /**
    * Which declared edge type an edge is, given the style values of its two
-   * ORIGINAL endpoints: the declared type of the edge's relation that runs
-   * between those values in either orientation and whose `match` the edge's
-   * own values satisfy (a satisfied `match` over none, the declared
-   * orientation over the reverse, then declaration order), handed to the
-   * spec's `classifyEdge`, which may keep it, replace it, or supply one where
-   * there is none; undefined when neither names one. Classified once, on
-   * the original endpoints; the type is carried through graduation, so a
-   * re-pointed edge keeps its stroke and its spring.
+   * ORIGINAL endpoints, by [the classification
+   * table](https://github.com/jmbarzee/force-graph#classifying-an-edge);
+   * undefined when it is untyped. Classified once, on the original
+   * endpoints; the type is carried through graduation, so a re-pointed edge
+   * keeps its stroke and its spring.
    */
   edgeTypeOf(edge: GraphEdge, src: AxisValue | undefined, tgt: AxisValue | undefined): EdgeTypeId | undefined
   /** Which of two graduated edges on one visible pair survives: the host's choice, or the one kept so far. */
@@ -171,15 +168,14 @@ export interface TaxonomySpec {
   edgeTypes?: readonly EdgeType[]
   /**
    * The host's say in classifying an edge, given the style values of its
-   * original endpoints and `declared` — the type the declarations answer (by
-   * relation, endpoint pair, `match` and orientation), or undefined: an id
-   * to use, or undefined to keep the declared answer. For the exceptions the
-   * declarations cannot express — a type that also runs between pairs it
-   * does not declare, say: `(edge, src, tgt, declared) => declared ?? …`.
-   * Required only when two declared types on one pair share an orientation
-   * and a `match`.
+   * original endpoints and `declared`, the declarations' answer by [the
+   * classification
+   * table](https://github.com/jmbarzee/force-graph#classifying-an-edge): an
+   * id to use, `null` to leave the edge untyped, or undefined to keep
+   * `declared`. Required only when two declared types share an edge they
+   * cannot tell apart.
    */
-  classifyEdge?: (edge: GraphEdge, src: AxisValue | undefined, tgt: AxisValue | undefined, declared: EdgeTypeId | undefined) => EdgeTypeId | undefined
+  classifyEdge?: (edge: GraphEdge, src: AxisValue | undefined, tgt: AxisValue | undefined, declared: EdgeTypeId | undefined) => EdgeTypeId | null | undefined
   /** The axes the filter bar offers. Absent, the style axis alone, as an allow-list. */
   filterAxes?: readonly AxisDescriptor[]
   /**
@@ -279,9 +275,7 @@ export function createTaxonomy(spec: TaxonomySpec): Taxonomy {
   const fallbackSpec = spec.fallbackStyle ?? DEFAULT_FALLBACK
   checkStyle('fallbackStyle', fallbackSpec)
   const edgeIds = new Set<EdgeTypeId>()
-  // The pair a type runs between, unordered: what classifies an edge when the
-  // host's rule says nothing. Two types on one pair are told apart by their
-  // `match`, by their orientation, or by the host's rule — or refused.
+  // The pair a type runs between, unordered.
   const pairKey = (relation: string, a: AxisValue, b: AxisValue) => JSON.stringify(a <= b ? [relation, a, b] : [relation, b, a])
   const byPair = new Map<string, EdgeType[]>()
   const declaredEdgeTypes = spec.edgeTypes ?? []
@@ -291,8 +285,9 @@ export function createTaxonomy(spec: TaxonomySpec): Taxonomy {
     if (e.style?.color?.light !== undefined) colour(`edgeTypes.${e.id}.style.color.light`, e.style.color.light)
     if (e.style?.color?.dark !== undefined) colour(`edgeTypes.${e.id}.style.color.dark`, e.style.color.dark)
     for (const end of ['sourceValue', 'targetValue'] as const) {
-      const declared = endpointValues(e[end])
-      if (declared.length === 0) problems.push(`edgeTypes.${e.id}.${end} names no value; name at least one`)
+      if (e[end] === undefined) continue
+      const declared = endpointValues(e[end], values)
+      if (declared.length === 0) problems.push(`edgeTypes.${e.id}.${end} names no value; name at least one, or leave it out for any`)
       declared.forEach((v, i) => {
         if (!valueSet.has(v)) problems.push(`edgeTypes.${e.id}.${end}${declared.length > 1 ? `[${i}]` : ''} is ${JSON.stringify(v)}, which styles does not declare`)
       })
@@ -310,29 +305,30 @@ export function createTaxonomy(spec: TaxonomySpec): Taxonomy {
     }
     // Indexed under every pair it runs between; a type on several pairs is
     // a candidate on each.
-    for (const [s, t] of edgePairs(e)) {
+    for (const [s, t] of edgePairs(e, values)) {
       const key = pairKey(e.relation, s, t)
       const sharing = byPair.get(key) ?? []
       if (!sharing.includes(e)) sharing.push(e)
       byPair.set(key, sharing)
     }
   }
-  // Two types nothing tells apart: the same orientation and the same `match`
-  // (or none). Only the host's rule can settle those.
+  // Two types nothing tells apart: as many ends named, the same orientation
+  // and the same `match` (or none). Only the host's rule can settle those.
+  const named = (t: EdgeType): number => +(t.sourceValue !== undefined) + +(t.targetValue !== undefined)
   const sameMatch = (a: EdgeType, b: EdgeType): boolean => {
     if (a.match === undefined || b.match === undefined) return a.match === b.match
     const keys = Object.keys(a.match)
     return keys.length === Object.keys(b.match).length && keys.every(k => a.match![k] === b.match![k])
   }
   if (!spec.classifyEdge) {
-    const sameOrientedPair = (a: EdgeType, b: EdgeType): boolean => edgePairs(a).some(([s, t]) => edgePairs(b).some(([s2, t2]) => s === s2 && t === t2))
+    const sameOrientedPair = (a: EdgeType, b: EdgeType): boolean => edgePairs(a, values).some(([s, t]) => edgePairs(b, values).some(([s2, t2]) => s === s2 && t === t2))
     const said = new Set<string>()
     for (const [key, types] of byPair) {
       for (let i = 0; i < types.length; i++) {
         for (let j = i + 1; j < types.length; j++) {
           const a = types[i], b = types[j]
           const once = `${a.id}\u0000${b.id}`
-          if (said.has(once) || !sameOrientedPair(a, b) || !sameMatch(a, b)) continue
+          if (said.has(once) || named(a) !== named(b) || !sameOrientedPair(a, b) || !sameMatch(a, b)) continue
           said.add(once)
           problems.push(`edge types ${JSON.stringify(a.id)} and ${JSON.stringify(b.id)} run between the same values with the same relation (${JSON.parse(key)[0]}) and nothing tells them apart; give one a match on an edge axis, declare them in opposite orientations, or give classifyEdge`)
         }
@@ -366,7 +362,7 @@ export function createTaxonomy(spec: TaxonomySpec): Taxonomy {
   if (n > 0 && fallbackSpec.physics?.band?.y === undefined) {
     fallback.physics.band.y = { min: styles[values[0]].physics.band.y.min, max: styles[values[n - 1]].physics.band.y.max }
   }
-  const edgeTypes = declaredEdgeTypes.map(resolveEdgeTypeDefaults)
+  const edgeTypes = declaredEdgeTypes.map(e => resolveEdgeTypeDefaults(e, values))
   const strokeById = new Map(edgeTypes.map(e => [e.id, e.style] as const))
   const unstroked = new Set<string>()
   const edgeStrokeFor = (id: EdgeTypeId): EdgeStroke => {
@@ -382,25 +378,24 @@ export function createTaxonomy(spec: TaxonomySpec): Taxonomy {
     for (const axis of Object.keys(match)) if (edge.values?.[axis] !== match[axis]) return false
     return true
   }
-  // What the declarations say an edge is: every type of its relation on its
-  // endpoint pair that the edge fits — its `match` absent or satisfied. A
-  // satisfied match beats the pair alone; the declared orientation beats the
-  // reverse; declaration order settles the rest.
+  // What the declarations say an edge is: of the types of its relation on its
+  // endpoint pair whose `match` it satisfies, the first by the classification
+  // table's precedence. The candidates are in declaration order and the sort
+  // is stable.
   const declaredTypeOf = (edge: GraphEdge, src: AxisValue | undefined, tgt: AxisValue | undefined): EdgeTypeId | undefined => {
     if (src === undefined || tgt === undefined) return undefined
     const candidates = byPair.get(pairKey(edge.relation === 'containment' ? 'containment' : 'dependency', src, tgt))
     if (candidates === undefined) return undefined
-    const fits = candidates.filter(t => t.match === undefined || satisfies(edge, t.match))
-    const specific = fits.filter(t => t.match !== undefined)
-    const pool = specific.length > 0 ? specific : fits
-    const oriented = pool.filter(t => edgePairs(t).some(([s, g]) => s === src && g === tgt))
-    return (oriented[0] ?? pool[0])?.id
+    const matched = (t: EdgeType): number => +(t.match !== undefined)
+    const oriented = (t: EdgeType): number => +edgePairs(t, values).some(([s, g]) => s === src && g === tgt)
+    return candidates
+      .filter(t => t.match === undefined || satisfies(edge, t.match))
+      .sort((a, b) => named(b) - named(a) || matched(b) - matched(a) || oriented(b) - oriented(a))[0]?.id
   }
-  // The host's rule sees the declared answer and may keep it, replace it, or
-  // supply one where there is none — no "declared pair?" guard of its own.
   const edgeTypeOf = (edge: GraphEdge, src: AxisValue | undefined, tgt: AxisValue | undefined): EdgeTypeId | undefined => {
     const declared = declaredTypeOf(edge, src, tgt)
-    return spec.classifyEdge?.(edge, src, tgt, declared) ?? declared
+    const said = spec.classifyEdge?.(edge, src, tgt, declared)
+    return said === null ? undefined : said ?? declared
   }
 
   // Warn once per unrecognized value, and once PER ONTOLOGY: this resolves per
