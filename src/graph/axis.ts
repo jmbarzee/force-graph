@@ -36,7 +36,7 @@ export function internValue(parts: string | readonly string[]): AxisValue {
   return typeof parts === 'string' ? parts : parts.join('\u0000')
 }
 
-/** One button in a filter bar: a label, an optional glyph, and the values it toggles. */
+/** One button in a filter bar. */
 export interface FilterChip {
   /** Unique among the axis's chips. */
   id: string
@@ -192,7 +192,7 @@ export interface ResolvedAxisDescriptor extends AxisNamer {
 
 /** How the style axis names and adorns its values, for a descriptor's defaults. */
 export interface StyleNamer {
-  /** The style axis. */
+  /** The style axis: a descriptor on it takes these names by default. */
   axis: AxisId
   /** A style value's label. */
   labelFor(value: AxisValue): string

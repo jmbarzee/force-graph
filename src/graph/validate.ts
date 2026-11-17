@@ -36,7 +36,7 @@ export type GraphDiagnosticCode =
   | 'containment-untyped'
   | 'group-key-undeclared'
 
-/** One defect in a host's graph, as data: its severity, its code, a message, and the node or edge it names. */
+/** One defect in a host's graph, as data. */
 export interface GraphDiagnostic {
   /** An error names something the view cannot draw as given; a warning, something it draws but the host should know. */
   severity: 'error' | 'warning'

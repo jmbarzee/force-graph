@@ -142,7 +142,7 @@ export interface ResolvedNodeStyle {
  */
 export type EdgeTypeId = string
 
-/** One spring: stiffness (k) and rest length. */
+/** One spring. */
 export interface SpringPhysics {
   /** Stiffness, k. */
   strength: number

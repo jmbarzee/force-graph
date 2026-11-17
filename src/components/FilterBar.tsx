@@ -43,7 +43,7 @@ import { SearchIcon } from './icons/SearchIcon'
 
 const NO_LOCKS: ReadonlySet<string> = new Set()
 
-/** The search control's state: the query, and whether the control is open. */
+/** The search control's state. */
 export interface SearchState {
   /** The text searched for. */
   query: string

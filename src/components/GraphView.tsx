@@ -59,7 +59,7 @@ export interface Position {
   y: number
 }
 
-/** The host's action for a node, offered in the hover box: its label, and what it does with the host's own node. */
+/** The host's action for a node, offered in the hover box. */
 export interface NodeAction {
   /** The button's text. */
   label: string

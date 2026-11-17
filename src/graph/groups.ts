@@ -116,11 +116,11 @@ export function nodeGroupsOf(groups: Groups, nodes: readonly GraphNode[]): { gro
   return { groups: listed, diagnostics: diagnostics.length ? diagnostics : NO_DIAGNOSTICS }
 }
 
-/** A group as drawn: the visible node ids it covers and its palette colour. */
+/** A group as drawn. */
 export interface ActiveGroup {
   /** The host's group id. */
   id: string
-  /** The glow's colour. */
+  /** The glow's colour: the host's, else the palette's. */
   color: string
   /** The glow's intensity: 1, or more for a group that is emphasised or holds the hovered or selected node. */
   strength: number

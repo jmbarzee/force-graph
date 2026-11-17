@@ -28,7 +28,7 @@ export interface ThemedColor {
   readonly dark: ColorPair
 }
 
-/** How an edge type is stroked: its colour per theme, base alpha, dash pattern and width. */
+/** How an edge type is stroked. */
 export interface EdgeStroke {
   /** The stroke's colour per theme. */
   readonly color: { readonly light: string; readonly dark: string }
