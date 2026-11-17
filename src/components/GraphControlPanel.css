@@ -8,7 +8,7 @@
   background: var(--gv-color-surface);
   border: 1px solid var(--gv-color-border);
   border-radius: 8px;
-  box-shadow: 0 2px 8px rgba(0, 0, 0, 0.1);
+  box-shadow: var(--gv-panel-shadow);
   z-index: 10;
   max-width: calc(100vw - 24px);
   max-height: calc(100% - 70px);
@@ -208,7 +208,7 @@
   width: 10px;
   height: 10px;
   border-radius: 50%;
-  background: #fff;
+  background: var(--gv-on-accent);
   transition: left 0.15s ease;
 }
 .gv-switch.on .gv-switch-knob { left: 14px; }

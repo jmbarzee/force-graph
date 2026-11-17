@@ -22,6 +22,9 @@
   --gv-inset-bg: rgba(0, 0, 0, 0.02);
   --gv-key-bg: rgba(0, 0, 0, 0.05);
   --gv-tooltip-shadow: 0 2px 8px rgba(0, 0, 0, 0.12);
+  --gv-panel-shadow: 0 2px 8px rgba(0, 0, 0, 0.1);
+  --gv-bar-shadow: 0 1px 4px rgba(0, 0, 0, 0.06);
+  --gv-color-attention: #F59E0B;
   /* The pull overlay's tension colours: stretched, compressed, at rest. */
   --gv-tension-stretch: #d97706;
   --gv-tension-compress: #7CB9E8;
@@ -45,8 +48,12 @@
   --gv-radius: 6px;
   --gv-focus-ring-color: #4A90D9;
   --gv-selection-ring-color: #ffffff;
+  /* Violet, so a badge never reads as a node body. */
   --gv-badge-fill: #7C3AED;
   --gv-badge-text: #ffffff;
+  /* What sits on the accent, such as the switch's knob on its track: not the
+     surface, which the accent is drawn over. */
+  --gv-on-accent: #ffffff;
 }
 
 [data-gv-theme="dark"]:not([data-gv-theme] *) {
@@ -58,6 +65,8 @@
   --gv-inset-bg: rgba(255, 255, 255, 0.04);
   --gv-key-bg: rgba(255, 255, 255, 0.06);
   --gv-tooltip-shadow: 0 2px 8px rgba(0, 0, 0, 0.4);
+  --gv-panel-shadow: 0 2px 8px rgba(0, 0, 0, 0.4);
+  --gv-bar-shadow: 0 1px 4px rgba(0, 0, 0, 0.3);
   --gv-tension-stretch: #fbbf24;
   --gv-tension-compress: #7CB9E8;
   --gv-tension-rest: #7EC8B8;
