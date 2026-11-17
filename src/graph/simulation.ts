@@ -532,12 +532,7 @@ export function sprungEdges(edges: readonly GraphEdge[], visibleIds: ReadonlySet
   return edges.filter(e => visibleIds.has(e.sourceId) && visibleIds.has(e.targetId))
 }
 
-/**
- * The force parameters, the tables they resolve to and the frame those place
- * the graph in: resolved and framed once per change by the view's
- * simulation hook, read there by the control panel and the overlay, and
- * taken by the simulation as given — so a computed scalar runs once per edit.
- */
+/** The force parameters, the tables they resolve to, and the frame those place the simulation's graph in. */
 export interface Layout {
   readonly params: ForceParams
   readonly resolved: ResolvedPhysics
@@ -564,7 +559,7 @@ export class Simulation {
   // The per-bucket tables the kernels read per pair / per node, and the frame
   // the band forces act in — median centres and ring radii over the WHOLE node
   // set — shared by seeding, the kernels and the overlay. Both arrive with the
-  // params (`Layout`); nothing here resolves or frames.
+  // params (`Layout`).
   private resolved: ResolvedPhysics
   private frame: LayoutFrame
   // Each edge's spring category, classified once per (edges, resolved) rather

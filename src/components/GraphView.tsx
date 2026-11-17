@@ -488,9 +488,8 @@ export const GraphView = React.forwardRef<GraphViewHandle, GraphViewProps>(funct
   }, [tuningRef, setTuning])
 
   // Simulation spine: the instance, version signal, running flag, the force
-  // parameters as retuned for this graph and taxonomy, the tables they
-  // resolve to and the frame over the WHOLE graph — the simulation's own,
-  // which the canvas and every control read — and every sim-mutating handler.
+  // parameters as retuned for this graph and taxonomy, and every
+  // sim-mutating handler.
   const {
     simRef,
     simVersion,

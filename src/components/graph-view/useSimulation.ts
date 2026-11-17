@@ -3,11 +3,9 @@
 // Owns the long-lived Simulation instance (simRef), its rebuild lifecycle and
 // version signal, the running flag, and every handler that mutates the sim
 // (param/gravity edits, node drag, reheat, play/pause). The force parameters
-// are the view's layout state, read here and written through its writer, and
-// resolved and framed here once per change for the simulation and the view
-// alike. It exposes a narrow surface: the ref, a `getNode` accessor, the
-// version (the data link other hooks list in their deps), the resolved
-// tables and frame, and the handlers. The RAF loop that
+// are the view's layout state, read here and written through its writer. It
+// exposes a narrow surface: the ref, a `getNode` accessor, the version (the data
+// link other hooks list in their deps), and the handlers. The RAF loop that
 // *drives* the sim is a separate hook (useSimulationLoop); this owns the instance.
 
 import React from 'react'
@@ -27,8 +25,6 @@ export interface SimulationController {
   running: boolean
   setRunning: React.Dispatch<React.SetStateAction<boolean>>
   forceParams: ForceParams
-  // The tables the params resolve to, and the frame they place the WHOLE graph
-  // in: the ones the simulation seeds and ticks in.
   resolved: ResolvedPhysics
   frame: LayoutFrame
   getNode: (id: string) => SimNode | undefined
