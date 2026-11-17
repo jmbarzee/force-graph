@@ -275,7 +275,6 @@ export function createTaxonomy(spec: TaxonomySpec): Taxonomy {
   const fallbackSpec = spec.fallbackStyle ?? DEFAULT_FALLBACK
   checkStyle('fallbackStyle', fallbackSpec)
   const edgeIds = new Set<EdgeTypeId>()
-  // The pair a type runs between, unordered.
   const pairKey = (relation: string, a: AxisValue, b: AxisValue) => JSON.stringify(a <= b ? [relation, a, b] : [relation, b, a])
   const byPair = new Map<string, EdgeType[]>()
   const declaredEdgeTypes = spec.edgeTypes ?? []

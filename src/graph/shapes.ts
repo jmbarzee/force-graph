@@ -163,8 +163,7 @@ export interface EdgeType {
    * Values the edge itself must carry on the host's edge axes to be this
    * type — how two types on one pair are told apart (a call and a signal
    * between the same two values, by the edge's `kind`). An edge lacking
-   * one of these values is not this type. Absent, the pair alone decides,
-   * and this type is the fallback for a pair other types `match` on.
+   * one of these values is not this type.
    */
   match?: Readonly<Record<AxisId, AxisValue>>
   /** Declared stiffness / rest length — what the type resolves to until tuned. */

@@ -542,9 +542,6 @@ export function resolveSprings(pair: PairTuning, taxonomy: Taxonomy): ResolvedSp
     const table = new Map(taxonomy.edgeTypes.map(e => [e.id, e]))
     return {
       mapping,
-      // An edge no declared type of its relation claims has no category here:
-      // it springs with the middling spring and draws in its relation's
-      // stroke, and the diagnostics have named it.
       classify: (edge, src, tgt) => {
         const id = taxonomy.edgeTypeOf(edge, src, tgt)
         const type = id === undefined ? undefined : table.get(id)

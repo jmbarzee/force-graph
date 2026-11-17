@@ -155,8 +155,9 @@ step narrows the types the one before it left:
 | Step | Leaves |
 |---|---|
 | relation | the types of the edge's relation |
-| pair | those running between its endpoints' values, either way round; of those, the ones naming both ends, else one, else neither |
-| `match` | those whose `match` the edge's `values` satisfy, else those declaring none |
+| pair | those running between its endpoints' values, either way round, whose `match` (if any) the edge's `values` satisfy |
+| ends named | those naming both ends, else one, else neither |
+| `match` | those declaring a `match`, else those declaring none |
 | orientation | those declared in the edge's direction, else the reverse |
 | declaration order | the first declared |
 | `classifyEdge(edge, sourceValue, targetValue, declared)` | its answer: an id replaces `declared`, `null` leaves the edge untyped, undefined keeps `declared` |
@@ -297,12 +298,11 @@ the console. Everything else is optional.
   leaves, so a tooltip can be reached. Removing an axis in the bar resets its
   selection to "match everything" and fires `onFilterChange` before
   `onAxesChange`; an axis the taxonomy does not declare renders as a header
-  with its remove control and filters nothing.
-  Derived containment edges are `in:<id>` (numbered on a collision) and reach `highlight` and
-  `collapse`. An error diagnostic drops the edge, or the later node of a
-  duplicated id, or clears the `parentId`, it names. The pane's theme
-  observer watches every `data-theme` in the document unless `systemTheme` is
-  given.
+  with its remove control and filters nothing. Derived containment edges are
+  `in:<id>` (numbered on a collision) and reach `highlight` and `collapse`.
+  An error diagnostic drops the edge, or the later node of a duplicated id,
+  or clears the `parentId`, it names. The pane's theme observer watches every
+  `data-theme` in the document unless `systemTheme` is given.
 - **Keyboard.** `keyboard` scopes the shortcuts: `pane` (the default — the
   focusable root handles the keys that reach it, so a page keeps Tab and
   Space for its own controls), `global` (the window — a page that is the

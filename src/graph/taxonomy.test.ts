@@ -32,6 +32,16 @@ describe('edgeTypeOf', () => {
     expect(taxonomy.edgeTypeOf(edge, 'queue', 'store')).toBe('any')
   })
 
+  it('drops a type whose match the edge lacks before ranking by ends named', () => {
+    const taxonomy = createTaxonomy({
+      styleAxis: 'kind', styles, edgeTypes: [
+        { ...dependency('calls', { sourceValue: 'service', targetValue: 'queue' }), match: { kind: 'call' } },
+        dependency('fromService', { sourceValue: 'service' }),
+      ],
+    })
+    expect(taxonomy.edgeTypeOf({ ...edge, values: { kind: 'signal' } }, 'service', 'queue')).toBe('fromService')
+  })
+
   it('refuses two types naming as many ends that nothing tells apart', () => {
     expect(() => createTaxonomy({
       styleAxis: 'kind', styles, edgeTypes: [dependency('fromService', { sourceValue: 'service' }), dependency('toQueue', { targetValue: 'queue' })],
