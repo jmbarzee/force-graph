@@ -100,6 +100,26 @@ describe('frameQueue', () => {
     expect(framed).toEqual([])
   })
 
+  it('drops a refit\'s warm frame at a pan before the next tick, though the last tick was cool', () => {
+    const { framed, queue } = queued()
+    queue.tick(0.1)
+    queue.request(opening)
+    queue.release()
+    queue.measured()
+    queue.tick(0.1)
+    expect(framed).toEqual([])
+  })
+
+  it('frames nothing at a resize before the next tick on a hot layout, though the last tick was cool', () => {
+    const { framed, queue } = queued()
+    queue.tick(0.1)
+    queue.request(opening)
+    queue.measured()
+    expect(framed).toEqual([])
+    queue.tick(0.5)
+    expect(framed).toEqual([])
+  })
+
   it('releases a held frame for a newer request, and for a next one acting after it', () => {
     const { framed, queue } = queued()
     const fit = { ids: ['b'] }

@@ -47,24 +47,27 @@ export function frameQueue(apply: (request: FrameRequest) => boolean) {
     if (next?.hold) next = undefined
     held = undefined
   }
+  // A warm request acts once the layout has cooled and the pane measured.
+  const landWarm = () => {
+    if (!warm || !cooled || !apply(warm)) return false
+    const request = warm
+    warm = undefined
+    act(request)
+    return true
+  }
   return {
     request(request: FrameRequest) {
       const behind = request.when === 'warm' ? next : undefined
       drop()
       next ??= behind
-      if (request.when === 'warm') warm = request
+      if (request.when === 'warm') { warm = request; cooled = false }
       else if (request.when === 'next') next = request
       else { apply(request); act(request) }
     },
     tick(alpha: number) {
       cooled = alpha < 0.3
       if (held) apply(held)
-      if (warm) {
-        if (!cooled || !apply(warm)) return
-        const request = warm
-        warm = undefined
-        act(request)
-      }
+      if (warm && !landWarm()) return
       if (next) {
         const request = next
         next = undefined
@@ -74,10 +77,7 @@ export function frameQueue(apply: (request: FrameRequest) => boolean) {
     },
     // The pane measured: a warm request it alone held up acts now.
     measured() {
-      if (!warm || !cooled || !apply(warm)) return
-      const request = warm
-      warm = undefined
-      act(request)
+      landWarm()
     },
     release() {
       const released = held?.released
