@@ -661,7 +661,7 @@ export class Simulation {
   }
 
   tick(visibleIds?: Set<string>, downstreamScores?: Map<string, number>): void {
-    if (this.alpha < this.params.alphaMin) return
+    if (this.isStable()) return
 
     const active = visibleIds
       ? this.nodes.filter(n => visibleIds.has(n.id))
@@ -753,7 +753,7 @@ export class Simulation {
   }
 
   isStable(): boolean {
-    return this.alpha < this.params.alphaMin
+    return this.alpha < this.params.alphaMin || this.alpha === 0
   }
 
   pinNode(id: string, x: number, y: number): void {
