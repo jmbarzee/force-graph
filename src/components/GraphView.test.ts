@@ -6,6 +6,7 @@ import { GraphView } from './GraphView'
 import type { GraphViewHandle } from './GraphView'
 import { createTaxonomy } from '../graph/taxonomy'
 import type { Graph, GraphNode } from '../graph/model'
+import type { GraphDiagnostic } from '../graph/validate'
 import type { FilterState } from '../filter/types'
 import { selectionFor, withSelection } from '../filter/types'
 
@@ -28,12 +29,13 @@ const grown = graphOf(['a', 'x'], ['b', 'y'], ['c', 'z'])
 async function mount(props: Partial<React.ComponentProps<typeof GraphView>>, start = first) {
   const ref = React.createRef<GraphViewHandle>()
   const reported: FilterState[] = []
-  const root = createRoot(document.createElement('div'))
+  const el = document.createElement('div')
+  const root = createRoot(el)
   const render = (graph: Graph) => act(async () => {
     root.render(React.createElement(GraphView, { ref, graph, taxonomy, onFilterChange: next => reported.push(next), ...props }))
   })
   await render(start)
-  return { ref, render, last: () => reported[reported.length - 1]! }
+  return { el, ref, render, last: () => reported[reported.length - 1]! }
 }
 
 it('writes one axis through updateFilter, and re-seeds the rest when the graph grows', async () => {
@@ -50,4 +52,16 @@ it('keeps the axes defaultFilter changed, and re-seeds the rest', async () => {
   await view.render(grown)
   expect(selectionFor(view.last(), 'team')).toEqual({ except: new Set(['a']) })
   expect(selectionFor(view.last(), 'site')).toEqual({ except: new Set(['z']) })
+})
+
+it('names a parent cycle and draws past it with every node hidden', async () => {
+  const [a, b, c] = graphOf(['a', 'x'], ['a', 'x'], ['a', 'x']).nodes
+  const cycle: Graph = {
+    nodes: [{ ...a!, parentId: 'n2' }, { ...b!, parentId: 'n0' }, { ...c!, parentId: 'n1' }],
+    edges: [{ id: 'd', sourceId: 'n0', targetId: 'n1' }],
+  }
+  let reported: readonly GraphDiagnostic[] = []
+  const view = await mount({ defaultFilter: new Map([['team', new Set<string>()]]), onDiagnostics: d => { reported = d } }, cycle)
+  expect(reported.filter(d => d.code === 'parent-cycle').map(d => d.nodeId)).toEqual(['n0'])
+  expect(view.el.textContent).toContain('parent-cycle')
 })

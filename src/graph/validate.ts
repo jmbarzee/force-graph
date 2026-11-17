@@ -16,11 +16,11 @@ import type { Taxonomy } from './taxonomy'
  * The defects `validateGraph` names. Errors: a node or edge id used twice,
  * an edge whose endpoint is not in the graph, an unknown relation, a type
  * whose relation is not the edge's, a rule that threw, a parent not in the
- * graph. Warnings: an edge no type claims, a style value the taxonomy does
- * not declare, containment edges that contradict `parentId`, derived
- * containment edges no type claims (`containment-untyped`, from
- * `derivedContainmentDiagnostics`), a group key the groups do not declare
- * (`group-key-undeclared`, from `nodeGroupsOf`).
+ * graph, a cycle of parents. Warnings: an edge no type claims, a style value
+ * the taxonomy does not declare, containment edges that contradict
+ * `parentId`, derived containment edges no type claims
+ * (`containment-untyped`, from `derivedContainmentDiagnostics`), a group key
+ * the groups do not declare (`group-key-undeclared`, from `nodeGroupsOf`).
  */
 export type GraphDiagnosticCode =
   | 'edge-id-duplicate'
@@ -30,6 +30,7 @@ export type GraphDiagnosticCode =
   | 'edge-type-unclassified'
   | 'edge-type-relation-mismatch'
   | 'parent-missing'
+  | 'parent-cycle'
   | 'containment-parent-mismatch'
   | 'node-value-undeclared'
   | 'node-id-duplicate'
@@ -56,10 +57,10 @@ const RELATIONS = new Set(['containment', 'dependency'])
  * Every defect in a host's graph, as data: errors for what the view cannot
  * draw as given (a duplicated node id, a dangling endpoint, an unknown
  * relation, a type whose relation is not the edge's, a parent not in the
- * graph) and warnings for what it draws but the host should know (an
- * unclassified edge, an undeclared style value, containment edges that
- * contradict `parentId`). Pure; the same graph and taxonomy give the same
- * list, in graph order.
+ * graph, a cycle of parents) and warnings for what it draws but the host
+ * should know (an unclassified edge, an undeclared style value, containment
+ * edges that contradict `parentId`). Pure; the same graph and taxonomy give
+ * the same list, in graph order.
  */
 export function validateGraph(graph: Graph, taxonomy: Taxonomy): GraphDiagnostic[] {
   const out: GraphDiagnostic[] = []
@@ -84,6 +85,8 @@ export function validateGraph(graph: Graph, taxonomy: Taxonomy): GraphDiagnostic
       out.push({ severity: 'warning', code: 'node-value-undeclared', nodeId: node.id, message: `node ${JSON.stringify(node.id)} sits at ${JSON.stringify(value)} on the style axis, which the taxonomy does not declare; it draws in the fallback style` })
     }
   }
+
+  out.push(...parentCycles(byId))
 
   // Edges: unique ids, both ends present, a known relation, a type (when one
   // classifies) whose relation is the edge's.
@@ -143,6 +146,41 @@ export function validateGraph(graph: Graph, taxonomy: Taxonomy): GraphDiagnostic
 }
 
 /**
+ * One error per cycle of `parentId`s, naming its nodes from the first in graph
+ * order, which `dropInvalid` orphans so containment is a tree.
+ */
+function parentCycles(byId: ReadonlyMap<string, GraphNode>): GraphDiagnostic[] {
+  const done = new Set<string>()
+  const onCycle = new Set<string>()
+  for (const start of byId.keys()) {
+    const path: string[] = []
+    const pos = new Map<string, number>()
+    let id: string | undefined = start
+    while (id !== undefined && byId.has(id) && !done.has(id)) {
+      const at = pos.get(id)
+      if (at !== undefined) {
+        for (const c of path.slice(at)) onCycle.add(c)
+        break
+      }
+      pos.set(id, path.length)
+      path.push(id)
+      id = byId.get(id)!.parentId
+    }
+    for (const p of path) done.add(p)
+  }
+  const out: GraphDiagnostic[] = []
+  const named = new Set<string>()
+  for (const first of byId.keys()) {
+    if (!onCycle.has(first) || named.has(first)) continue
+    const cycle = [first]
+    for (let id = byId.get(first)!.parentId!; id !== first; id = byId.get(id)!.parentId!) cycle.push(id)
+    for (const c of cycle) named.add(c)
+    out.push({ severity: 'error', code: 'parent-cycle', nodeId: first, message: `parentId runs in a cycle: ${[...cycle, first].map(c => JSON.stringify(c)).join(' → ')}; the view clears ${JSON.stringify(first)}'s parent` })
+  }
+  return out
+}
+
+/**
  * The graph with every node and edge an error names removed and every parent
  * an error names cleared — what the view draws when the host's graph has
  * defects. A duplicated id keeps its first node and its first edge. The
@@ -155,7 +193,7 @@ export function dropInvalid(graph: Graph, diagnostics: readonly GraphDiagnostic[
   for (const d of diagnostics) {
     if (d.severity !== 'error') continue
     if (d.edgeId !== undefined) badEdges.add(d.edgeId)
-    if (d.code === 'parent-missing' && d.nodeId !== undefined) badParents.add(d.nodeId)
+    if ((d.code === 'parent-missing' || d.code === 'parent-cycle') && d.nodeId !== undefined) badParents.add(d.nodeId)
     if (d.code === 'node-id-duplicate' && d.nodeId !== undefined) duplicateNodes.add(d.nodeId)
   }
   if (badEdges.size === 0 && badParents.size === 0 && duplicateNodes.size === 0) return graph
