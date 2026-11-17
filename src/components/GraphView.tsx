@@ -6,7 +6,7 @@ import './GraphView.css'
 import { nodesById, readableGraph, isContainment, withContainmentEdges } from '../graph/model'
 import type { Graph, GraphEdge, GraphNode } from '../graph/model'
 import type { FilterState, AxisLocks } from '../filter/types'
-import { initialFilter, filterStatesEqual, hiddenMatchesOf, listEqual, locksEqual, passesDescriptors, reseedFilter } from '../filter/types'
+import { changedAxes, initialFilter, filterStatesEqual, hiddenMatchesOf, listEqual, locksEqual, passesDescriptors, reseedFilter } from '../filter/types'
 import { reconcileFilter } from '../filter/reconcile'
 import type { ForceParams, Simulation } from '../graph/simulation'
 import { bandOverlay, layoutFrame, resolvePhysics } from '../graph/forces'
@@ -101,6 +101,8 @@ export interface GraphViewHandle {
   getPositions(): Map<string, Position>
   /** Move nodes to the given positions (pinned ones stay) and let the layout settle around them. */
   setPositions(positions: ReadonlyMap<string, Position>): void
+  /** Rewrite the filter from its current value: the axes `fn` changes count as the user's, a later graph re-seeds the rest, and `onFilterChange` reports the write. */
+  updateFilter(fn: (filter: FilterState) => FilterState): void
 }
 
 /**
@@ -169,8 +171,8 @@ export interface GraphViewProps {
    * The selection per axis. Controlled while defined: the view shows it and
    * never rewrites it — a host that controls the filter re-seeds it for a
    * new graph itself (`reseedFilter`). Absent, the view keeps the filter:
-   * `defaultFilter`, or `initialFilter(taxonomy, graph)` re-seeded from each
-   * new graph on every axis still at the selection it opened with.
+   * `defaultFilter`, or `initialFilter(taxonomy, graph)`, re-seeded from
+   * each new graph on every axis the user has not touched.
    */
   filter?: FilterState
   /**
@@ -184,8 +186,9 @@ export interface GraphViewProps {
   /**
    * Where the view's own filter starts when the host does not control it —
    * a start that depends on the host's state, which a descriptor's
-   * `initialSelection` cannot see. Read once; a host that gives it has
-   * chosen its start, so a later graph re-seeds nothing.
+   * `initialSelection` cannot see. Read once; it counts as the user's on
+   * every axis where it differs from `initialFilter(taxonomy, graph)`, and a
+   * later graph re-seeds the rest.
    */
   defaultFilter?: FilterState
   /** Which axes are locked against a cross-view adoption. Default: `defaultLocks`, else none. Controlling it with `onLocksChange` shows the lock toggles. */
@@ -310,27 +313,26 @@ export const GraphView = React.forwardRef<GraphViewHandle, GraphViewProps>(funct
     setFilterState(next)
     onFilterChangeRef.current?.(next, touched)
   }, [filterRef, setFilterState, onFilterChangeRef])
-  // The axes the user has touched in the bar — state, not an inference: a
-  // selection that happens to equal a graph's opening one is not thereby
-  // untouched. A later graph re-seeds the rest.
-  const touchedRef = React.useRef(new Set<AxisId>())
+  // The axes the user has touched — in the bar, through the handle's
+  // `updateFilter`, or where `defaultFilter` differs from the opening filter.
+  // State, not an inference: a selection that happens to equal a graph's
+  // opening one is not thereby untouched. A later graph re-seeds the rest.
+  const [touchedAxes] = React.useState(() => new Set(defaultFilterProp ? changedAxes(initialFilter(taxonomy, hostGraph), defaultFilterProp) : []))
   const userWriteFilter = React.useCallback((next: FilterState, touched: readonly AxisId[]) => {
-    for (const axis of touched) touchedRef.current.add(axis)
+    for (const axis of touched) touchedAxes.add(axis)
     writeFilter(next, touched)
-  }, [writeFilter])
+  }, [writeFilter, touchedAxes])
   // A graph that changes while the view keeps the filter itself re-seeds
   // every axis the user has not touched: a host that mounts empty while its
   // data loads is not left blank, and a value first seen later is not born
-  // hidden. The user's selections stand; a host that gave `defaultFilter`
-  // chose its start (read once, at mount); a host that controls the filter
+  // hidden. The user's selections stand; a host that controls the filter
   // owns it, and the view never rewrites it.
-  const choseStartRef = React.useRef(defaultFilterProp !== undefined)
   const seededFromRef = React.useRef(hostGraph)
   React.useEffect(() => {
     if (seededFromRef.current === hostGraph) return
     seededFromRef.current = hostGraph
-    if (filterProp !== undefined || choseStartRef.current) return
-    const next = reseedFilter(filter, taxonomy, hostGraph, touchedRef.current)
+    if (filterProp !== undefined) return
+    const next = reseedFilter(filter, taxonomy, hostGraph, touchedAxes)
     if (next !== filter) writeFilter(next, [])
   }, [hostGraph]) // eslint-disable-line react-hooks/exhaustive-deps
   const [rawLocks, setLocks] = useControllable(locksProp, onLocksChange, () => defaultLocks ?? new Map<string, boolean>(), 'locks')
@@ -856,7 +858,12 @@ export const GraphView = React.forwardRef<GraphViewHandle, GraphViewProps>(funct
       sim.reheat(0.1)
       setRunning(true)
     },
-  }), [focusNodeById, fit, setRunning, requestSelect, simRef, visibleNodesRef])
+    updateFilter: (fn: (filter: FilterState) => FilterState) => {
+      const prev = filterRef.current
+      const next = fn(prev)
+      if (!filterStatesEqual(prev, next)) userWriteFilter(next, changedAxes(prev, next))
+    },
+  }), [focusNodeById, fit, setRunning, requestSelect, simRef, visibleNodesRef, filterRef, userWriteFilter])
 
   // Keyboard, scoped by `keyboard`: on the pane, the focusable root
   // handles the keys that reach it; globally, the window does — a tab shell

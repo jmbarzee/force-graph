@@ -2,10 +2,10 @@
 // axes the host declares, and the operations on it.
 //
 // Every operation here is copy-on-write: the axis being edited gets a new
-// Set, every other axis keeps its exact instance, and a no-op edit returns the
-// same state. The view compares selections by content, so a host that rebuilds
-// a filter from a URL or a store is not read as a change — identity is the
-// cheap path, not the contract.
+// selection, every other axis keeps its exact instance, and a no-op edit
+// returns the same state. The view compares selections by content, so a host
+// that rebuilds a filter from a URL or a store is not read as a change —
+// identity is the cheap path, not the contract.
 //
 // The search query lives outside a FilterState because the views share it.
 
@@ -15,8 +15,14 @@ import type { Graph } from '../graph/model'
 import type { Taxonomy } from '../graph/taxonomy'
 import { isPlainRecord } from '../json'
 
-/** The chosen values on one axis. Empty means what the axis's descriptor says. */
-export type AxisSelection = ReadonlySet<string>
+/**
+ * The chosen values on one axis, in one of two kinds. A set is an inclusion,
+ * "only these": exactly its values, so a value the data gains later stays
+ * hidden; an empty one means what the axis's `emptyMeans` says. `{ except }`
+ * is an exclusion, "all but these": every value the graph presents but its
+ * own, so a value the data gains later shows.
+ */
+export type AxisSelection = ReadonlySet<string> | { except: ReadonlySet<string> }
 
 /**
  * A selection per axis. A `Map`, not a `Record`: an axis the host did not
@@ -50,11 +56,39 @@ export function axesOf(state: FilterState): AxisId[] {
   return [...state.keys()].sort()
 }
 
-/** Whether two selections hold the same values. */
+/** The values a selection names: an inclusion's, or the ones an exclusion leaves out. */
+export function namedBy(selection: AxisSelection): ReadonlySet<string> {
+  return 'except' in selection ? selection.except : selection
+}
+
+/** Whether a selection shows `value`: an inclusion holds it, an exclusion does not. An empty inclusion is `emptyMeans`'s to read first. */
+export function selects(selection: AxisSelection, value: string): boolean {
+  return 'except' in selection ? !selection.except.has(value) : selection.has(value)
+}
+
+/** Whether a selection is an empty inclusion — the one `emptyMeans` reads. */
+export function isEmptySelection(selection: AxisSelection): boolean {
+  return !('except' in selection) && selection.size === 0
+}
+
+/** `selection` with `values` turned on or off, of the same kind. */
+export function withValues(selection: AxisSelection, values: Iterable<string>, on: boolean): AxisSelection {
+  const exclusion = 'except' in selection
+  const named = new Set(namedBy(selection))
+  for (const v of values) {
+    if (on !== exclusion) named.add(v)
+    else named.delete(v)
+  }
+  return exclusion ? { except: named } : named
+}
+
+/** Whether two selections are of one kind and name the same values. */
 export function selectionsEqual(a: AxisSelection, b: AxisSelection): boolean {
   if (a === b) return true
-  if (a.size !== b.size) return false
-  for (const v of a) if (!b.has(v)) return false
+  if (('except' in a) !== ('except' in b)) return false
+  const [x, y] = [namedBy(a), namedBy(b)]
+  if (x.size !== y.size) return false
+  for (const v of x) if (!y.has(v)) return false
   return true
 }
 
@@ -63,7 +97,7 @@ export function selectionsEqual(a: AxisSelection, b: AxisSelection): boolean {
  *
  * Returns `state` **itself** when the new selection is content-equal to the old
  * one, so a no-op edit changes no identity anywhere. Otherwise only the edited
- * axis gets a new Set; every other axis is carried over by reference.
+ * axis takes `next`; every other axis is carried over by reference.
  */
 export function withSelection(
   state: FilterState,
@@ -139,7 +173,8 @@ export type ReconcileResult = {
  * The filter a view starts from: on every filter axis, what its descriptor's
  * `initialSelection` chooses from the values the graph presents there —
  * every value on an allow-list, none on a narrowing axis, or the host's own
- * choice.
+ * choice. An allow-list's is an exclusion of the values not chosen, so a
+ * value the graph gains later shows.
  */
 export function initialFilter(taxonomy: Pick<Taxonomy, 'filterAxes'>, graph: Pick<Graph, 'nodes'>): FilterState {
   return new Map(taxonomy.filterAxes.map(d => [d.id, seedSelection(taxonomy, d, valuesOn(graph.nodes, d.id))]))
@@ -162,7 +197,7 @@ export function seedSelection(taxonomy: Pick<Taxonomy, 'filterAxes'>, d: Resolve
     for (const v of mine) chosen.add(v)
     warnSplitChip(taxonomy, d.id, chip.id, mine.filter(v => !on.includes(v)))
   }
-  return chosen
+  return d.emptyMeans === 'none' ? { except: new Set(values.filter(v => !chosen.has(v))) } : chosen
 }
 
 /**
@@ -211,9 +246,9 @@ function warnSplitChip(taxonomy: object, axis: AxisId, chip: string, added: read
 // a host string, and `out['__proto__'] = …` on a literal sets the prototype
 // instead of a key, so that axis would vanish from the stored text.
 
-/** A filter as plain data — each axis's selected values in an array — for a URL, a store or a saved layout. */
-export function filterToJSON(filter: FilterState): Record<AxisId, string[]> {
-  return Object.fromEntries([...filter].map(([axis, selection]) => [axis, [...selection]]))
+/** A filter as plain data — an inclusion as its values in an array, an exclusion as `{ except: [...] }` — for a URL, a store or a saved layout. */
+export function filterToJSON(filter: FilterState): Record<AxisId, string[] | { except: string[] }> {
+  return Object.fromEntries([...filter].map(([axis, selection]) => [axis, 'except' in selection ? { except: [...selection.except] } : [...selection]]))
 }
 
 /**
@@ -224,9 +259,12 @@ export function filterToJSON(filter: FilterState): Record<AxisId, string[]> {
 export function filterFromJSON(value: unknown): FilterState | undefined {
   if (!isPlainRecord(value)) return undefined
   const out = new Map<AxisId, AxisSelection>()
-  for (const [axis, values] of Object.entries(value)) {
+  for (const [axis, stored] of Object.entries(value)) {
+    const exclusion = isPlainRecord(stored)
+    const values = exclusion ? stored.except : stored
+    if (exclusion && Object.keys(stored).length !== 1) return undefined
     if (!Array.isArray(values) || !values.every((v): v is string => typeof v === 'string')) return undefined
-    out.set(axis, new Set(values))
+    out.set(axis, exclusion ? { except: new Set(values) } : new Set(values))
   }
   return out
 }
@@ -295,7 +333,7 @@ export function passesDescriptors(
 ): boolean {
   for (const axis of axes) {
     const selection = selectionFor(filter, axis.id)
-    if (selection.size === 0) {
+    if (isEmptySelection(selection)) {
       if (axis.emptyMeans === 'none') return false
       continue
     }
@@ -304,7 +342,7 @@ export function passesDescriptors(
       if (axis.absentMeans === 'hidden') return false
       continue
     }
-    if (!selection.has(value)) return false
+    if (!selects(selection, value)) return false
   }
   return true
 }

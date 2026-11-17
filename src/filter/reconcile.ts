@@ -17,9 +17,12 @@ import type {
 } from './types'
 import {
   filterStatesEqual,
+  isEmptySelection,
   lockedFor,
   selectionFor,
+  selects,
   withSelection,
+  withValues,
 } from './types'
 import type { AxisId, AxisValue, ResolvedAxisDescriptor } from '../graph/axis'
 import { valuesOn } from '../graph/axis'
@@ -115,10 +118,10 @@ function reconcileFocus(
     if (value === undefined) continue
 
     const current = selectionFor(destFilter, axis.id)
-    if (current.has(value)) continue
-    if (axis.widens === 'whenActive' && current.size === 0) continue
+    if (selects(current, value)) continue
+    if (axis.widens === 'whenActive' && isEmptySelection(current)) continue
 
-    next = withSelection(next, axis.id, new Set([...current, ...chipValues(axis, value, graph)]))
+    next = withSelection(next, axis.id, withValues(current, chipValues(axis, value, graph), true))
     if (lockedFor(destLocks, axis.id)) overridden.add(axis.id)
   }
 

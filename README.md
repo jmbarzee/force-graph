@@ -222,9 +222,23 @@ the console. Everything else is optional.
   changes — every axis the user has not touched takes the new graph's
   opening selection — for a host that controls the filter to call from its
   own data effect; `onFilterChange(next, touched)` names the axes the user
-  changed in each write, so the host can keep that set.
-  `filterToJSON` / `filterFromJSON` and `locksToJSON` / `locksFromJSON` carry
-  a filter and its locks to a URL or a store and back.
+  changed in each write, so the host can keep that set. A host that writes
+  only one axis need not control the filter: the handle's `updateFilter`
+  writes it, and the view keeps re-seeding the rest.
+- **Save and restore.** An axis's selection is a set, "only these", or
+  `{ except }`, "all but these". An allow-list opens as an exclusion and the
+  bar keeps an axis's kind, so a value the data gains after a chip was turned
+  off shows; a set the host writes stays exactly its values. `filterToJSON`
+  / `filterFromJSON` and `locksToJSON` / `locksFromJSON` carry a filter and
+  its locks to a URL or a store and back, and a restored filter is the
+  user's on every axis where it differs from the opening one:
+
+  ```tsx
+  localStorage.setItem('filter', JSON.stringify(filterToJSON(filter)))
+  // { "team": { "except": ["ops"] }, "region": ["north"] }
+  const saved = filterFromJSON(JSON.parse(localStorage.getItem('filter') ?? 'null'))
+  <GraphView graph={graph} taxonomy={taxonomy} defaultFilter={saved} />
+  ```
 - **Selection and focus.** `selectedId` controls the selection: while it is
   defined the view shows it and nothing else, `onSelectionChange` reports the
   selections the user makes (never one the host made), and the host answers
@@ -283,10 +297,10 @@ the console. Everything else is optional.
   whether the node ended visible (a value absent on a hiding axis cannot be
   revealed); `select(id | null)` sets or clears the selection; `fit()` frames
   the visible set; `getPositions()` and `setPositions()` carry a layout out
-  and back in.
+  and back in; `updateFilter(fn)` rewrites the filter, the axes `fn` changes
+  counting as the user's.
 - **What to know.** The view's own filter re-seeds on a graph change for
-  every axis still at the selection it opened with — a controlled filter
-  never does, and a host that gave `defaultFilter` chose its start — and
+  every axis the user has not touched — a controlled filter never does — and
   `onFilterChange` hears it. `onHover(null)` arrives 150 ms after the pointer
   leaves, so a tooltip can be reached. Removing an axis in the bar resets its
   selection to "match everything" and fires `onFilterChange` before

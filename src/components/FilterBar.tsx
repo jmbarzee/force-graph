@@ -35,7 +35,7 @@ import { selectionFor } from '../filter/types'
 import React from 'react'
 import './FilterBar.css'
 import type { ResolvedAxisDescriptor } from '../graph/axis'
-import { changedAxes, filterStatesEqual, listEqual, lockedFor, locksEqual, seedSelection, selectionsEqual, withLock, withSelection } from '../filter/types'
+import { changedAxes, filterStatesEqual, isEmptySelection, listEqual, lockedFor, locksEqual, seedSelection, selects, selectionsEqual, withLock, withSelection } from '../filter/types'
 import type { FilterState, AxisLocks } from '../filter/types'
 import { toggleGroup } from '../filter/toggle'
 import { LockToggle } from './LockToggle'
@@ -365,7 +365,7 @@ export function FilterBar({
         // An `emptyMeans: 'all'` axis with nothing selected is not "off" — it is
         // matching everything, and the chips say so rather than reading as a
         // filter that hides the lot.
-        const allIncluded = selection.size === 0 && descriptor?.emptyMeans === 'all'
+        const allIncluded = isEmptySelection(selection) && descriptor?.emptyMeans === 'all'
 
         return (
           <React.Fragment key={axis}>
@@ -378,7 +378,7 @@ export function FilterBar({
                   </span>
                 )}
                 {chips.map(chip => {
-                  const isActive = chip.values.some(v => selection.has(v))
+                  const isActive = chip.values.some(v => selects(selection, v))
                   const isChanged = chip.values.some(v => recentlyChanged.get(axis)?.has(v))
                   const hiddenCount = chip.values.reduce((sum, v) => sum + (look.hidden?.get(v) ?? 0), 0)
                   const count = look.counts === undefined ? undefined : chip.values.reduce((sum, v) => sum + (look.counts!.get(v) ?? 0), 0)
@@ -430,13 +430,11 @@ export function FilterBar({
                     // empty selection matches everything; on an allow-list it
                     // matches NOTHING, so clearing it would blank the view
                     // instead of unfiltering it. Match-everything is therefore empty for
-                    // one and the full value set for the other.
+                    // one and an exclusion of nothing for the other.
                     change(withSelection(
                       filter,
                       axis,
-                      descriptor?.emptyMeans !== 'none'
-                        ? new Set<string>()
-                        : new Set(chips.flatMap(c => [...c.values])),
+                      descriptor?.emptyMeans !== 'none' ? new Set<string>() : { except: new Set<string>() },
                     ), axis)
                     setAxes(axes.filter(d => d !== axis))
                     setAxisOpen(axis, false)
