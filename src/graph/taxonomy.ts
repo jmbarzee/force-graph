@@ -73,13 +73,6 @@ export interface Taxonomy {
    * One axis, named once. Every other feature elects its own — the physics reads
    * its axis off the force params, filters read theirs off the filter — and no
    * feature composes two.
-   *
-   * A method, not a field, and that is a correctness property rather than a
-   * style choice: a container derived by spreading (`{ ...taxonomy,
-   * styleAxis: 'other' }`) would rewrite a field and leave the closures
-   * answering on the old axis — an object that disagrees with itself, the
-   * draw loop reading one half and the physics the other. With one source
-   * there is nothing to override out of step.
    */
   styleAxis(): AxisId
   /** The style axis's display name, for a control that names axes. */

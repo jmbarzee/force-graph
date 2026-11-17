@@ -228,9 +228,8 @@ export function dropInvalid(graph: Graph, diagnostics: readonly GraphDiagnostic[
 }
 
 /**
- * The one warning the drawn graph adds to the host's: the containment edges
- * the view derived from `parentId` that no declared containment type claims
- * (a dependency type the host's rule answers does not count). They draw in
+ * The containment edges derived from `parentId` that no declared containment
+ * type claims (a dependency type the host's rule answers does not count). They draw in
  * the containment stroke and spring with the middling spring; a host that
  * wants them typed declares a containment type between the child's value and
  * the parent's.
