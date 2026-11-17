@@ -82,7 +82,7 @@ describe('computeVisibleGraph undirected', () => {
 describe('neighborhoodOf', () => {
   it('leaves out a hidden neighbor', () => {
     const vg = computeVisibleGraph(sim, withSelection(initialFilter(taxonomy, graph), 'kind', new Set(['parent'])), taxonomy)
-    expect(neighborhoodOf('p1', vg.visibleNodes, vg.visibleEdges).map(n => n.id)).toEqual(['p1', 'p2'])
+    expect(neighborhoodOf('p1', vg.visibleEdges)).toEqual(new Set(['p1', 'p2']))
   })
 })
 

@@ -211,13 +211,13 @@ function classifyEdges(sim: VisibleGraphSource, taxonomy: Taxonomy): Map<string,
 }
 
 /** The node and every node one edge from it. */
-export function neighborhoodOf(id: string, nodes: readonly SimNode[], edges: readonly GraphEdge[]): SimNode[] {
+export function neighborhoodOf(id: string, edges: readonly GraphEdge[]): Set<string> {
   const ids = new Set([id])
   for (const edge of edges) {
     if (edge.sourceId === id) ids.add(edge.targetId)
     if (edge.targetId === id) ids.add(edge.sourceId)
   }
-  return nodes.filter(n => ids.has(n.id))
+  return ids
 }
 
 export function computeVisibleGraph(

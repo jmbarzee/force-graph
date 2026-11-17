@@ -52,15 +52,13 @@ describe('frameQueue', () => {
   }
   const opening = { ids: ['a'], when: 'warm', hold: true } as const
 
-  it('holds a frame from the first warm tick, running its then once', () => {
+  it('holds a frame from the first warm tick', () => {
     const { framed, queue } = queued()
-    let thens = 0
-    queue.request({ ...opening, then: () => thens++ })
+    queue.request(opening)
     queue.tick(0.5)
     expect(framed).toEqual([])
     queue.tick(0.29); queue.tick(0.2); queue.tick(0.1)
     expect(framed).toHaveLength(3)
-    expect(thens).toBe(1)
   })
 
   it('releases a held frame, and one waiting to hold, at once', () => {
@@ -87,6 +85,34 @@ describe('frameQueue', () => {
     queue.request(opening)
     queue.tick(0.1); queue.tick(0.1)
     expect(framed).toEqual([opening, fit, opening, focus])
+  })
+
+  it('keeps a next frame waiting to hold behind a newer warm one, and holds it after', () => {
+    const { framed, queue } = queued()
+    const focus = { ids: ['c'], when: 'next', hold: true } as const
+    queue.request(focus)
+    queue.request(opening)
+    queue.tick(0.5)
+    queue.tick(0.1); queue.tick(0.1)
+    expect(framed).toEqual([opening, focus, focus])
+  })
+
+  it('runs released when a held frame is released, but not for a newer request or before it holds', () => {
+    const { queue } = queued()
+    let releases = 0
+    const focus = { ids: ['a'], when: 'next', hold: true, released: () => releases++ } as const
+    queue.request(focus)
+    queue.release()
+    queue.request(focus)
+    queue.tick(0.1)
+    queue.request({ ids: ['b'] })
+    queue.release()
+    expect(releases).toBe(0)
+    queue.request(focus)
+    queue.tick(0.1)
+    queue.release()
+    queue.release()
+    expect(releases).toBe(1)
   })
 })
 

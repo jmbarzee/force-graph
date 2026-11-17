@@ -339,9 +339,10 @@ A host with a second view links them through `useLinkedViews`
 - **A lock** holds one view's axis against manual switches. Unlocking resumes
   adoption from the next switch.
 - **Focus into the graph** is `focusNode`
-  ([README § The view](README.md#the-view)). Framing the node's
-  neighbourhood, holding the viewport and flashing the target are
-  [#21](https://github.com/jmbarzee/force-graph/issues/21).
+  ([README § The view](README.md#the-view)). Its frame of the node and its
+  neighbours holds as the first layout's does; when a settled layout, a pan,
+  zoom or drag lets it go, a ring round the node fades over 600 ms, and a
+  newer frame lets it go without one.
 
 ## Keyboard
 

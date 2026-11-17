@@ -76,7 +76,7 @@ export interface LinkedViews<V extends string> {
   /**
    * Show `target` — a node, or the values a record of the host's names — in
    * `view`: a focus switch to it, and the target in `of(view).focus`. A
-   * `GraphView` centres on and selects a node once it is in the graph, and
+   * `GraphView` frames and selects a node once it is in the graph, and
    * the request clears when the pane reports it.
    */
   focus(view: V, target: GraphNode | FocusTarget): ReconcileResult
