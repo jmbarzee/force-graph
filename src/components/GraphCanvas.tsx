@@ -12,6 +12,7 @@ import type { Viewport } from '../graph/viewport'
 import { screenToWorld, worldToScreen } from '../graph/viewport'
 import { nodeSizeMul, type NodeScaleParams } from '../graph/node-scale'
 import type { Taxonomy } from '../graph/taxonomy'
+import type { GlowGroup } from '../graph/groups'
 import { useTaxonomy } from './graph-view/useTaxonomy'
 import { useLatest } from './graph-view/useControllable'
 import { listenWheelZoom } from './graph-view/wheelZoom'
@@ -42,8 +43,10 @@ const GROUP_GLOW_EDGE_WIDTH = 9
 // out of a field of faint ones. This is the fraction of the strength boost applied
 // to size (0 = brighten only, 1 = size grows in lockstep with alpha).
 const GROUP_GLOW_FOCUS_SWELL = 0.6
-function glowSwell(strength: number): number {
-  return 1 + Math.max(0, strength - 1) * GROUP_GLOW_FOCUS_SWELL
+// A group's `weight` (0..1) swells its glow too, up to doubling it at 1;
+// brightness stays the strength's alone.
+function glowSwell(g: GlowGroup): number {
+  return (1 + Math.max(0, g.strength - 1) * GROUP_GLOW_FOCUS_SWELL) * (1 + Math.min(1, Math.max(0, g.weight ?? 0)))
 }
 
 // A marked edge's band, behind its own stroke so the edge keeps its type's
@@ -138,15 +141,6 @@ const CULL_MARGIN = 100
 const LABEL_ELIDE_SCALE = 0.25    // hide name labels below this scale (except hovered/selected)
 const DETAIL_REDUCE_SCALE = 0.1   // drop decorative rings below this scale
 
-// A group glow request: the visible node ids that belong to one decomposition
-// group, the color to glow them, and a strength multiplier (hovered groups glow
-// stronger). ActiveGroup from graph/groups.ts is structurally assignable.
-export interface GroupGlow {
-  nodeIds: ReadonlySet<string>
-  color: string
-  strength: number
-}
-
 interface GraphCanvasProps {
   nodes: SimNode[]
   edges: GraphEdge[]
@@ -183,7 +177,7 @@ interface GraphCanvasProps {
   activePullEdge: string | null
   nodeScale: NodeScaleParams
   // Decomposition group glow layer (drawn behind everything). Empty = no overlay.
-  groupGlows: GroupGlow[]
+  groupGlows: GlowGroup[]
   /** The visible edges drawn with a marking band, by id. */
   markedEdges: ReadonlySet<string>
 }
@@ -217,7 +211,7 @@ interface DrawData {
   edges: GraphEdge[]
   nodeMap: Map<string, SimNode>
   viewport: Viewport
-  groupGlows: GroupGlow[]
+  groupGlows: GlowGroup[]
   markedEdges: ReadonlySet<string>
   highlightedNodes: Set<string> | null
   highlightedEdges: Set<string> | null
@@ -492,9 +486,9 @@ export function GraphCanvas({
       // edge whose endpoints share a group glows as a connecting corridor.
       // Sections partition members, so a node belongs to at most one group.
       if (d.groupGlows.length > 0) {
-        const glowByNode = new Map<string, { color: string; strength: number }>()
+        const glowByNode = new Map<string, GlowGroup>()
         for (const g of d.groupGlows) {
-          for (const id of g.nodeIds) glowByNode.set(id, { color: g.color, strength: g.strength })
+          for (const id of g.nodeIds) glowByNode.set(id, g)
         }
 
         ctx.save()
@@ -513,7 +507,7 @@ export function GraphCanvas({
             Math.max(sy, ty) < -CULL_MARGIN || Math.min(sy, ty) > h + CULL_MARGIN) continue
           ctx.globalAlpha = Math.min(0.5, GROUP_GLOW_EDGE_ALPHA * gs.strength)
           ctx.strokeStyle = gs.color
-          ctx.lineWidth = GROUP_GLOW_EDGE_WIDTH * glowSwell(gs.strength)
+          ctx.lineWidth = GROUP_GLOW_EDGE_WIDTH * glowSwell(gs)
           ctx.beginPath()
           ctx.moveTo(sx, sy)
           ctx.lineTo(tx, ty)
@@ -527,7 +521,7 @@ export function GraphCanvas({
           const node = d.nodeMap.get(id)
           if (!node) continue
           const [sx, sy] = worldToScreen(vp, node.x, node.y)
-          const gr = d.taxonomy.nodeStyleOf(node).size.r * mul + GROUP_GLOW_PAD * glowSwell(g.strength)
+          const gr = d.taxonomy.nodeStyleOf(node).size.r * mul + GROUP_GLOW_PAD * glowSwell(g)
           if (sx + gr < 0 || sx - gr > w || sy + gr < 0 || sy - gr > h) continue
           const a = Math.min(0.92, GROUP_GLOW_CENTER_ALPHA * g.strength)
           const grad = ctx.createRadialGradient(sx, sy, 0, sx, sy, gr)
