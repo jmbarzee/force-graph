@@ -14,8 +14,7 @@ import type { FrameRequest } from './frame'
 
 export interface ViewportController {
   viewport: Viewport
-  // The user's move, which releases a held frame.
-  setViewport: React.Dispatch<React.SetStateAction<Viewport>>
+  moveViewport: React.Dispatch<React.SetStateAction<Viewport>>
   containerRef: React.RefObject<HTMLDivElement>
   overlayRef: React.RefObject<HTMLDivElement>
   overlayHeight: number
@@ -82,10 +81,10 @@ export function useViewport(drawn: React.RefObject<readonly SimNode[]>): Viewpor
   }, [measure, drawn, overlayHeightRef])
 
   const queue = React.useMemo(() => frameQueue(apply), [apply])
-  const move = React.useCallback((action: React.SetStateAction<Viewport>) => {
+  const moveViewport = React.useCallback((action: React.SetStateAction<Viewport>) => {
     queue.release()
     setViewport(action)
   }, [queue])
 
-  return { viewport, setViewport: move, containerRef, overlayRef, overlayHeight, requestFrame: queue.request, tickFrame: queue.tick, releaseFrame: queue.release }
+  return { viewport, moveViewport, containerRef, overlayRef, overlayHeight, requestFrame: queue.request, tickFrame: queue.tick, releaseFrame: queue.release }
 }

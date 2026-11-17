@@ -6,7 +6,8 @@ import type { SimNode } from '../../graph/simulation'
 /**
  * A framing, handed to the camera's one owner, `useViewport`'s
  * `requestFrame`: the nodes to bring into view. Only the drawn ones among
- * `ids` count, and a request naming none leaves the viewport as it is. The
+ * `ids` count, and a request naming none, or framing them less than half a
+ * pixel from where they are, leaves the viewport as it is. The
  * frame fits them `padding` px inside the canvas below the overlay, or,
  * given `minScale`, centres them there at the current scale raised to it.
  *
@@ -83,9 +84,12 @@ export function frameView(vp: Viewport, request: FrameRequest, drawn: readonly S
   const scale = request.minScale !== undefined
     ? Math.max(vp.scale, request.minScale)
     : Math.min((area.width - padding * 2) / (maxX - minX || 1), (height - padding * 2) / (maxY - minY || 1), 2)
-  return {
-    scale,
-    x: area.width / 2 - (minX + maxX) / 2 * scale,
-    y: area.overlay + height / 2 - (minY + maxY) / 2 * scale,
-  }
+  const x = area.width / 2 - (minX + maxX) / 2 * scale
+  const y = area.overlay + height / 2 - (minY + maxY) / 2 * scale
+  const ds = scale - vp.scale
+  const moved = Math.max(
+    Math.abs(x - vp.x + ds * minX), Math.abs(x - vp.x + ds * maxX),
+    Math.abs(y - vp.y + ds * minY), Math.abs(y - vp.y + ds * maxY),
+  )
+  return moved < 0.5 ? vp : { scale, x, y }
 }

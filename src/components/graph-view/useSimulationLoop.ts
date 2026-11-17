@@ -45,8 +45,9 @@ export function useSimulationLoop({
 
   // Physics animation loop. Decoupled from React rendering: the canvas has its
   // own RAF draw loop reading live SimNode.x/.y through a ref, so the physics
-  // tick does NOT trigger a React re-render each frame. We only touch React state
-  // for one-shot events (a held framing, stability, FPS).
+  // tick does NOT trigger a React re-render each frame. React state moves for
+  // stability, FPS, a waiting framing, and each tick a held frame moves a
+  // framed node half a pixel or more.
   React.useEffect(() => {
     if (!running) return
     let frameId = 0
