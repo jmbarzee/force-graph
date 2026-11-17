@@ -54,7 +54,7 @@ describe('groupsByNode', () => {
 
 describe('activeGroupsOf', () => {
   const hue = { light: '#010101', dark: '#fefefe' }
-  const source = (id: string, ...ids: string[]): GlowSource => ({ id, nodeIds: new Set(ids), color: hue })
+  const source = (id: string, ...ids: string[]): GlowSource => ({ id, label: id, nodeIds: new Set(ids), color: hue })
   const sources = [source('red', 'a', 'b'), source('blue', 'b'), source('green', 'c')]
 
   it('restricts each source to the visible set and drops the empty', () => {

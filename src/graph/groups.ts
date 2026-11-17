@@ -38,8 +38,8 @@ export interface NodeGroup {
   weight?: number
 }
 
-/** A group the glow draws, its colour settled for both themes. */
-export type GlowSource = NodeGroup & { color: ThemedHue }
+/** A group the glow draws, its colour settled for both themes and its name for the legend. */
+export type GlowSource = NodeGroup & { color: ThemedHue; label: string }
 
 /** One key of a set-shaped channel, in the order its palette slots follow. */
 export interface LegendKey {
@@ -171,7 +171,7 @@ export interface ActiveGroup {
   nodeIds: ReadonlySet<string>
 }
 
-/** An active group with the `weight` its glow swells by; the canvas reads it, a host's control sees an `ActiveGroup`. */
+/** An active group with the `weight` its glow swells by, as the canvas reads it. */
 export interface GlowGroup extends ActiveGroup {
   /** The host's `weight`. */
   weight?: number
