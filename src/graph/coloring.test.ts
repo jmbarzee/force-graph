@@ -1,8 +1,8 @@
 import { describe, expect, it, vi } from 'vitest'
-import { resolveColoring } from './coloring'
+import { fillOf, pairFor, resolveColoring } from './coloring'
 import type { Coloring, SetColoring } from './coloring'
 import type { GraphNode } from './model'
-import { PALETTE } from './scheme'
+import { PALETTE, pairOf } from './scheme'
 import type { NodeStyle } from './shapes'
 import { createTaxonomy } from './taxonomy'
 
@@ -94,5 +94,33 @@ describe('resolveColoring by groups', () => {
     expect(derived.of.get('b')).toEqual(['x', 'y'])
     const listed = resolveColoring({ by: 'groups' }, { nodes, edges: [] }, taxonomy, [{ id: 'x', nodeIds: new Set(['a']) }])
     expect(listed.keys.get('x')!.label).toBe('x')
+  })
+})
+
+describe('fillOf', () => {
+  it('follows the style axis when absent, in the styles’ own colours, a node of no declared style keyless', () => {
+    const fill = fillOf(undefined, { nodes, edges: [] }, taxonomy)
+    expect(fill.axis).toBe('kind')
+    expect([...fill.keys.keys()]).toEqual(['service', 'queue', 'store'])
+    expect(fill.keys.get('queue')).toEqual({ label: 'Queue', color: taxonomy.styleOf('queue').color, cssVar: taxonomy.colorVar('queue') })
+    expect(nodes.map(n => fill.of.get(n.id))).toEqual(['queue', 'service', 'service', undefined])
+    expect(fillOf({ by: 'axis', axis: 'kind' }, { nodes, edges: [] }, taxonomy)).toEqual(fill)
+  })
+
+  it('pairs each key’s hue as fill and border on another axis', () => {
+    const fill = fillOf({ by: 'axis', axis: 'team' }, { nodes, edges: [] }, taxonomy)
+    expect(fill.axis).toBe('team')
+    expect(fill.keys.get('blue')).toEqual({ label: 'BLUE', color: pairOf(PALETTE[0]), cssVar: '--gv-node-blue' })
+    expect(fill.of.get('a')).toBe('red')
+    expect(fill.of.has('d')).toBe(false)
+  })
+})
+
+describe('pairFor', () => {
+  it('answers a keyed node its key’s colour and a keyless one the fallback', () => {
+    const fill = fillOf({ by: 'axis', axis: 'team' }, { nodes, edges: [] }, taxonomy)
+    const fallback = taxonomy.styleOf(undefined).color
+    expect(pairFor(fill, 'a', fallback)).toBe(fill.keys.get('red')!.color)
+    expect(pairFor(fill, 'd', fallback)).toBe(fallback)
   })
 })

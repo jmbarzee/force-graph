@@ -13,8 +13,12 @@ import { NO_OVERRIDES } from '../filter/linked'
 import type { LinkedViewState } from '../filter/linked'
 import type { ForceParams, SimNode, Simulation } from '../graph/simulation'
 import { bandOverlay, resolvePhysics } from '../graph/forces'
-import { countsOn, isIdentityMapping, mappingKey, valuesOn } from '../graph/axis'
+import { countsOn, mappingKey, valuesOn } from '../graph/axis'
 import type { AxisId, AxisLabels, AxisMapping } from '../graph/axis'
+import { coloringsEqual, fillOf } from '../graph/coloring'
+import type { Coloring } from '../graph/coloring'
+import { FillContext, useFill } from './graph-view/useFill'
+import { bucketsFill } from './controls/bucketColor'
 import type { PresentSets } from './graph-view/present'
 import { presentSetsOf } from './graph-view/present'
 import type { EdgeStroke, Theme } from '../graph/scheme'
@@ -58,7 +62,7 @@ import { namesNode, sameFocusRequest } from './graph-view/focus'
 import type { FocusRequest } from './graph-view/focus'
 export type { FocusRequest } from './graph-view/focus'
 import { useIsomorphicLayoutEffect } from './graph-view/useIsomorphicLayoutEffect'
-import { validateGraph, dropInvalid } from '../graph/validate'
+import { validateGraph, dropInvalid, tintDiagnostics } from '../graph/validate'
 import type { GraphDiagnostic } from '../graph/validate'
 
 /** A node's position in the layout, in world units. */
@@ -165,6 +169,13 @@ export interface GraphViewProps {
   groupCohesion?: number
   /** The host's control for its groups (`GroupLegend`, or its own), rendered inside the pane — which sets `--gv-toolbar-height` on its root so a control can anchor under the bar — and handed the groups as drawn, colours included, and the view's control over them. */
   groupsControl?: (active: readonly ActiveGroup[], control: GroupsControl) => React.ReactNode
+  /**
+   * Where the nodes' colours come from. `fill` colours each node's body by
+   * its key — the canvas, the chips, the control rows and the hover box
+   * alike; absent, the style axis's. Icon, size and physics stay on the style
+   * axis, and a new colouring repaints without relaying the layout.
+   */
+  coloring?: { fill?: Coloring }
   /** Edges to mark, by id, with a dashed band behind their stroke; a graduated edge is marked when the edge it stands for is. */
   markedEdges?: ReadonlySet<string>
   /** The host's action for a node, offered in the hover box: one for every node, or the host's answer per node (null for none). */
@@ -328,6 +339,7 @@ export const GraphView = React.forwardRef<GraphViewHandle, GraphViewProps>(funct
   groups,
   groupCohesion = 1,
   groupsControl,
+  coloring,
   markedEdges,
   nodeAction,
   chrome,
@@ -439,7 +451,19 @@ export const GraphView = React.forwardRef<GraphViewHandle, GraphViewProps>(funct
   const { groups: nodeGroups, diagnostics: groupDiagnostics } = React.useMemo(() => nodeGroupsOf(groups ?? NO_GROUPS, graph.nodes), [groups, graph])
   const groupSlots = React.useMemo(() => groupSlotsOf(nodeGroups, graph.edges), [nodeGroups, graph])
   const groupsOf = React.useMemo(() => groupsByNode(nodeGroups), [nodeGroups])
-  const diagnostics = React.useMemo(() => groupDiagnostics.length ? [...graphDiagnostics, ...groupDiagnostics] : graphDiagnostics, [graphDiagnostics, groupDiagnostics])
+  // What each filter axis can take, read off the graph: the engine declares no
+  // value vocabulary, so the bar learns an axis's domain from the nodes.
+  const valuesByAxis = React.useMemo(
+    () => new Map(taxonomy.filterAxes.map(d => [d.id, valuesOn(graph.nodes, d.id)])),
+    [graph, taxonomy],
+  )
+  // The fill, resolved apart from the simulation: a new colouring repaints.
+  const fillColoring = useStable(coloring?.fill, coloringsEqual)
+  const fill = React.useMemo(() => fillOf(fillColoring, graph, taxonomy), [fillColoring, graph, taxonomy])
+  const diagnostics = React.useMemo(() => {
+    const added = [...groupDiagnostics, ...fill.diagnostics, ...tintDiagnostics(taxonomy, valuesByAxis, fill)]
+    return added.length ? [...graphDiagnostics, ...added] : graphDiagnostics
+  }, [graphDiagnostics, groupDiagnostics, fill, taxonomy, valuesByAxis])
   const graphIndex = React.useMemo(() => nodesById(graph.nodes), [graph])
   const counts = React.useMemo(
     () => (typeof hostCounts === 'object' ? hostCounts : countsOn(graph.nodes, axes, hostCounts && { filter, taxonomy })),
@@ -487,12 +511,6 @@ export const GraphView = React.forwardRef<GraphViewHandle, GraphViewProps>(funct
     return () => ro.disconnect()
   }, [])
 
-  // What each filter axis can take, read off the graph: the engine declares no
-  // value vocabulary, so the bar learns an axis's domain from the nodes.
-  const valuesByAxis = React.useMemo(
-    () => new Map(taxonomy.filterAxes.map(d => [d.id, valuesOn(graph.nodes, d.id)])),
-    [graph, taxonomy],
-  )
   const recentlyChanged = useRecentlyChanged(filter, valuesByAxis)
 
   // The opening frame, when a rebuild follows a drawing of no node: called
@@ -568,11 +586,10 @@ export const GraphView = React.forwardRef<GraphViewHandle, GraphViewProps>(funct
   // visible edge's stroke is resolved here once, not per frame.
   const resolvedTheme = useResolvedTheme(containerRef, themeChoice, systemTheme)
   const theme = resolvedTheme ?? 'light'
-  const schemeStyle = React.useMemo(() => scopeStyle(taxonomy, theme, tokens), [taxonomy, theme, tokens])
+  const schemeStyle = React.useMemo(() => scopeStyle(taxonomy, theme, tokens, fill), [taxonomy, theme, tokens, fill])
   const overlay = React.useMemo(() => bandOverlay(graph.nodes, forceParams, resolved, frame,
-    (axis, bucket) => axis.mapping.axis === taxonomy.styleAxis() && isIdentityMapping(axis.mapping)
-      ? taxonomy.styleOf(bucket).color[theme].fill
-      : undefined), [graph, forceParams, resolved, frame, taxonomy, theme])
+    (axis, bucket) => bucketsFill(fill, axis.mapping) ? fill.keys.get(bucket)?.color[theme].fill : undefined),
+  [graph, forceParams, resolved, frame, fill, theme])
 
   // A new axis starts both pair forces from the taxonomy's declared physics on
   // its buckets (a tuning keyed by one axis has no reading on another).
@@ -1066,6 +1083,7 @@ export const GraphView = React.forwardRef<GraphViewHandle, GraphViewProps>(funct
 
   return (
     <TaxonomyContext.Provider value={taxonomy}>
+    <FillContext.Provider value={fill}>
     <CanvasErrorBoundary what="graph view">
     <div
       className={`gv-graph-view${className ? ` ${className}` : ''}`}
@@ -1263,6 +1281,7 @@ export const GraphView = React.forwardRef<GraphViewHandle, GraphViewProps>(funct
       )}
     </div>
     </CanvasErrorBoundary>
+    </FillContext.Provider>
     </TaxonomyContext.Provider>
   )
 })
@@ -1312,7 +1331,9 @@ interface GraphHoverTooltipProps {
 function GraphHoverTooltip({ hoveredNodeId, simRef, visibleEdges, undirected, visibleIds, viewport, shiftHeld, directionLine, copies, nodeSummaries, nodeAction, hostNodeOf, onMouseEnter, onMouseLeave }: GraphHoverTooltipProps) {
   // Before the early returns: this is a hook, and the component bails out four
   // different ways below.
-  const engine = engineOf(useTaxonomy())
+  const taxonomy = useTaxonomy()
+  const engine = engineOf(taxonomy)
+  const fill = useFill(taxonomy)
   if (!hoveredNodeId) return null
   const sim = simRef.current
   if (!sim) return null
@@ -1329,6 +1350,7 @@ function GraphHoverTooltip({ hoveredNodeId, simRef, visibleEdges, undirected, vi
     : Array.isArray(context) ? [...(context as readonly React.ReactNode[])] : [context as React.ReactNode]
   const action = nodeAction(node)
   const icon = engine.nodeStyleOf(node).icon
+  const fillKey = fill.of.get(node.id)
 
   // The composition line for a node that summarises its children (counted
   // per style value, named by its abbreviation). Degree nodes are covered by
@@ -1377,6 +1399,12 @@ function GraphHoverTooltip({ hoveredNodeId, simRef, visibleEdges, undirected, vi
         {icon && <span className="gv-tooltip-type-icon">{icon}</span>}
         <span className="gv-tooltip-name">{node.name}</span>
       </div>
+      {fillKey !== undefined && (
+        <div className="gv-tooltip-fill">
+          <span className="gv-tooltip-swatch" style={{ background: `var(${fill.keys.get(fillKey)!.cssVar})` }} />
+          {fill.keys.get(fillKey)!.label}
+        </div>
+      )}
       {contextLines.map((line, i) => <div key={i} className="gv-tooltip-parent">{line}</div>)}
       {compositionLine && <div className="gv-tooltip-summary">{compositionLine}</div>}
       {badgesLine && <div className="gv-tooltip-summary">{badgesLine}</div>}

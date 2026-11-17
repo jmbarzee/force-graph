@@ -11,6 +11,7 @@ import type { ScalarSpan } from '../graph/scalar'
 import type { ResolvedAxis, ResolvedPhysics } from '../graph/forces'
 import { bandRangeFor, isScalarAxis } from '../graph/forces'
 import { useTaxonomy } from './graph-view/useTaxonomy'
+import { useFill } from './graph-view/useFill'
 import { bucketColor } from './controls/bucketColor'
 import { alikeShift, laddersOn, rowsOf } from './controls/ladders'
 import type { Bound } from './controls/ladders'
@@ -86,6 +87,7 @@ const snap = (v: number, step: number) => Math.round(v / step) * step
 
 export function AxisControls({ axis, params, resolved, axes, present, onParamChange, onRelayout, hovered, onHover }: AxisControlsProps) {
   const taxonomy = useTaxonomy()
+  const fill = useFill(taxonomy)
   const key = tuningKey(axis)
   const tuning: LayoutTuning = params[key]
   const table = axis === 'x' ? resolved.bandX : resolved.bandY
@@ -154,7 +156,7 @@ export function AxisControls({ axis, params, resolved, axes, present, onParamCha
           onBands={bands => onParamChange(tuningPatch(axis, bands.reduce((t, [bucket, next]) => withOverride(t, bucket, next), mappedTuning(tuning))))}
           hovered={hovered}
           onHover={onHover}
-          color={bucket => bucketColor(taxonomy, mappedTuning(tuning).mapping, bucket)}
+          color={bucket => bucketColor(fill, mappedTuning(tuning).mapping, bucket)}
         />
       )}
 

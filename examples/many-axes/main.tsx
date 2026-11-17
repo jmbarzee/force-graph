@@ -42,6 +42,8 @@ const graph: Graph = {
   edges: [],
 }
 
+const BY_TEAM = { fill: { by: 'axis', axis: 'Team' } } as const
+
 /** A group per value of `axis`. */
 const groupsOn = (axis: string): DerivedGroups => ({
   keys: Array.from({ length: VALUES }, (_, v) => ({ id: `${axis} ${v + 1}`, label: `${axis} ${v + 1}` })),
@@ -62,6 +64,7 @@ function App() {
       <GraphView
         graph={graph}
         taxonomy={taxonomy}
+        coloring={BY_TEAM}
         groups={groups}
         groupsControl={(active, control) => (
           <GroupLegend title="Groups" items={groups.keys} active={active} control={control}>

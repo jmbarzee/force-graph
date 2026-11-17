@@ -48,8 +48,12 @@ export interface FilterChip {
   label: string
   /** A glyph drawn before the label. */
   icon?: string
-  /** A style value whose colour this chip wears, in the pane's theme; none means neutral. */
-  tint?: AxisValue
+  /**
+   * A key of the view's fill whose colour this chip wears, in the pane's
+   * theme. Absent, a one-value chip on the axis the fill follows wears its
+   * value's key, and any other chip is neutral.
+   */
+  tint?: string
   /**
    * Hover text, when the label alone is not enough to identify the chip.
    *
@@ -144,7 +148,7 @@ export interface AxisDescriptor {
    * value: a chip may cover several values. Takes the available values
    * rather than reading a declared list, because an axis's values are
    * derived from the graph. Absent, one chip per value, labelled by
-   * `labelFor` and, on the style axis, wearing the value's icon and tint.
+   * `labelFor` and, on the style axis, wearing the value's icon.
    * The values arrive in `order`.
    */
   chipsFor?(values: readonly AxisValue[]): readonly FilterChip[]
@@ -248,7 +252,6 @@ export function resolveDescriptor(d: AxisDescriptor, style: StyleNamer, labels?:
     id: v,
     label: labelFor(v),
     icon: iconFor(v) || undefined,
-    tint: onStyle ? v : undefined,
     tooltip: d.tooltipFor?.(v),
     values: [v],
   })))

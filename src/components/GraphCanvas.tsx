@@ -14,7 +14,10 @@ import { nodeSizeMul, type NodeScaleParams } from '../graph/node-scale'
 import type { Taxonomy } from '../graph/taxonomy'
 import { engineOf } from '../graph/taxonomy'
 import type { GlowGroup } from '../graph/groups'
+import { pairFor } from '../graph/coloring'
+import type { Fill } from '../graph/coloring'
 import { useTaxonomy } from './graph-view/useTaxonomy'
+import { useFill } from './graph-view/useFill'
 import { useLatest } from './graph-view/useControllable'
 import { usePalette } from './graph-view/usePalette'
 import type { Palette } from './graph-view/usePalette'
@@ -197,6 +200,7 @@ interface DrawData {
   // Read by the loop rather than closed over: drawData.current is rewritten
   // every render, a closure is not.
   taxonomy: Taxonomy
+  fill: Fill
   nodes: SimNode[]
   edges: GraphEdge[]
   nodeMap: Map<string, SimNode>
@@ -285,18 +289,19 @@ export function GraphCanvas({
   }, [hoveredNodeId, selectedNodeId, nodeMap, dupNodeIds])
 
   const taxonomy = useTaxonomy()
+  const fill = useFill(taxonomy)
   const palette = usePalette(canvasRef)
 
   // --- Ref-based draw data (updated every render, read by draw loop) ---
   const drawData = React.useRef<DrawData>({
-    taxonomy,
+    taxonomy, fill,
     nodes, edges, nodeMap, viewport, groupGlows, markedEdges, highlightedNodes, highlightedEdges,
     hoveredNodeId, selectedNodeId, focusedNodeId, flashNode, searchMatchIds,
     forceParams, resolved, overlay, theme, edgeStrokes, edgeOffsets, undirectedEdges, activeSection, activePushBucket, activeGravityBucket, activePullEdge, nodeScale, running,
     dupNodeIds, activeDupDefKey, palette,
   })
   drawData.current = {
-    taxonomy,
+    taxonomy, fill,
     nodes, edges, nodeMap, viewport, groupGlows, markedEdges, highlightedNodes, highlightedEdges,
     hoveredNodeId, selectedNodeId, focusedNodeId, flashNode, searchMatchIds,
     forceParams, resolved, overlay, theme, edgeStrokes, edgeOffsets, undirectedEdges, activeSection, activePushBucket, activeGravityBucket, activePullEdge, nodeScale, running,
@@ -635,7 +640,7 @@ export function GraphCanvas({
           const baseAlpha = highlighted ? 0.28 : 0.05
           const stepAlpha = highlighted ? 0.06 : 0.015
 
-          const color = engineOf(d.taxonomy).nodeStyleOf(node).color[d.theme].fill
+          const color = pairFor(d.fill, node.id, engineOf(d.taxonomy).nodeStyleOf(node).color)[d.theme].fill
           ctx.strokeStyle = color
 
           const effectiveCharge = Math.abs(chargeFor(d.resolved.push, node)) * pushMul
@@ -881,7 +886,7 @@ export function GraphCanvas({
         const nodeDimmed = (hasHighlight && !nodeHighlighted) || searchDimmed
         ctx.globalAlpha = nodeDimmed ? dimAlpha : 1
 
-        const { fill, border } = def.color[d.theme]
+        const { fill, border } = pairFor(d.fill, node.id, def.color)[d.theme]
         const icon   = def.icon
 
         // Filled body + crisp border. The border is ~3 stops darker than the

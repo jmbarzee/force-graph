@@ -12,9 +12,10 @@ import { withSpringOverride } from '../graph/simulation'
 import type { ResolvedPhysics } from '../graph/forces'
 import type { EdgeCategoryDescription } from '../graph/forces'
 import type { AxisMapping, AxisValue } from '../graph/axis'
-import type { Taxonomy } from '../graph/taxonomy'
+import type { Fill } from '../graph/coloring'
 
 import { useTaxonomy } from './graph-view/useTaxonomy'
+import { useFill } from './graph-view/useFill'
 import { NEUTRAL_BUCKET_COLOR, bucketColor } from './controls/bucketColor'
 import { ForceMap2D, ForceCurves, CURVE_W, CURVE_H, CURVE_SAMPLES } from './ForceMap'
 import type { MapToken, CurveItem } from './ForceMap'
@@ -31,8 +32,8 @@ export const EDGE_REST_STEP = 10
 const clamp = (v: number, lo: number, hi: number) => Math.max(lo, Math.min(hi, v))
 
 /** One half of a split-colour token: its value's colour, or the neutral "any" for an end the type leaves out. */
-const swatchColor = (taxonomy: Taxonomy, mapping: AxisMapping, value: AxisValue | null): string =>
-  value === null ? NEUTRAL_BUCKET_COLOR : bucketColor(taxonomy, mapping, value)
+const swatchColor = (fill: Fill, mapping: AxisMapping, value: AxisValue | null): string =>
+  value === null ? NEUTRAL_BUCKET_COLOR : bucketColor(fill, mapping, value)
 
 /** One token per category present in the graph, in first-seen order; ids the table cannot describe are skipped. */
 function describedCategories(spring: ResolvedPhysics['spring'], present: ReadonlySet<string>): EdgeCategoryDescription[] {
@@ -63,6 +64,7 @@ interface SpringControlProps {
 // split-colour token; dragging sets both rest and k at once.
 export function SpringMap({ params, resolved, present, onParamChange, hoveredEdge, onHoverEdge }: SpringControlProps) {
   const taxonomy = useTaxonomy()
+  const fill = useFill(taxonomy)
   const { spring } = resolved
   const shown = describedCategories(spring, present)
   const tokens: MapToken[] = shown.map(c => {
@@ -71,8 +73,8 @@ export function SpringMap({ params, resolved, present, onParamChange, hoveredEdg
       id: c.id,
       x: ph.distance,
       y: ph.strength,
-      colorA: swatchColor(taxonomy, spring.mapping, c.swatch[0]),
-      colorB: swatchColor(taxonomy, spring.mapping, c.swatch[1]),
+      colorA: swatchColor(fill, spring.mapping, c.swatch[0]),
+      colorB: swatchColor(fill, spring.mapping, c.swatch[1]),
       outline: c.relation === 'containment' ? 'dashed' : 'solid',
       label: c.label,
       tooltip: c.tooltip,
@@ -127,6 +129,7 @@ function springResponse(d: number, kEff: number, restEff: number, exp: number): 
 
 export function SpringCurves({ params, resolved, present, onParamChange, hoveredEdge, onHoverEdge }: SpringControlProps) {
   const taxonomy = useTaxonomy()
+  const fill = useFill(taxonomy)
   const { spring } = resolved
   const shown = React.useMemo(() => describedCategories(spring, present), [spring, present])
   const pull = params.pullMultiplier
@@ -161,16 +164,12 @@ export function SpringCurves({ params, resolved, present, onParamChange, hovered
 
     const built = sampled.map(({ edge, restEff, pts }) => ({
       id: edge.id,
-      color: swatchColor(taxonomy, spring.mapping, edge.swatch[0]),
+      color: swatchColor(fill, spring.mapping, edge.swatch[0]),
       markerX: xFor(restEff),
       points: pts.map(p => `${xFor(p.d).toFixed(1)},${yFor(p.v).toFixed(1)}`).join(' '),
     }))
     return { curves: built, dMax }
-    // `taxonomy` belongs here: the body reads it for the split-colour tokens.
-    // Its sibling ChargeCurves already listed it, and the asymmetry was the bug
-    // — a taxonomy swap left these curves drawn in the previous taxonomy's
-    // colours, on its edge set, with no error.
-  }, [spring, shown, pull, dist, exp, taxonomy])
+  }, [spring, shown, pull, dist, exp, fill])
 
   return (
     <ForceCurves

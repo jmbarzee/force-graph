@@ -131,8 +131,10 @@ never by spreading the built object.
   — only while a selection is active), whether a change keeps the camera
   (`keepCamera`: a narrowing axis does, an allow-list refits) — and may be
   overridden. `chipsFor(values)` groups values into chips (default one per
-  value; on the style axis they wear the value's icon and tint; a chip none
-  of whose values the data presents is not offered), `order` lists the
+  value; on the style axis they wear the value's icon; a chip none
+  of whose values the data presents is not offered; a chip's `tint` names a
+  key of the view's fill, and absent, a one-value chip on the axis the fill
+  follows wears its value's key), `order` lists the
   values `chipsFor` receives first, in its order, the rest after them in
   first-encounter order (default: the `styles` order on the style axis;
   elsewhere, first encounter alone), `labelFor`,
@@ -226,8 +228,9 @@ one.
 - **Identity.** Keep one `graph` object until something in it changes: a new
   object equal to the last rebuilds the layout for nothing, and the view says
   so once. The same for the taxonomy — build it once, outside render; the
-  view warns when its identity churns. The filter, locks and axes are
-  compared by content, so a host may rebuild those each render. A changed
+  view warns when its identity churns. The filter, locks, axes and the
+  colourings are compared by content, so a host may rebuild those each
+  render. A changed
   graph keeps the positions of the nodes it still has.
 - **Validation.** `validateGraph(graph, taxonomy)` names every defect — a
   dangling endpoint, an unknown relation, a type the rule returns that the
@@ -340,6 +343,21 @@ the console. Everything else is optional.
   `{ label, tuning }` with `tuning` a `TuningJSON`: `TUNING_PRESETS` by
   default, `[...TUNING_PRESETS, mine]` beside them, `[mine]` in place of
   them, `[]` for no row.
+- **Colouring.** `coloring={{ fill }}` colours each node's body by a
+  `Coloring`: `{ by: 'axis', axis, keys? }`, a node's value on an axis, or
+  `{ by: 'node', keys, of }`, the key a host function answers; keys are
+  `LegendKey`s, and an axis without them takes its values, each in a palette
+  slot. Absent, or the style axis without keys, the fill is the styles' own.
+  The chips, the control rows that bucket the fill's axis, the band overlay
+  and the hover box (the node's key beside its swatch) follow the canvas;
+  icon, size and physics stay on the style axis, and a new colouring
+  repaints without relaying the layout. A key no colouring declares
+  (`key-undeclared`) and a chip `tint` naming no key (`tint-undeclared`)
+  are diagnostics, and draw neutral.
+
+  ```tsx
+  <GraphView graph={graph} taxonomy={taxonomy} coloring={{ fill: { by: 'axis', axis: 'team' } }} />
+  ```
 - **Inputs.** `counts` (chip badges; the graph's entity counts unless given,
   the copies of one `copyKey` once; `'faceted'` counts each axis under the
   other axes' selections),
@@ -566,16 +584,20 @@ const { scopeProps } = useScheme(taxonomy, { choice, tokens })
 <aside {...scopeProps}>…</aside>
 ```
 
-Every class is `gv-*`. Each style value's fill and border are
-published on the pane under the name `taxonomy.colorVar(value)` answers —
-`--gv-node-` and the value id in kebab case (a value id such as
-`teachingLab` → `--gv-node-teaching-lab`), or a numbered name when the id kebab-cases to
-nothing or to another value's — and `-border` for the border. A host's own
-chrome beside the pane reads the same tints through `useScheme`, or
-`schemeStylesheet(taxonomy, darkSelector?)` mounted once (its dark block under
-`[data-theme="dark"]`, or the host's own selector). Default rest
-bands are laid in `BAND_FRAME` (world units: the hierarchy axis from −300 to
-400, x from 0 to 380); a band a host declares is read in the same units.
+Every class is `gv-*`. Each style value's fill and border are published on
+the pane under the name `taxonomy.colorVar(value)` answers — `--gv-node-` and
+the value id in kebab case (a value id such as `teachingLab` →
+`--gv-node-teaching-lab`), or a numbered name when the id kebab-cases to
+nothing or to another value's — and `-border` for the border. Inside the
+pane the fill's keys publish as `--gv-node-` and the key in kebab case,
+numbered where two keys kebab-case alike (`c`, `c-2`) or one kebab-cases to
+nothing, a key's colour winning over a style value it shares a name with. A
+host's own chrome beside the pane reads the styles' tints through
+`useScheme`, or `schemeStylesheet(taxonomy, darkSelector?)` mounted once (its
+dark block under `[data-theme="dark"]`, or the host's own selector). Default
+rest bands are laid in `BAND_FRAME` (world units: the hierarchy axis from
+−300 to 400, x from 0 to 380); a band a host declares is read in the same
+units.
 
 ## Collapse rules
 

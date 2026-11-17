@@ -6,6 +6,7 @@
 
 import type React from 'react'
 import type { AxisValue } from './axis'
+import type { Fill } from './coloring'
 import type { Taxonomy } from './taxonomy'
 
 /** The two themes every colour is declared in. */
@@ -64,9 +65,8 @@ export function cssSuffix(value: AxisValue): string {
 
 /**
  * The inline custom properties a pane carries for one theme: every style
- * value's fill and border. Set on the pane's root, they are what tokens, chip
- * tints and typed rows read, and they follow the resolved theme by being
- * recomputed, not overridden.
+ * value's fill and border, under its fill's keys. Set on the pane's root,
+ * they follow the resolved theme by being recomputed, not overridden.
  */
 export function schemeVars(taxonomy: Taxonomy, theme: Theme): React.CSSProperties {
   const vars: Record<string, string> = {}
@@ -74,6 +74,16 @@ export function schemeVars(taxonomy: Taxonomy, theme: Theme): React.CSSPropertie
     const c = taxonomy.styleOf(key).color[theme]
     vars[taxonomy.colorVar(key)] = c.fill
     vars[`${taxonomy.colorVar(key)}-border`] = c.border
+  }
+  return vars
+}
+
+/** The fill's keys under the names it gives them, for one theme: a pane's `--gv-node-*` follows its fill. */
+export function keyVars(fill: Fill, theme: Theme): React.CSSProperties {
+  const vars: Record<string, string> = {}
+  for (const { color, cssVar } of fill.keys.values()) {
+    vars[cssVar] = color[theme].fill
+    vars[`${cssVar}-border`] = color[theme].border
   }
   return vars
 }

@@ -1,8 +1,9 @@
 // @vitest-environment jsdom
 import React, { act } from 'react'
 import { createRoot } from 'react-dom/client'
-import { beforeEach, expect, it, vi } from 'vitest'
+import { beforeEach, describe, expect, it, vi } from 'vitest'
 import { GraphView } from './GraphView'
+import type { Coloring } from '../graph/coloring'
 import type { GraphViewHandle } from './GraphView'
 import { createTaxonomy } from '../graph/taxonomy'
 import { createTuning } from '../graph/tuning'
@@ -17,9 +18,9 @@ import { PALETTE } from '../graph/scheme'
 import type { EdgeStroke } from '../graph/scheme'
 
 // What the canvas was last handed, and every simulation the view built.
-const drawn = vi.hoisted(() => ({ strokes: new Map<{ id: string }, EdgeStroke>(), simulations: [] as object[] }))
+const drawn = vi.hoisted(() => ({ strokes: new Map<{ id: string }, EdgeStroke>(), simulations: [] as object[], hover: (_id: string | null) => {} }))
 vi.mock('./GraphCanvas', () => ({
-  GraphCanvas: (props: { edgeStrokes: typeof drawn.strokes }) => { drawn.strokes = props.edgeStrokes; return null },
+  GraphCanvas: (props: { edgeStrokes: typeof drawn.strokes; onHoverNode: typeof drawn.hover }) => { drawn.strokes = props.edgeStrokes; drawn.hover = props.onHoverNode; return null },
 }))
 vi.mock('../graph/simulation', async importOriginal => {
   const actual = await importOriginal<typeof import('../graph/simulation')>()
@@ -213,4 +214,60 @@ it('names a search result\'s style by labels, then by labelFor, then by the styl
   const graph: Graph = { nodes: ['svc', 'db', 'queue'].map((kind, i): GraphNode => ({ id: `n${i}`, name: `match ${kind}`, values: { kind } })), edges: [] }
   const view = await mount({ taxonomy: styled, labels: { kind: { svc: 'Service' } }, search: { query: 'match', active: true }, onSearchChange: () => {} }, graph)
   expect([...view.el.querySelectorAll('.gv-graph-search-result-type')].map(e => e.textContent)).toEqual(['Service', 'Database', 'queue style'])
+})
+
+describe('coloring.fill', () => {
+  // The team chips name a key no fill declares.
+  const filled = createTaxonomy({
+    styleAxis: 'kind', styles: [{ id: 'svc', label: 'Service' }],
+    filterAxes: [{ id: 'team', emptyMeans: 'all', chipsFor: values => values.map(v => ({ id: v, label: v, values: [v], tint: 'mauve' })) }],
+  })
+  const graph: Graph = { nodes: [{ id: 'n0', name: 'zero', values: { kind: 'svc', team: 'red' } }], edges: [] }
+  const byTeam = { fill: { by: 'axis' as const, axis: 'team' } }
+
+  async function mountFilled(coloring?: { fill?: Coloring }) {
+    let reported: readonly GraphDiagnostic[] = []
+    const el = document.createElement('div')
+    const root = createRoot(el)
+    const render = (next?: { fill?: Coloring }) => act(async () => {
+      root.render(React.createElement(GraphView, { graph, taxonomy: filled, coloring: next, onDiagnostics: d => { reported = d } }))
+    })
+    await render(coloring)
+    return { el, render, reported: () => reported }
+  }
+
+  it('repaints a new colouring without rebuilding the simulation', async () => {
+    const view = await mountFilled()
+    const built = drawn.simulations.length
+    await view.render(byTeam)
+    expect(drawn.simulations.length).toBe(built)
+  })
+
+  it("names the hovered node's fill key beside its swatch", async () => {
+    const view = await mountFilled(byTeam)
+    await act(async () => drawn.hover('n0'))
+    const row = view.el.querySelector('.gv-tooltip-fill')!
+    expect(row.textContent).toBe('red')
+    expect(row.querySelector<HTMLElement>('.gv-tooltip-swatch')!.style.background).toBe('var(--gv-node-red)')
+  })
+
+  it('neither re-resolves nor re-reports a colouring equal to the last', async () => {
+    const of = vi.fn((node: GraphNode) => node.values.team)
+    const onDiagnostics = vi.fn()
+    const root = createRoot(document.createElement('div'))
+    const render = () => act(async () => {
+      root.render(React.createElement(GraphView, { graph, taxonomy: filled, coloring: { fill: { by: 'node', keys: [{ id: 'red', label: 'Red' }], of } }, onDiagnostics }))
+    })
+    await render()
+    const [asked, reported] = [of.mock.calls.length, onDiagnostics.mock.calls.length]
+    expect(reported).toBeGreaterThan(0)
+    await render()
+    expect([of.mock.calls.length, onDiagnostics.mock.calls.length]).toEqual([asked, reported])
+  })
+
+  it('reports a chip tint naming no key once', async () => {
+    const view = await mountFilled(byTeam)
+    await view.render({ ...byTeam })
+    expect(view.reported().filter(d => d.code === 'tint-undeclared')).toHaveLength(1)
+  })
 })
