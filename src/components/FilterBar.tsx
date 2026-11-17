@@ -117,7 +117,7 @@ interface FilterBarBaseProps<R extends SearchRecord> {
   search?: SearchState
   onSearchChange?: (next: SearchState) => void
   /** The search input, for a host that focuses it from its own shortcut. Absent, a shown bar binds `/` to it while focus is not in an editable field. */
-  searchInputRef?: React.RefObject<HTMLInputElement>
+  searchInputRef?: React.RefObject<HTMLInputElement | null>
   /** Default: "Search", with the key when the bar binds `/`. */
   searchTitle?: string
   searchPlaceholder?: string
@@ -303,7 +303,8 @@ export function FilterBar<R extends SearchRecord = SearchRecord>({
   const [search, setSearch] = useControllable(searchProp, onSearchChange, () => ({ query: '', active: false }), 'search')
   const { query: searchQuery, active: searchActive } = search
   const ownInputRef = React.useRef<HTMLInputElement>(null)
-  const searchInputRef = hostInputRef ?? ownInputRef
+  // React 18's types refuse a RefObject<T | null> as an element's ref; React 19's useRef(null) makes one.
+  const searchInputRef = (hostInputRef ?? ownInputRef) as React.RefObject<HTMLInputElement>
   // The bar's own theme and scheme, on its root: a second view's bar needs
   // no wrapper to read its tints, and a pane's bar is handed the resolved one.
   const rootRef = React.useRef<HTMLDivElement>(null)
