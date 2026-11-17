@@ -32,16 +32,17 @@ export const TUNING_PRESETS: readonly TuningPreset[] = [
   { label: 'Rings', tuning: { forces: { radial: true, gravityY: 0.2 } } },
 ]
 
-/** A preset as the panel lists it: its reading on the taxonomy, or why it has none. */
+/** A preset as the panel lists it: its reading on the taxonomy, forces retuned for the graph, or why it has none. */
 export type PresetChoice =
   | { label: string; tuning: Tuning; keepsScale: boolean }
   | { label: string; reason: string }
 
-/** Each preset read on the taxonomy; one `createTuning` refuses carries its message instead. */
-export function presetChoices(presets: readonly TuningPreset[], taxonomy: Taxonomy): PresetChoice[] {
+/** Each preset read on the taxonomy, its forces retuned for the graph; one `createTuning` refuses carries its message instead. */
+export function presetChoices(presets: readonly TuningPreset[], taxonomy: Taxonomy, graph: Graph): PresetChoice[] {
   return presets.map(({ label, tuning }) => {
     try {
-      return { label, tuning: createTuning(tuning, taxonomy), keepsScale: tuning.nodeScale === undefined }
+      const read = openTuning(createTuning(tuning, taxonomy))
+      return { label, tuning: makeTuning(retunedFor(read.forces, taxonomy, graph), read.nodeScale), keepsScale: tuning.nodeScale === undefined }
     } catch (e) {
       if (e instanceof TuningJSONError) return { label, reason: e.message }
       throw e
@@ -49,15 +50,15 @@ export function presetChoices(presets: readonly TuningPreset[], taxonomy: Taxono
   })
 }
 
-/** Where choosing a preset takes `current`: its forces retuned for the graph, and its node scale or `current`'s. */
-export function presetTarget(choice: Extract<PresetChoice, { tuning: Tuning }>, current: Tuning, taxonomy: Taxonomy, graph: Graph): Tuning {
+/** Where choosing a preset takes `current`: its forces, and its node scale or `current`'s. */
+export function presetTarget(choice: Extract<PresetChoice, { tuning: Tuning }>, current: Tuning): Tuning {
   const read = openTuning(choice.tuning)
-  return makeTuning(retunedFor(read.forces, taxonomy, graph), (choice.keepsScale ? openTuning(current) : read).nodeScale)
+  return makeTuning(read.forces, (choice.keepsScale ? openTuning(current) : read).nodeScale)
 }
 
 /** The index of the preset `current` is, or -1: custom. */
-export function presetIndex(choices: readonly PresetChoice[], current: Tuning, taxonomy: Taxonomy, graph: Graph): number {
-  return choices.findIndex(c => 'tuning' in c && tuningsEqual(presetTarget(c, current, taxonomy, graph), current))
+export function presetIndex(choices: readonly PresetChoice[], current: Tuning): number {
+  return choices.findIndex(c => 'tuning' in c && tuningsEqual(presetTarget(c, current), current))
 }
 
 /** The tuning `t` of the way from `from` to `to`: every number interpolated, every other part `to`'s. */

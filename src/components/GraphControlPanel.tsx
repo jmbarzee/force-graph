@@ -75,7 +75,6 @@ interface GraphControlPanelProps {
   // are drawn at a given zoom.
   nodeScale: NodeScaleParams
   onNodeScaleChange: (patch: Partial<NodeScaleParams>) => void
-  /** The preset row. */
   presets: PresetMenu
   onPreset: (index: number) => void
 }

@@ -90,3 +90,19 @@ it('draws no preset row for presets={[]}', async () => {
   const view = await mount([])
   expect(view.select()).toBeNull()
 })
+
+it('stops at a write it did not make', async () => {
+  const view = await mount()
+  await view.choose(SPREAD)
+  await frame(100)
+  const s = view.select()!.closest('.gv-graph-control-panel-body')!.querySelector<HTMLInputElement>('input[type="range"]')!
+  await act(async () => {
+    Object.getOwnPropertyDescriptor(HTMLInputElement.prototype, 'value')!.set!.call(s, s.min)
+    s.dispatchEvent(new Event('input', { bubbles: true }))
+  })
+  const moved = tuningToJSON(view.last())
+  const n = view.reported.length
+  await frame(1000)
+  expect(view.reported.length).toBe(n)
+  expect(tuningToJSON(view.last())).toEqual(moved)
+})

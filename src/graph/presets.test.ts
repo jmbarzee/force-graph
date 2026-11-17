@@ -26,7 +26,7 @@ describe('presetChoices', () => {
       { label: 'By team', tuning: { forces: { pair: { axis: 'teem' } } } },
       { label: 'By credit', tuning: { forces: { bandY: { scalar: 'credit' } } } },
       { label: 'Plain', tuning: {} },
-    ], bare)
+    ], bare, empty)
     expect(choices).toEqual([
       { label: 'By team', reason: 'forces.pair.axis: no axis "teem"' },
       { label: 'By credit', reason: 'forces.bandY.scalar: no scalar "credit"' },
@@ -35,20 +35,20 @@ describe('presetChoices', () => {
   })
 
   it('lists a malformed preset with why', () => {
-    const [c] = presetChoices([{ label: 'Broken', tuning: { forces: { gravityX: 'strong' } } as never }], bare)
+    const [c] = presetChoices([{ label: 'Broken', tuning: { forces: { gravityX: 'strong' } } as never }], bare, empty)
     expect(c).toEqual({ label: 'Broken', reason: 'forces.gravityX: not a finite number' })
   })
 })
 
 describe('presetIndex', () => {
-  const choices = presetChoices(TUNING_PRESETS, bare)
-  const index = (t: ReturnType<typeof defaultTuningFor>) => presetIndex(choices, t, bare, empty)
+  const choices = presetChoices(TUNING_PRESETS, bare, empty)
+  const index = (t: ReturnType<typeof defaultTuningFor>) => presetIndex(choices, t)
 
   it('finds the preset the tuning is, whatever the node scale when the preset leaves it out', () => {
     const base = defaultTuningFor(bare)
     expect(index(base)).toBe(0)
     expect(index(makeTuning(base.forces, { ...DEFAULT_NODE_SCALE, baseMul: 2 }))).toBe(0)
-    expect(index(openTuning(presetTarget(readable(choices[1]), base, bare, empty)))).toBe(1)
+    expect(index(openTuning(presetTarget(readable(choices[1]), base)))).toBe(1)
   })
 
   it('is -1, custom, once a control moves', () => {
@@ -58,9 +58,9 @@ describe('presetIndex', () => {
 
   it('keeps the node scale unless the preset names it', () => {
     const current = makeTuning(defaultTuningFor(bare).forces, { ...DEFAULT_NODE_SCALE, baseMul: 2 })
-    const [kept, named] = presetChoices([{ label: 'a', tuning: {} }, { label: 'b', tuning: { nodeScale: { baseMul: 0.5 } } }], bare)
-    expect(openTuning(presetTarget(readable(kept), current, bare, empty)).nodeScale.baseMul).toBe(2)
-    expect(openTuning(presetTarget(readable(named), current, bare, empty)).nodeScale).toEqual({ ...DEFAULT_NODE_SCALE, baseMul: 0.5 })
+    const [kept, named] = presetChoices([{ label: 'a', tuning: {} }, { label: 'b', tuning: { nodeScale: { baseMul: 0.5 } } }], bare, empty)
+    expect(openTuning(presetTarget(readable(kept), current)).nodeScale.baseMul).toBe(2)
+    expect(openTuning(presetTarget(readable(named), current)).nodeScale).toEqual({ ...DEFAULT_NODE_SCALE, baseMul: 0.5 })
   })
 })
 

@@ -34,8 +34,8 @@ export function usePresets(
   write: (next: Tuning) => void,
   relayout: (forces: ForceParams) => void,
 ): { menu: PresetMenu; choose: (index: number) => void } {
-  const choices = React.useMemo(() => presetChoices(presets, taxonomy), [presets, taxonomy])
-  const selected = React.useMemo(() => presetIndex(choices, current, taxonomy, graph), [choices, current, taxonomy, graph])
+  const choices = React.useMemo(() => presetChoices(presets, taxonomy, graph), [presets, taxonomy, graph])
+  const selected = React.useMemo(() => presetIndex(choices, current), [choices, current])
 
   // A preset this taxonomy refuses is said once on the console.
   const warned = React.useRef(new WeakMap<Taxonomy, Set<string>>())
@@ -61,7 +61,7 @@ export function usePresets(
     if (!choice || !('tuning' in choice)) return
     stop()
     const from = latest.current
-    const to = presetTarget(choice, from, taxonomy, graph)
+    const to = presetTarget(choice, from)
     if (typeof window !== 'undefined' && window.matchMedia?.('(prefers-reduced-motion: reduce)').matches) {
       relayout(openTuning(to).forces)
       if (!choice.keepsScale) write(makeTuning(openTuning(latest.current).forces, openTuning(to).nodeScale))
@@ -78,7 +78,7 @@ export function usePresets(
       frame.current = t < 1 ? requestAnimationFrame(step) : null
     }
     frame.current = requestAnimationFrame(step)
-  }, [choices, taxonomy, graph, latest, write, relayout, stop])
+  }, [choices, latest, write, relayout, stop])
 
   return { menu: { choices, selected }, choose }
 }

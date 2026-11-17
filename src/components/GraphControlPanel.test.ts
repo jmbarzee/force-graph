@@ -78,7 +78,7 @@ describe('the Misc tab', () => {
 
 describe('the preset row', () => {
   const taxonomy = createTaxonomy({ styleAxis: 'kind', styles: [] })
-  const choices = presetChoices([...TUNING_PRESETS, { label: 'By credit', tuning: { forces: { bandY: { scalar: 'credit' } } } }], taxonomy)
+  const choices = presetChoices([...TUNING_PRESETS, { label: 'By credit', tuning: { forces: { bandY: { scalar: 'credit' } } } }], taxonomy, { nodes: [], edges: [] })
   const row = (selected: number) => renderToStaticMarkup(React.createElement(PresetRow, { menu: { choices, selected }, onPreset: noop }))
   const options = (html: string) => [...html.matchAll(/<option([^>]*)>([^<]*)<\/option>/g)].map(([, attrs, text]) => ({ text, disabled: attrs.includes('disabled'), selected: attrs.includes('selected') }))
 
