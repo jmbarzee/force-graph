@@ -434,6 +434,7 @@ export function createTaxonomy(spec: TaxonomySpec): Taxonomy {
     hasOwn(styles, value) ? styles[value].abbreviation : value.slice(0, 2)
   const namer = {
     axis: styleAxis,
+    values,
     labelFor: (value: AxisValue) => (hasOwn(styles, value) ? styles[value].label : value),
     abbreviationFor,
     iconFor: (value: AxisValue) => (hasOwn(styles, value) ? styles[value].icon : ''),

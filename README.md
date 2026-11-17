@@ -128,7 +128,10 @@ never by spreading the built object.
   (`keepCamera`: a narrowing axis does, an allow-list refits) — and may be
   overridden. `chipsFor(values)` groups values into chips (default one per
   value; on the style axis they wear the value's icon and tint; a chip none
-  of whose values the data presents is not offered), `labelFor`,
+  of whose values the data presents is not offered), `order` puts the
+  chips of the values it lists first, in its order, and the rest after them in
+  first-encounter order (default: the `styles` order on the style axis;
+  elsewhere, first encounter alone), `labelFor`,
   `abbreviationFor`, `iconFor` and `tooltipFor` name and adorn values
   (defaults: the style's names and icon on the style axis, the value itself
   and no icon elsewhere, the abbreviation from the label, no tooltip),
@@ -283,7 +286,8 @@ the console. Everything else is optional.
   taxonomy)}` opens the view laid out on a scalar. The `LayoutState` itself
   is opaque: keep it and hand it back.
 - **Inputs.** `counts` (chip badges; the graph's entity counts unless given,
-  the copies of one `copyKey` once),
+  the copies of one `copyKey` once; `'faceted'` counts each axis under the
+  other axes' selections),
   `findings` under the bar, `groups` to glow (derived from the data as
   `{ keys, of }` — the `LegendKey`s, `{ id, label, color?, weight? }`, and a
   function answering each node's keys — or listed as `NodeGroup`s, each an id
@@ -399,9 +403,9 @@ for a host that persists them. The bar carries its own theme and scheme
 (`theme`, default `'system'`; `systemTheme` says what that means), so it needs
 no wrapper; give it the `graph` (or the `values` per axis — `valuesOn(records,
 axis)` reads them off any subjects carrying `values`) and, if the host reads
-its own data, the `counts`. Given every record the view holds as `records`
-and `matches(record, query)`, the bar badges each chip with the search
-matches it hides and the search with their "+N". A shown bar binds `/` to its
+its own data, the `counts` (or `'faceted'`, with the `graph`). Given every
+record the view holds as `records` and `matches(record, query)`, the bar
+badges each chip with the search matches it hides and the search with their "+N". A shown bar binds `/` to its
 search while focus is not in an editable field; a host that binds its own
 passes `searchInputRef`. The lock toggles appear only when `locks` is
 controlled with its callback — `useLinkedViews` does — or `chrome.locks` asks.
@@ -413,7 +417,8 @@ it.
 What the pane computes for its own bar is exported for the second view:
 `passesSelection({ filter, taxonomy, axes, node })` decides visibility on the
 axes the view shows (`valueOn(node, axis)` for a record that carries its
-values under other names), `countsOn(nodes, axes)` the badges,
+values under other names), `countsOn(nodes, axes, { filter, taxonomy })`
+the badges (without the third argument, unfaceted),
 `hiddenMatchesOf({ nodes, filter, taxonomy, axes, visibleIds, matches })` the
 search's hidden-match badges. `reconcileFilter({ destination, source, locks,
 transition, taxonomy, axes, graph })` is the switch the hook makes; `axes`

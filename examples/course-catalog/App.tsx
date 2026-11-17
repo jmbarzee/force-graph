@@ -2,15 +2,15 @@
 // panel writes (the filter) or follows (the selection, which closing the panel
 // clears), hands the theme choice in from the URL, asks the view to reveal a
 // node by naming it (`focus`), and leaves the axes, the locks and the search to
-// the view. It supplies what only the host can know — chip counts, findings,
-// programme groups, and what "Open details" does.
+// the view. It supplies what only the host can know — findings, programme
+// groups, and what "Open details" does.
 
 import React from 'react'
 import {
-  GraphView, GroupLegend, TaxonomyContext, copyGroups, initialFilter, nodesById, payloadNumber, payloadString, selectionFor, useFocusRequest, useScheme, withSelection,
+  GraphView, GroupLegend, TaxonomyContext, copyGroups, initialFilter, nodesById, payloadNumber, payloadString, useFocusRequest, useScheme, withSelection,
 } from '@jmbarzee/force-graph'
 import type {
-  AxisSelection, FilterState, GraphNode, ThemeChoice,
+  FilterState, GraphNode, ThemeChoice,
 } from '@jmbarzee/force-graph'
 import { catalog } from './data'
 import type { Campus, Catalog } from './data'
@@ -24,26 +24,6 @@ const nodeById = nodesById(graph.nodes)
 const nodeByCode = new Map(graph.nodes.map(n => [payloadString(n, 'code') ?? n.id, n]))
 const copies = copyGroups(graph)
 const groups = programmeGroups(catalog)
-
-/** Chip badges: distinct catalog entries per value — a cross-listed course counts once. */
-function countsOf(data: Catalog, campuses: AxisSelection): ReadonlyMap<string, ReadonlyMap<string, number>> {
-  const entity = new Map<string, number>([
-    ['faculty', data.faculties.length],
-    ['department', data.departments.length],
-  ])
-  const campus = new Map<string, number>()
-  const bump = (m: Map<string, number>, k: string, by = 1) => m.set(k, (m.get(k) ?? 0) + by)
-  for (const c of data.courses) {
-    bump(campus, c.campus)
-    if ('except' in campuses ? campuses.except.has(c.campus) : campuses.size > 0 && !campuses.has(c.campus)) continue
-    bump(entity, 'course')
-    bump(entity, 'lab', c.labs?.length ?? 0)
-  }
-  return new Map([
-    [ENTITY, entity],
-    [CAMPUS, campus],
-  ])
-}
 
 /** Data-quality warnings the registrar should see. */
 function findingsOf(data: Catalog): string[] {
@@ -70,7 +50,6 @@ export function App({ initialTheme = 'system' }: { initialTheme?: ThemeChoice })
   // is a fresh one, so asking again for the same node asks again.
   const [focus, requestFocus] = useFocusRequest()
 
-  const counts = React.useMemo(() => countsOf(catalog, selectionFor(filter, CAMPUS)), [filter])
 
   /** Ask the view to reveal `node`: it widens the filter just enough, centres and selects. */
   const reveal = (node: GraphNode) => requestFocus(node.id)
@@ -82,7 +61,7 @@ export function App({ initialTheme = 'system' }: { initialTheme?: ThemeChoice })
         <div className="catalog-pane">
           <GraphView
             graph={graph}
-            counts={counts}
+            counts="faceted"
             findings={FINDINGS.length > 0 && <Findings messages={FINDINGS} />}
             groups={groups}
             groupsControl={(active, control) => (

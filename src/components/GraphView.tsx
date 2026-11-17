@@ -145,8 +145,8 @@ export interface GraphViewProps {
   keyboard?: 'pane' | 'global' | 'none'
   /** Where nodes start, by id — a layout the host kept (`getPositions`). Read whenever the simulation is built; a node the live layout already holds keeps its place. */
   defaultPositions?: ReadonlyMap<string, Position>
-  /** Chip badge counts per axis and value — the host's reading of its own data. Absent, the graph's entity counts (the copies of one `copyKey` once). */
-  counts?: ReadonlyMap<string, ReadonlyMap<string, number>>
+  /** Chip badge counts per axis and value — the host's reading of its own data. Absent, the graph's entity counts (the copies of one `copyKey` once); `faceted`, those counts under the other axes' selections. */
+  counts?: ReadonlyMap<string, ReadonlyMap<string, number>> | 'faceted'
   /** The host's findings bars, rendered under the filter chips. */
   findings?: React.ReactNode
   /** Groups to glow, over the whole graph: derived from the data, or listed. The view settles membership once per graph and groups, then restricts each to the visible set and colours it. */
@@ -407,9 +407,11 @@ export const GraphView = React.forwardRef<GraphViewHandle, GraphViewProps>(funct
   const diagnostics = React.useMemo(() => groupDiagnostics.length ? [...graphDiagnostics, ...groupDiagnostics] : graphDiagnostics, [graphDiagnostics, groupDiagnostics])
   const graphIndex = React.useMemo(() => nodesById(graph.nodes), [graph])
   // The chip badges: the host's reading of its own data, or a count of the
-  // graph's entities per axis and value.
-  const nodeCounts = React.useMemo(() => countsOn(graph.nodes, axes), [graph, axes])
-  const counts = hostCounts ?? nodeCounts
+  // graph's entities per axis and value, faceted when the host asks.
+  const counts = React.useMemo(
+    () => (typeof hostCounts === 'object' ? hostCounts : countsOn(graph.nodes, axes, hostCounts && { filter, taxonomy })),
+    [hostCounts, graph, axes, filter, taxonomy],
+  )
   // Every node's copies, by the key they share — derived here, once per graph.
   const copies = React.useMemo(() => copyGroups(graph), [graph])
 
