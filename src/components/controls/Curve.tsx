@@ -1,7 +1,5 @@
 // Curve — a read-only line plot on fixed log–log axes, framed by Plot: what a
-// section's sliders do, drawn as they move. A value outside an axis's span is
-// drawn at its edge. A mark is a dashed vertical at an x worth naming, with an
-// optional label at its top.
+// section's sliders do, drawn as they move.
 
 import { Plot } from './Plot'
 import './controls.css'

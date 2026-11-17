@@ -116,9 +116,7 @@ const COOLING: SliderDef = { key: 'alphaDecay', label: 'cooling', min: 0.0005, m
 const THRESHOLD: SliderDef = { key: 'alphaMin', label: 'threshold', min: 0, max: 0.005, step: 0.0001,
   tooltip: 'Energy level below which simulation pauses' }
 
-// α starts at 1 and loses `cooling` a tick until it reaches `threshold` (see
-// Simulation.tick). On log axes centred on the default stop tick and
-// threshold, cooling moves the drop and threshold its foot.
+// The stop and α's run follow Simulation.tick.
 const TICKS: Span = [10, 4000]
 const ALPHA: Span = [1e-8, 1]
 const TICK_SAMPLES = 48
@@ -147,8 +145,8 @@ const SCALE: Span = [SIZE.min * SHRINK_FLOOR.min, SIZE.max * GROW_CAP.max]
 
 const NODE_SCALE_EQUATION = (
   <div className="gv-eq-line">
-    scale = <FormulaValue id={SIZE.key}>size</FormulaValue> × clamp(zoom,
-    <FormulaValue id={SHRINK_FLOOR.key}>shrink floor</FormulaValue>,
+    scale = <FormulaValue id={SIZE.key}>size</FormulaValue> × clamp(zoom,{' '}
+    <FormulaValue id={SHRINK_FLOOR.key}>shrink floor</FormulaValue>,{' '}
     <FormulaValue id={GROW_CAP.key}>grow cap</FormulaValue>)
   </div>
 )
@@ -268,8 +266,6 @@ export function GraphControlPanel({
               </EquationSection>
             </SectionSlot>
 
-            {/* MISC section — non-force controls: simulation dynamics and
-                render-time node scaling, each in its own labelled sub-section. */}
             <SectionSlot active={activeTab === 'misc'}>
               <MiscControls
                 params={params}

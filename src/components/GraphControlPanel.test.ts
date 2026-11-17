@@ -45,6 +45,7 @@ describe('the Misc tab', () => {
     expect(html.split('gv-ctl-formula-value').length - 1).toBe(6)
     expect(popIds(html)).toEqual(
       ['alphaDecay', 'alphaMin', 'baseMul', 'maxZoomMul', 'minZoomMul', 'velocityDecay'])
+    expect(html).toMatch(/clamp\(zoom, <span[^>]*>shrink floor<\/span>, <span/)
   })
 
   it('marks the tick the simulation stops at', () => {
