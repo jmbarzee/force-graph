@@ -13,7 +13,7 @@ import { NO_OVERRIDES } from '../filter/linked'
 import type { LinkedViewState } from '../filter/linked'
 import type { ForceParams, SimNode, Simulation } from '../graph/simulation'
 import { bandOverlay } from '../graph/forces'
-import { countsOn, isIdentityMapping, valuesOn } from '../graph/axis'
+import { countsOn, isIdentityMapping, mappingKey, valuesOn } from '../graph/axis'
 import type { AxisId, AxisMapping } from '../graph/axis'
 import type { PresentSets } from './graph-view/present'
 import { presentSetsOf } from './graph-view/present'
@@ -549,9 +549,9 @@ export const GraphView = React.forwardRef<GraphViewHandle, GraphViewProps>(funct
   // A new axis starts both pair forces from the taxonomy's declared physics on
   // its buckets (a tuning keyed by one axis has no reading on another).
   const handleAxisChange = React.useCallback((mapping: AxisMapping) => {
-    if (mapping.axis === forceParams.pair.mapping.axis) return
+    if (mappingKey(mapping) === mappingKey(forceParams.pair.mapping)) return
     handleRelayout({ pair: pairTuning(mapping) })
-  }, [forceParams.pair.mapping.axis, handleRelayout])
+  }, [forceParams.pair.mapping, handleRelayout])
 
   // Render-time node sizing — the tuning's other half, tunable from the
   // Controls panel (Misc → Node scaling); a pure-render concern, so a change

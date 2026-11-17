@@ -1,8 +1,9 @@
 import { describe, expect, it } from 'vitest'
-import { Simulation, defaultParamsFor } from './simulation'
+import { Simulation, axisOptions, defaultParamsFor, pairTuning, retunedFor, withPushOverride } from './simulation'
 import type { ForceParams, Layout } from './simulation'
 import { layoutFrame, resolvePhysics } from './forces'
-import { createTaxonomy } from './taxonomy'
+import { createTaxonomy, engineOf } from './taxonomy'
+import { mappingKey } from './axis'
 import { readableGraph } from './model'
 import type { Graph, GraphNode } from './model'
 
@@ -60,5 +61,46 @@ describe('Simulation', () => {
 
   it('stops at the first tick alpha falls below any other threshold', () => {
     expect(ticksToStop(0.3)).toBe(3)
+  })
+})
+
+describe('a declared pair mapping', () => {
+  const kinds = ['scheduler', 'router', 'worker', 'store']
+  const declaring = createTaxonomy({
+    styleAxis: 'kind',
+    styles: kinds.map(id => ({ id, label: id, color: { light: { fill: '#000000', border: '#000000' }, dark: { fill: '#ffffff', border: '#ffffff' } } })),
+    filterAxes: [{ id: 'team', emptyMeans: 'all' }],
+    pairMappings: [{
+      id: 'role', label: 'Role', axis: 'kind', buckets: [
+        { id: 'control', label: 'Control', abbreviation: 'C', values: ['scheduler', 'router'] },
+        { id: 'work', label: 'Work', abbreviation: 'W', values: ['worker', 'store'] },
+      ],
+    }],
+  })
+  const byKind: Graph = {
+    nodes: kinds.map(kind => ({ id: kind, name: kind, values: { kind, team: 'core' } })),
+    edges: [
+      { id: 'sw', sourceId: 'scheduler', targetId: 'worker' },
+      { id: 'rs', sourceId: 'router', targetId: 'store' },
+      { id: 'sr', sourceId: 'scheduler', targetId: 'router' },
+    ],
+  }
+
+  it('is offered after the style axis and before the observed values, with its counts', () => {
+    const options = axisOptions(declaring, byKind)
+    expect(options.map(o => o.mapping.id)).toEqual(['kind:identity', 'role', 'team:identity'])
+    expect(options[1]).toMatchObject({ pushTokens: 2, pullTokens: 2 })
+  })
+
+  it('keys apart from the view\'s mappings whatever its id', () => {
+    const named = createTaxonomy({ styleAxis: 'kind', styles: [], pairMappings: [{ ...engineOf(declaring).pairMappings[0], id: 'kind:identity' }] })
+    const keys = axisOptions(named, byKind).map(o => mappingKey(o.mapping))
+    expect(new Set(keys).size).toBe(keys.length)
+  })
+
+  it('keeps its overrides when the graph changes', () => {
+    const params = { ...defaultParamsFor(declaring), pair: withPushOverride(pairTuning(engineOf(declaring).pairMappings[0]), 'control', { charge: 1, coreRadius: 2 }) }
+    const grown: Graph = { ...byKind, nodes: [...byKind.nodes, { id: 'w2', name: 'w2', values: { kind: 'worker', team: 'edge' } }] }
+    expect(retunedFor(params, declaring, grown).pair).toBe(params.pair)
   })
 })

@@ -20,7 +20,7 @@ import type { EdgeCategory, LayoutFrame, LayoutSubject, ResolvedPhysics } from '
 import type { ResolvedScalarAxis, ScalarTuning } from './scalar'
 import { isScalarTuning } from './scalar'
 import type { AxisNamer, AxisId, AxisValue, AxisMapping } from './axis'
-import { identityMapping, valuesOn } from './axis'
+import { identityMapping, mappingKey, valuesOn } from './axis'
 import type { Taxonomy } from './taxonomy'
 import { engineOf } from './taxonomy'
 
@@ -192,12 +192,13 @@ export function fitsCeiling(option: AxisOption): boolean {
 
 /**
  * Every axis push/pull can key on for this graph: the style axis bucketed by
- * identity, then each filter axis bucketed by the values the graph presents on
- * it. The token counts are measured, not estimated, so the ceiling is a number
- * the dropdown can show beside an axis it has to decline.
+ * identity, then the host's mappings, then each filter axis bucketed by the
+ * values the graph presents on it. The token counts are measured, not
+ * estimated, so the ceiling is a number the dropdown can show beside an axis
+ * it has to decline.
  */
 export function axisOptions(taxonomy: Taxonomy, graph: Graph): AxisOption[] {
-  const mappings: AxisMapping[] = [styleIdentityMapping(taxonomy)]
+  const mappings: AxisMapping[] = [styleIdentityMapping(taxonomy), ...engineOf(taxonomy).pairMappings]
   for (const axis of nodeAxes(taxonomy, graph)) {
     const values = valuesOn(graph.nodes, axis)
     if (values.length > 0) mappings.push(identityMapping(namerFor(taxonomy, axis), values))
@@ -250,10 +251,10 @@ export type LayoutAxisOption =
   | { readonly kind: 'mapping'; readonly option: AxisOption }
   | { readonly kind: 'scalar'; readonly scalar: ResolvedScalarAxis }
 
-/** Every axis X or Y can key on: the mappings push/pull can (already measured), then every scalar the taxonomy knows. */
+/** Every axis X or Y can key on: the axes push/pull can (already measured), then every scalar the taxonomy knows. The host's mappings are the pair forces' alone. */
 export function layoutAxisOptions(axes: readonly AxisOption[], taxonomy: Taxonomy): LayoutAxisOption[] {
   return [
-    ...axes.map(option => ({ kind: 'mapping' as const, option })),
+    ...axes.filter(option => !option.mapping.declared).map(option => ({ kind: 'mapping' as const, option })),
     ...engineOf(taxonomy).scalars.map(scalar => ({ kind: 'scalar' as const, scalar })),
   ]
 }
@@ -264,8 +265,8 @@ export function layoutAxisOptions(axes: readonly AxisOption[], taxonomy: Taxonom
  * what the tuning answers to.
  */
 export function layoutAxisKey(choice: LayoutTuning | LayoutAxisOption): string {
-  if ('kind' in choice) return choice.kind === 'scalar' ? `scalar:${choice.scalar.id}` : `mapping:${choice.option.mapping.axis}`
-  return isScalarTuning(choice) ? `scalar:${choice.scalar}` : `mapping:${choice.mapping.axis}`
+  if ('kind' in choice) return choice.kind === 'scalar' ? `scalar:${choice.scalar.id}` : mappingKey(choice.option.mapping)
+  return isScalarTuning(choice) ? `scalar:${choice.scalar}` : mappingKey(choice.mapping)
 }
 
 /** Same axis, same buckets, same values — order-insensitive, since node order is not a fact about the graph. */
@@ -277,14 +278,19 @@ function sameBuckets(a: AxisMapping, b: AxisMapping): boolean {
 
 /**
  * The same parameters, re-bucketed for the graph and taxonomy they now face.
+ *
  * An identity mapping over observed values goes stale when a file is added or
- * removed; the style axis's goes stale when the taxonomy is swapped. Overrides
- * are keyed by value, so they survive where the value does. A tuning whose
- * buckets did not change comes back by reference, so a caller can tell nothing
- * moved. An axis the graph no longer carries, or one that has grown past the
- * token ceiling, falls back to the style axis with nothing overridden. A graph
- * with no nodes judges nothing: the parameters come back as they are, so a
- * layout restored before the data arrives waits for it.
+ * removed, and the style axis's when the taxonomy is swapped; its overrides
+ * are keyed by value, so they survive where the value does. A host's mapping
+ * is read from the taxonomy, not the graph, so it and all its overrides
+ * survive any graph. A tuning whose buckets did not change comes back by
+ * reference, so a caller can tell nothing moved.
+ *
+ * A tuning falls back to the style axis with nothing overridden when its axis
+ * is no longer carried by any node, its mapping is no longer declared, or it
+ * has grown past the token ceiling. A graph with no nodes judges nothing: the
+ * parameters come back as they are, so a layout restored before the data
+ * arrives waits for it.
  */
 export function retunedFor(params: ForceParams, taxonomy: Taxonomy, graph: Graph): ForceParams {
   // A scalar the taxonomy does not know falls back whatever the graph holds:
@@ -301,6 +307,7 @@ export function retunedFor(params: ForceParams, taxonomy: Taxonomy, graph: Graph
   const byId = nodesById(graph.nodes)
   const nodeOf = (id: string) => byId.get(id)
   const refreshed = (m: AxisMapping): AxisMapping | undefined => {
+    if (m.declared) return engineOf(taxonomy).pairMappings.find(d => d.id === m.id)
     if (m.axis === style) return styleIdentityMapping(taxonomy)
     const values = valuesOn(graph.nodes, m.axis)
     return values.length === 0 ? undefined : identityMapping(namerFor(taxonomy, m.axis), values)
@@ -314,9 +321,12 @@ export function retunedFor(params: ForceParams, taxonomy: Taxonomy, graph: Graph
   const refresh = <T extends { mapping: AxisMapping }>(
     tuning: T, fresh: (mapping: AxisMapping) => T, fits: (mapping: AxisMapping) => boolean,
   ): T => {
-    const next = refreshed(tuning.mapping)
-    if (next === undefined || (next.axis !== style && !fits(next))) {
-      fellBack(tuning.mapping.axis, next === undefined ? 'no node carries it any more' : `it has ${next.buckets.length} buckets, past the ceiling of ${TOKEN_CEILING}`)
+    const was = tuning.mapping
+    const next = refreshed(was)
+    const styleIdentity = next !== undefined && !next.declared && next.axis === style
+    if (next === undefined || (!styleIdentity && !fits(next))) {
+      const gone = was.declared ? 'the taxonomy no longer declares it' : 'no node carries it any more'
+      fellBack(was.declared ? `the ${JSON.stringify(was.id)} mapping` : `the ${JSON.stringify(was.axis)} axis`, next === undefined ? gone : `it has ${next.buckets.length} buckets, past the ceiling of ${TOKEN_CEILING}`)
       return fresh(styleIdentityMapping(taxonomy))
     }
     return sameBuckets(next, tuning.mapping) ? tuning : { ...tuning, mapping: next }
@@ -339,14 +349,14 @@ export function retunedFor(params: ForceParams, taxonomy: Taxonomy, graph: Graph
   return pair === params.pair && bandX === params.bandX && bandY === params.bandY ? params : { ...params, pair, bandX, bandY }
 }
 
-// A fallback is said once per axis and reason: it happens on every retune
-// after the first, and the user has one control to look at, not a stream.
+// A fallback is said once per axis or mapping and reason: it happens on every
+// retune after the first, and the user has one control to look at, not a stream.
 const FELL_BACK = new Set<string>()
-function fellBack(axis: AxisId, reason: string): void {
-  const key = `${axis}\u0000${reason}`
+function fellBack(what: string, reason: string): void {
+  const key = `${what}\u0000${reason}`
   if (FELL_BACK.has(key)) return
   FELL_BACK.add(key)
-  console.warn(`[graph] the ${JSON.stringify(axis)} axis cannot be tuned on: ${reason}; the forces returned to the style axis with nothing overridden.`)
+  console.warn(`[graph] ${what} cannot be tuned on: ${reason}; the forces returned to the style axis with nothing overridden.`)
 }
 
 // PUSH — repulsion. Per-type charge strength and core radius, the masters that

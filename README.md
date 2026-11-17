@@ -142,6 +142,12 @@ never by spreading the built object.
   `initialSelection(values)` is the first open's selection (default every
   value on an allow-list, none on a narrowing axis), `presentation` is
   `'chip'` or `'tag'`.
+- **Pair mappings.** `pairMappings` folds an axis's values into fewer
+  buckets push and pull may key on — seven node types into "control" and
+  "work", say. Each `AxisMappingSpec` has an `id`, a `label`, the `axis` it
+  maps and its `buckets`, each a `MappingBucket`: an `id`, a `label`, a one-
+  or two-character `abbreviation` and the `values` it groups. A value in two
+  buckets, an empty bucket, and an id declared twice are refused.
 - **Scalars and hooks.** `scalars` adds computed axes (`id`, `label` and
   `tooltip` — defaults the id and the label — and `compute(graph)` answering a
   number per node; `normalize` maps
@@ -309,7 +315,9 @@ the console. Everything else is optional.
   (`TuningJSON`) fills whatever it leaves out from the taxonomy's defaults,
   so `createTuning({}, taxonomy)` is the default tuning, and
   `defaultTuning={createTuning({ forces: { bandY: { scalar: 'credits' } } },
-  taxonomy)}` opens the view laid out on a scalar. It throws on a mistake
+  taxonomy)}` opens the view laid out on a scalar, and `{ forces: { pair: {
+  mapping: 'role' } } }` starts push and pull on a declared pair mapping. It
+  throws on a mistake
   and names its path (`forces.bandY.scalar: no scalar "credit"`).
   `tuningToJSON(tuning)` carries a tuning to a store and
   `tuningFromJSON(json, taxonomy)` back, answering undefined, never a throw,
@@ -571,9 +579,7 @@ What is not built is filed as issues:
   ([#9](https://github.com/jmbarzee/force-graph/issues/9)),
   undirected edges ([#11](https://github.com/jmbarzee/force-graph/issues/11)),
   an edge time series played back
-  ([#33](https://github.com/jmbarzee/force-graph/issues/33)), host-declared
-  pair-axis mappings ([#32](https://github.com/jmbarzee/force-graph/issues/32)),
-  a node drawn as a stack of ghosts
+  ([#33](https://github.com/jmbarzee/force-graph/issues/33)), a node drawn as a stack of ghosts
   ([#19](https://github.com/jmbarzee/force-graph/issues/19)).
 - **Interaction** — selecting several nodes
   ([#28](https://github.com/jmbarzee/force-graph/issues/28)), edge hover and

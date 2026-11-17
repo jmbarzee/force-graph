@@ -8,6 +8,7 @@ const taxonomy = createTaxonomy({
   styleAxis: 'kind',
   styles: [{ id: 'service', label: 'service', color: { light: { fill: '#000000', border: '#000000' }, dark: { fill: '#ffffff', border: '#ffffff' } } }],
   filterAxes: [{ id: 'kind', label: 'kind', emptyMeans: 'none' }, { id: 'team', label: 'team', emptyMeans: 'all' }],
+  pairMappings: [{ id: 'role', label: 'Role', axis: 'kind', buckets: [{ id: 'all', label: 'All', abbreviation: 'A', values: ['service'] }] }],
 })
 
 // A host's mistake, as it would arrive from JavaScript or parsed JSON.
@@ -34,6 +35,11 @@ describe('createTuning', () => {
     expect(out.nodeScale?.baseMul).toBe(2)
   })
 
+  it('starts the pair forces on a declared mapping named by its id', () => {
+    const json: TuningJSON = { forces: { pair: { mapping: 'role', push: { all: { charge: 5, coreRadius: 2 } } } } }
+    expect(tuningToJSON(createTuning(json, taxonomy)).forces?.pair).toEqual(json.forces!.pair)
+  })
+
   it.each([
     ['tuning: not an object', []],
     ['forces: not an object', { forces: 1 }],
@@ -42,6 +48,8 @@ describe('createTuning', () => {
     ['forces.gravityX: not a finite number', { forces: { gravityX: 'strong' } }],
     ['forces.radial: not a boolean', { forces: { radial: 1 } }],
     ['forces.pair.axis: no axis "teem"', { forces: { pair: { axis: 'teem' } } }],
+    ['forces.pair.mapping: no mapping "rol"', { forces: { pair: { mapping: 'rol' } } }],
+    ['forces.pair: names both an axis and a mapping', { forces: { pair: { axis: 'kind', mapping: 'role' } } }],
     ['forces.pair.push.a.charge: not a finite number', { forces: { pair: { axis: 'kind', push: { a: { charge: null, coreRadius: 1 } } } } }],
     ['forces.bandX.axis: not an axis id', { forces: { bandX: {} } }],
     ['forces.bandX.overrides.a.max: not a finite number', { forces: { bandX: { axis: 'kind', overrides: { a: { min: 0 } } } } }],
@@ -73,5 +81,9 @@ describe('tuningFromJSON', () => {
   it('passes over a field it has no place for and an axis or scalar the taxonomy does not name, for the view to retune', () => {
     const value = { forces: { topologicalEnabled: true, pair: { axis: 'teem' }, bandY: { scalar: 'credit' } } }
     expect(tuningFromJSON(value, taxonomy)).toBeDefined()
+  })
+
+  it('passes over a mapping the taxonomy does not declare, for the view to retune', () => {
+    expect(tuningFromJSON({ forces: { pair: { mapping: 'rol' } } }, taxonomy)).toBeDefined()
   })
 })

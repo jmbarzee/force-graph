@@ -301,6 +301,17 @@ export interface AxisMapping {
   buckets: readonly MappingBucket[]
   /** The bucket a value belongs to, or undefined if the mapping omits it. */
   bucketFor(value: AxisValue | undefined): MappingBucket | undefined
+  /** Set on a host's mapping, from `TaxonomySpec.pairMappings`; absent on the view's own, built from an axis's values. */
+  readonly declared?: true
+}
+
+/**
+ * The one spelling of a mapping for a control's option value and for "is this
+ * the one in use": a host's by its id, the view's by its axis — one per axis —
+ * so no host id can collide with an axis.
+ */
+export function mappingKey(mapping: AxisMapping): string {
+  return mapping.declared ? `declared:${mapping.id}` : `axis:${mapping.axis}`
 }
 
 /** What `createAxisMapping` is given, before the buckets are checked for overlap. */
