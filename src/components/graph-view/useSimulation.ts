@@ -88,6 +88,8 @@ export function useSimulation(
   // mapping has nothing left to detect.
   React.useEffect(() => {
     const prev = simRef.current
+    // StrictMode's replay of this effect, over the inputs it just built from.
+    if (prev && prevGraphRef.current === graph && prevOntologyRef.current === taxonomy) return
     // A new graph object equal to the last rebuilds the simulation for
     // nothing; said once, because the fix is on the host's side (memoise).
     if (prev && prevGraphRef.current && prevGraphRef.current !== graph && !warnedRef.current && graphEquals(prevGraphRef.current, graph)) {
@@ -112,7 +114,7 @@ export function useSimulation(
     if (prev) for (const n of prev.nodes) start.set(n.id, { x: n.x, y: n.y })
     const sim = new Simulation(graph, { params: forceParams, resolved, frame }, defaultRng, start.size > 0 ? start : undefined)
     // A first build told where every node is opens where they rest: a reload
-    // holds still. A later build reheats, whatever it kept.
+    // holds still.
     if (!prev && graph.nodes.every(n => start.has(n.id))) sim.cool()
     simRef.current = sim
     onRebuildRef.current?.()

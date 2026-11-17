@@ -18,7 +18,9 @@ import type { SimNode } from '../../graph/simulation'
  * zoom or drag, a newer request or a settled layout releases it, and
  * `released` runs then, unless for a newer request. A release, or a newer
  * request, also drops a waiting `hold` request, which then never acts, but a
- * `'warm'` request leaves a waiting `'next'` one, which acts after it.
+ * `'warm'` request leaves a waiting `'next'` one, which acts after it. A
+ * release keeps a `'warm'` request the layout has cooled for and only the
+ * pane holds up: it frames once, when the pane measures.
  */
 export interface FrameRequest {
   ids: Iterable<string>
@@ -36,6 +38,7 @@ export interface FrameRequest {
  */
 export function frameQueue(apply: (request: FrameRequest) => boolean) {
   let warm: FrameRequest | undefined, next: FrameRequest | undefined, held: FrameRequest | undefined
+  let cooled = false
   const act = (request: FrameRequest) => {
     held = request.hold ? request : undefined
   }
@@ -54,9 +57,10 @@ export function frameQueue(apply: (request: FrameRequest) => boolean) {
       else { apply(request); act(request) }
     },
     tick(alpha: number) {
+      cooled = alpha < 0.3
       if (held) apply(held)
       if (warm) {
-        if (alpha >= 0.3 || !apply(warm)) return
+        if (!cooled || !apply(warm)) return
         const request = warm
         warm = undefined
         act(request)
@@ -68,9 +72,18 @@ export function frameQueue(apply: (request: FrameRequest) => boolean) {
         act(request)
       }
     },
+    // The pane measured: a warm request it alone held up acts now.
+    measured() {
+      if (!warm || !cooled || !apply(warm)) return
+      const request = warm
+      warm = undefined
+      act(request)
+    },
     release() {
       const released = held?.released
+      const waiting = cooled && warm ? { ...warm, hold: false } : undefined
       drop()
+      warm ??= waiting
       released?.()
     },
   }

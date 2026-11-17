@@ -73,6 +73,33 @@ describe('frameQueue', () => {
     expect(framed).toHaveLength(1)
   })
 
+  it('keeps, past a release, a cooled warm frame the pane holds up, and frames it once when the pane measures', () => {
+    let measured = false
+    const framed: FrameRequest[] = []
+    const queue = frameQueue(request => { if (measured) framed.push(request); return measured })
+    queue.request(opening)
+    queue.tick(0.1)
+    queue.release()
+    queue.measured()
+    expect(framed).toEqual([])
+    measured = true
+    queue.measured()
+    queue.measured()
+    queue.tick(0.1)
+    expect(framed).toHaveLength(1)
+  })
+
+  it('drops at a release a warm frame the layout has not cooled for, and frames nothing when the pane measures before the layout cools', () => {
+    const { framed, queue } = queued()
+    queue.request(opening)
+    queue.measured()
+    queue.tick(0.5)
+    queue.release()
+    queue.measured()
+    queue.tick(0.1)
+    expect(framed).toEqual([])
+  })
+
   it('releases a held frame for a newer request, and for a next one acting after it', () => {
     const { framed, queue } = queued()
     const fit = { ids: ['b'] }

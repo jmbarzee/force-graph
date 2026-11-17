@@ -91,10 +91,11 @@ that would animate a reveal or a hide are
 
 **Fit** (the button, `fit()`) frames every visible node. A layout that
 follows a drawing of no node — the first, or a graph after an empty one — is
-framed from when its warm-up cools until it settles, and so is a refitting
-filter change; a pan, zoom, drag or newer frame lets go at once. Any other new
-graph keeps the viewport, and a frame still holding carries on over the nodes
-it names that the new graph draws.
+framed from when its warm-up cools until it settles, or, in a pane not yet
+measured, once when it measures; so is a refitting filter change. A pan,
+zoom, drag or newer frame lets go at once. Any other new graph keeps the
+viewport, and a frame still holding carries on over the nodes it names that
+the new graph draws.
 Every frame lands in the canvas below the filter bar.
 Resizing the pane keeps
 the world point at its centre fixed.

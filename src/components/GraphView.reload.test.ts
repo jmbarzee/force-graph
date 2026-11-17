@@ -47,12 +47,12 @@ const graphOf = (...ids: string[]): Graph => ({
 const first = graphOf('a', 'b', 'c')
 const grown = graphOf('a', 'b', 'c', 'd')
 
-async function mount(start: Graph) {
+async function mount(start: Graph, defaultPositions?: ReadonlyMap<string, { x: number; y: number }>) {
   const ref = React.createRef<GraphViewHandle>()
   const selections: (string | null)[] = []
   const root = createRoot(document.createElement('div'))
   const render = (graph: Graph) => act(async () => {
-    root.render(React.createElement(GraphView, { ref, graph, taxonomy, onSelectionChange: n => selections.push(n?.id ?? null) }))
+    root.render(React.createElement(GraphView, { ref, graph, taxonomy, defaultPositions, onSelectionChange: n => selections.push(n?.id ?? null) }))
   })
   await render(start)
   const frame = (ids: string[]) => {
@@ -95,4 +95,27 @@ it('carries a held frame over a reload, on the new graph\'s nodes among its ids'
   await tick(1)
   expect(view.frame(first.nodes.map(n => n.id))).toBe(viewport)
   expect(view.frame(grown.nodes.map(n => n.id))).not.toBe(viewport)
+})
+
+const kept = new Map([['a', { x: 0, y: 0 }], ['b', { x: 300, y: 100 }], ['c', { x: -200, y: 400 }]])
+
+it('frames a reload that opens at rest, in its one tick', async () => {
+  const view = await mount(first, kept)
+  await tick()
+  expect(view.frame(first.nodes.map(n => n.id))).toBe(viewport)
+  for (const [id, p] of view.ref.current!.getPositions()) expect(Math.hypot(p.x - kept.get(id)!.x, p.y - kept.get(id)!.y)).toBeLessThan(0.01)
+})
+
+it('frames a reload that opens at rest when the pane measures after its one tick', async () => {
+  const resized: (() => void)[] = []
+  window.ResizeObserver = class Observer { constructor(cb: ResizeObserverCallback) { resized.push(() => cb([], this)) } observe() {} unobserve() {} disconnect() {} }
+  area.width = 0
+  const view = await mount(first, kept)
+  await tick()
+  expect(viewport).toBe(DEFAULT_VIEWPORT)
+  area.width = 800
+  await act(async () => resized.forEach(cb => cb()))
+  expect(viewport).not.toBe(DEFAULT_VIEWPORT)
+  expect(view.frame(first.nodes.map(n => n.id))).toBe(viewport)
+  for (const [id, p] of view.ref.current!.getPositions()) expect(Math.hypot(p.x - kept.get(id)!.x, p.y - kept.get(id)!.y)).toBeLessThan(0.01)
 })

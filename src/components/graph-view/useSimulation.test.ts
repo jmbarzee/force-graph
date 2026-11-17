@@ -18,7 +18,7 @@ const graphOf = (...ids: string[]): Graph => ({ nodes: ids.map(id => ({ id, name
 const kept = new Map([['a', { x: 0, y: 0 }], ['b', { x: 100, y: 0 }]])
 
 /** Mount the hook; `render` re-renders it over a new graph or taxonomy. */
-async function mount(graph: Graph, positions?: ReadonlyMap<string, { x: number; y: number }>) {
+async function mount(graph: Graph, positions?: ReadonlyMap<string, { x: number; y: number }>, strict = false) {
   const out: { sim?: SimulationController } = {}
   function Harness({ graph, taxonomy }: { graph: Graph; taxonomy: Taxonomy }) {
     const [forces, setForces] = React.useState(() => defaultParamsFor(taxonomy))
@@ -27,7 +27,8 @@ async function mount(graph: Graph, positions?: ReadonlyMap<string, { x: number; 
   }
   const root = createRoot(document.createElement('div'))
   const render = (graph: Graph, taxonomy: Taxonomy) => act(async () => {
-    root.render(React.createElement(Harness, { graph, taxonomy }))
+    const harness = React.createElement(Harness, { graph, taxonomy })
+    root.render(strict ? React.createElement(React.StrictMode, null, harness) : harness)
   })
   const taxonomy = taxonomyOf()
   await render(graph, taxonomy)
@@ -37,6 +38,11 @@ async function mount(graph: Graph, positions?: ReadonlyMap<string, { x: number; 
 
 it('starts a first build cool when every node has a position', async () => {
   const { sim } = await mount(graphOf('a', 'b'), kept)
+  expect(sim().alpha).toBe(sim().params.alphaMin)
+})
+
+it('starts a first build cool under StrictMode, which replays its effects', async () => {
+  const { sim } = await mount(graphOf('a', 'b'), kept, true)
   expect(sim().alpha).toBe(sim().params.alphaMin)
 })
 

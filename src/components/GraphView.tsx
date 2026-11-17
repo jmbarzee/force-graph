@@ -157,7 +157,7 @@ export interface GraphViewProps {
    * shortcuts — a tab shell's hidden tab.
    */
   keyboard?: 'pane' | 'global' | 'none'
-  /** Where nodes start, by id — a layout the host kept (`getPositions`). Read whenever the simulation is built; a node the live layout already holds keeps its place. */
+  /** Where nodes start, by id — a layout the host kept (`getPositions`). Read whenever the simulation is built; a node the live layout already holds keeps its place. One covering every node opens at rest, unsettled: hand back what `onSettled` kept, or call `setPositions` to settle from rough positions. */
   defaultPositions?: ReadonlyMap<string, Position>
   /** Chip badge counts per axis and value — the host's reading of its own data. Absent, the graph's entity counts (the copies of one `copyKey` once); `faceted`, those counts under the other axes' selections. */
   counts?: ReadonlyMap<string, ReadonlyMap<string, number>> | 'faceted'
@@ -686,7 +686,12 @@ export const GraphView = React.forwardRef<GraphViewHandle, GraphViewProps>(funct
   // per tick; a changed multiplier warms the layout it retunes.
   const cohesion = React.useMemo(() => cohesionOf(nodeGroups, sprung, groupCohesion), [nodeGroups, sprung, groupCohesion])
   React.useEffect(() => simRef.current?.setCohesion(cohesion), [cohesion, simVersion, simRef])
-  React.useEffect(() => handleForceAdjust(), [groupCohesion, handleForceAdjust])
+  const cohesionWarmed = React.useRef(groupCohesion)
+  React.useEffect(() => {
+    if (cohesionWarmed.current === groupCohesion) return
+    cohesionWarmed.current = groupCohesion
+    handleForceAdjust()
+  }, [groupCohesion, handleForceAdjust])
   const present = React.useMemo<PresentSets>(
     () => presentSetsOf(visibleNodes, sprung, resolved, getSimNode),
     [visibleNodes, sprung, resolved, taxonomy, getSimNode],
