@@ -97,9 +97,8 @@ export function coloringsEqual(a: SetColoring | undefined, b: SetColoring | unde
   if (a === b) return true
   if (!a || !b || a.by !== b.by) return false
   if (a.by === 'groups') return true
-  const c = b as Coloring
-  if (!keysEqual(a.keys, c.keys)) return false
-  return a.by === 'axis' ? a.axis === (c as typeof a).axis : a.of === (c as typeof a).of
+  if (!keysEqual(a.keys, (b as Coloring).keys)) return false
+  return a.by === 'axis' ? a.axis === (b as typeof a).axis : a.of === (b as typeof a).of
 }
 
 const keysEqual = (a: readonly LegendKey[] | undefined, b: readonly LegendKey[] | undefined): boolean =>
