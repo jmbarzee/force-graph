@@ -1140,6 +1140,7 @@ export function GraphCanvas({
         onPointerDown={handlePointerDown}
         onPointerMove={handlePointerMove}
         onPointerUp={handlePointerUp}
+        onPointerLeave={() => { onHoverNode(null); onHoverEdge(null) }}
         onDoubleClick={handleDoubleClick}
       />
     </div>
