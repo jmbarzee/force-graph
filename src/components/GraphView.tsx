@@ -989,6 +989,7 @@ export const GraphView = React.forwardRef<GraphViewHandle, GraphViewProps>(funct
   // mounted. A control keeps its own keys either way: Space on a button
   // activates the button, not the simulation, and Tab from a control moves
   // focus.
+  const enteredRef = React.useRef(false)
   const handleKey = React.useCallback((e: KeyboardEvent) => {
     // A chord is the browser's or the host's (find, zoom, the host's own
     // shortcuts): never this pane's.
@@ -1001,12 +1002,16 @@ export const GraphView = React.forwardRef<GraphViewHandle, GraphViewProps>(funct
 
     switch (e.key) {
       case 'Tab': {
-        // Tab cycles nodes only while the pane itself is focused, in either
+        // Tab walks the nodes only while the pane itself is focused, in either
         // scope; from the page it moves focus as it always does, so a keyboard
         // user can always reach the host's controls.
         if (target !== containerRef.current) return
         const order = tabOrder(visibleNodes, getSimNode)
-        const at = focusedNodeId === null ? -1 : order.indexOf(focusedNodeId)
+        const held = focusedNodeId === null ? -1 : order.indexOf(focusedNodeId)
+        // Coming back in at the end it left by, the walk starts over from that end.
+        const entering = enteredRef.current
+        enteredRef.current = false
+        const at = entering && held === (e.shiftKey ? 0 : order.length - 1) ? -1 : held
         const next = e.shiftKey ? (at === -1 ? order.length : at) - 1 : at + 1
         // Past either end, Tab is the browser's: it leaves the pane, which keeps the focus.
         if (next < 0 || next >= order.length) return
@@ -1121,7 +1126,7 @@ export const GraphView = React.forwardRef<GraphViewHandle, GraphViewProps>(funct
       aria-label={`Graph, ${counted}`}
       tabIndex={keyboard === 'none' ? undefined : 0}
       onKeyDown={keyboard === 'pane' ? paneKeyDown : undefined}
-      onFocus={e => { if (e.target === e.currentTarget) setPaneFocused(true) }}
+      onFocus={e => { if (e.target === e.currentTarget) { setPaneFocused(true); enteredRef.current = true } }}
       onBlur={e => { if (e.target === e.currentTarget) setPaneFocused(false) }}
       style={{ ...schemeStyle, ...(overlayHeight ? { ['--gv-toolbar-height' as string]: `${overlayHeight}px` } : {}), ...style }}
     >
@@ -1315,7 +1320,7 @@ export const GraphView = React.forwardRef<GraphViewHandle, GraphViewProps>(funct
             <button className="gv-graph-shortcuts-close" onClick={() => setShortcutsOpen(false)}>&times;</button>
           </div>
           <div className="gv-graph-shortcuts-list">
-            <Shortcut keys="Tab / Shift+Tab" desc="Cycle focus" />
+            <Shortcut keys="Tab / Shift+Tab" desc="Next / previous node" />
             <Shortcut keys="Enter" desc="Select focused node" />
             <Shortcut keys="Escape" desc="Deselect / close" />
             <Shortcut keys="Arrow keys" desc="Pan viewport" />

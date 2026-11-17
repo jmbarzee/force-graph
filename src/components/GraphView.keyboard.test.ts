@@ -84,6 +84,27 @@ it('leaves Tab to the browser past either end, keeping the focus', async () => {
   expect(drawn.focused).toBe('r')
 })
 
+it('starts over from the end a Tab comes back in at', async () => {
+  const view = await mount()
+  await view.tab(6)
+  expect(drawn.focused).toBe('z')
+  await act(async () => { view.pane.blur(); view.pane.focus() })
+  expect(await view.press('Tab')).toBe(true)
+  expect(drawn.focused).toBe('r')
+  expect(await view.press('Tab', { shiftKey: true })).toBe(false)
+  await act(async () => { view.pane.blur(); view.pane.focus() })
+  expect(await view.press('Tab', { shiftKey: true })).toBe(true)
+  expect(drawn.focused).toBe('z')
+})
+
+it('starts over under a global keyboard too', async () => {
+  const view = await mount({ keyboard: 'global' })
+  await view.tab(6)
+  await act(async () => { view.pane.blur(); view.pane.focus() })
+  await view.tab(1)
+  expect(drawn.focused).toBe('r')
+})
+
 it('tabs the nodes under a global keyboard once the pane has focus', async () => {
   const view = await mount({ keyboard: 'global' })
   expect(view.pane.tabIndex).toBe(0)
