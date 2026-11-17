@@ -448,10 +448,10 @@ the console. Everything else is optional.
   or clears the `parentId`, it names. The pane's theme observer watches every
   `data-theme` in the document unless `systemTheme` is given.
 - **Keyboard.** `keyboard` scopes the shortcuts: `'pane'` (the default — the
-  focusable root handles the keys that reach it, so a page keeps Tab and
-  Space for its own controls), `'global'` (the window — a page that is the
-  pane, or a tab shell's active tab) or `'none'` (a hidden tab). Tab walks
-  the nodes by containment and announces each; the keys are
+  root handles the keys that reach it, so a page keeps Tab and Space for its
+  own controls), `'global'` (the window — a page that is the pane, or a tab
+  shell's active tab) or `'none'` (a hidden tab). The root is focusable under
+  `'pane'` and `'global'` alike. The keys are
   [SPEC § Keyboard](SPEC.md#keyboard).
 
 ## Two views sharing a bar

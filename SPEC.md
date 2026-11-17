@@ -391,7 +391,7 @@ keeps its own keys, Escape aside.
 
 | Key | Action |
 |---|---|
-| Tab / Shift+Tab | Move the focus ring to the next or previous visible node, while the pane itself has focus |
+| Tab / Shift+Tab | Move the focus ring to the next or previous visible node, while the pane itself has focus; past the last or before the first, leave the pane, which keeps the focus |
 | Enter | Select the focused node alone |
 | Escape | Close the shortcuts panel, else the search, else clear the selection, else give the pane's focus back |
 | Arrows | Pan |

@@ -19,15 +19,12 @@ import { ancestry } from './tabOrder'
 import type { ForceSection } from '../GraphControlPanel'
 import type { GravityHover } from '../GravityControls'
 
-const NO_PATH: readonly string[] = []
-
 export interface HighlightController {
   hoveredNodeId: string | null
   setHoveredNodeId: React.Dispatch<React.SetStateAction<string | null>>
   shiftHeld: boolean
-  /** The keyboard focus: the node it holds while that is drawn, else its nearest drawn container. */
   focusedNodeId: string | null
-  focusNode: (id: string) => void
+  moveFocus: (id: string) => void
   highlightedNodes: Set<string> | null
   highlightedEdges: Set<string> | null
   activeSection: ForceSection
@@ -58,7 +55,7 @@ export function useHighlight(
   const [hoveredNodeId, setHoveredNodeId] = React.useState<string | null>(null)
   // The focus with its containers as they were when it was set: a filter or a
   // reload that stops drawing it moves it to the nearest one still drawn.
-  const [focusPath, setFocusPath] = React.useState<readonly string[]>(NO_PATH)
+  const [focusPath, setFocusPath] = React.useState<readonly string[]>([])
   const [shiftHeld, setShiftHeld] = React.useState(false)
 
   // Force-field preview (hover-driven; no persistent toggle).
@@ -79,9 +76,9 @@ export function useHighlight(
   }, [])
 
   const focusedNodeId = focusPath.find(id => visibleIds.has(id)) ?? null
-  const focusNode = React.useCallback((id: string) => setFocusPath(ancestry(id, getNode)), [getNode])
+  const moveFocus = React.useCallback((id: string) => setFocusPath(ancestry(id, getNode)), [getNode])
   React.useEffect(() => setFocusPath(path => {
-    const next = focusedNodeId === null ? NO_PATH : ancestry(focusedNodeId, getNode)
+    const next = focusedNodeId === null ? [] : ancestry(focusedNodeId, getNode)
     return listEqual(next, path) ? path : next
   }), [focusedNodeId, visibleIds, getNode])
 
@@ -108,7 +105,7 @@ export function useHighlight(
   return {
     hoveredNodeId, setHoveredNodeId,
     shiftHeld,
-    focusedNodeId, focusNode,
+    focusedNodeId, moveFocus,
     highlightedNodes, highlightedEdges,
     activeSection, setActiveSection,
     activePushBucket, setActivePushBucket,

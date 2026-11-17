@@ -45,9 +45,12 @@ async function mount(props: Partial<GraphViewProps> = {}, graph = tree) {
   await render(graph)
   const pane = el.querySelector<HTMLElement>('.gv-graph-view')!
   await act(async () => pane.focus())
-  const press = (key: string, init: KeyboardEventInit = {}, target: Element = pane) => act(async () => {
-    target.dispatchEvent(new KeyboardEvent('keydown', { key, bubbles: true, cancelable: true, ...init }))
-  })
+  /** Press a key on the pane: whether the pane kept it from the browser. */
+  const press = async (key: string, init: KeyboardEventInit = {}) => {
+    const event = new KeyboardEvent('keydown', { key, bubbles: true, cancelable: true, ...init })
+    await act(async () => { pane.dispatchEvent(event) })
+    return event.defaultPrevented
+  }
   const tab = async (times: number, init: KeyboardEventInit = {}) => { for (let i = 0; i < times; i++) await press('Tab', init) }
   const hide = (...kinds: string[]) => act(async () => ref.current!.updateFilter(f => withSelection(f, 'kind', new Set(['root', 'a', 'b', 'a1', 'z'].filter(k => !kinds.includes(k))))))
   const said = () => el.querySelector('[role="status"]')!.textContent
@@ -63,10 +66,22 @@ it('names the pane with its counts', async () => {
 it('tabs depth-first by containment, siblings by name, and back with Shift', async () => {
   const view = await mount()
   const seen: (string | null)[] = []
-  for (let i = 0; i < 6; i++) { await view.tab(1); seen.push(drawn.focused) }
-  expect(seen).toEqual(['r', 'a', 'a1', 'b', 'z', 'r'])
+  for (let i = 0; i < 5; i++) { await view.tab(1); seen.push(drawn.focused) }
+  expect(seen).toEqual(['r', 'a', 'a1', 'b', 'z'])
   await view.tab(2, { shiftKey: true })
-  expect(drawn.focused).toBe('b')
+  expect(drawn.focused).toBe('a1')
+})
+
+it('leaves Tab to the browser past either end, keeping the focus', async () => {
+  const view = await mount()
+  expect(await view.press('Tab', { shiftKey: true })).toBe(true)
+  expect(drawn.focused).toBe('z')
+  expect(await view.press('Tab')).toBe(false)
+  expect(drawn.focused).toBe('z')
+  await view.tab(4, { shiftKey: true })
+  expect(drawn.focused).toBe('r')
+  expect(await view.press('Tab', { shiftKey: true })).toBe(false)
+  expect(drawn.focused).toBe('r')
 })
 
 it('tabs the nodes under a global keyboard once the pane has focus', async () => {
@@ -98,6 +113,14 @@ it('holds the focus by id over a reload, then moves it to the nearest container 
   expect(drawn.focused).toBe('a')
   await view.render({ ...tree, nodes: [node('z', 'Zed')] })
   expect(drawn.focused).toBeNull()
+})
+
+it('moves the focus to the container a reload gave it, not the one it had', async () => {
+  const view = await mount()
+  await view.tab(3)
+  await view.render({ ...tree, nodes: tree.nodes.map(n => (n.id === 'a1' ? { ...n, parentId: 'b' } : n)) })
+  await view.hide('a1')
+  expect(drawn.focused).toBe('b')
 })
 
 it('announces the focused node: its name, its style value and its context', async () => {
