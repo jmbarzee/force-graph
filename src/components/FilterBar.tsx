@@ -82,7 +82,7 @@ interface FilterBarBaseProps {
   /**
    * The bar's theme: a choice, or the resolved theme a pane hands it.
    * Default `system` — the nearest ancestor's `data-theme`, else the OS. The
-   * bar carries the scheme's variables and its `data-theme` on its own root,
+   * bar carries the scheme's variables and its `data-gv-theme` on its own root,
    * so its chips read their tints without a wrapper.
    */
   theme?: ThemeChoice
@@ -345,7 +345,7 @@ export function FilterBar({
   }
 
   return (
-    <div className={`gv-canvas-header${refreshing ? ' refresh-flash' : ''}`} ref={rootRef} data-theme={theme} style={schemeStyle}>
+    <div className={`gv-canvas-header${refreshing ? ' refresh-flash' : ''}`} ref={rootRef} data-gv-theme={theme} style={schemeStyle}>
       {axes.map(axis => {
         // An axis the taxonomy does not declare filters nothing and offers no
         // chips; it renders as its header, a note and the remove control, so

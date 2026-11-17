@@ -3,7 +3,7 @@
 // `systemTheme`, else the nearest ancestor that declares one with
 // `data-theme`, else `prefers-color-scheme`, the last two observed so a host
 // that switches mid-session is followed. The pane then carries the resolved
-// theme as its own `data-theme`, so its stylesheet tokens follow the same
+// theme as its own `data-gv-theme`, so its stylesheet tokens follow the same
 // answer the canvas draws with — one resolver, not two.
 
 import React from 'react'

@@ -1,4 +1,5 @@
 /* Graph control panel: panel chrome, force tabs, equations, sliders, switch, dual-range. */
+@layer gv {
 /* Graph Control Panel */
 .gv-graph-control-panel {
   position: absolute;
@@ -163,7 +164,7 @@
      the controls rather than floating text. */
   background: color-mix(in srgb, var(--gv-color-text-muted) 7%, transparent);
   border: 1px solid var(--gv-color-border);
-  border-radius: 6px;
+  border-radius: var(--gv-radius);
 }
 
 .gv-graph-control-equation-body {
@@ -420,6 +421,7 @@
   color: var(--gv-color-text);
   background: transparent;
   border: 1px solid var(--gv-color-border);
-  border-radius: 6px;
+  border-radius: var(--gv-radius);
   padding: 3px 8px;
+}
 }

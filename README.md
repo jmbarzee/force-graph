@@ -408,11 +408,38 @@ read, for a host's own chrome, and `themeChoiceOf(value)` reads a stored
 choice back (`system` for anything else). A server render knows neither
 ancestors nor OS, so a server-rendered pane paints light until it hydrates; a
 host that wants no flash resolves the theme on the server (a cookie, say) and
-passes `systemTheme`. Every
-token the components read is a `--gv-*` custom property declared in the
-stylesheet per theme (`--gv-color-bg`, `--gv-color-text`, `--gv-accent`,
-`--gv-font-sans`, …), and every class is `gv-*`; a host overrides a token by
-redeclaring it on an ancestor. Each style value's fill and border are
+passes `systemTheme`.
+
+The pane and the bar mark the theme they resolved as `data-gv-theme` on their
+own roots, and declare their tokens there, not on `:root`. Every rule in the
+stylesheet sits in `@layer gv`, so a host's unlayered rule wins whatever its
+specificity: a host restyles the pane by redeclaring a token on its root,
+through the `className` it passes or an ancestor, and in one theme only by
+naming its `data-gv-theme`:
+
+```css
+.my-pane { --gv-accent: #0f766e; }                          /* className="my-pane": both themes */
+.host [data-gv-theme="dark"] { --gv-color-surface: #111; }  /* an ancestor: dark only */
+```
+
+| Token | Role | Light | Dark |
+|---|---|---|---|
+| `--gv-color-surface` | Panels, the bar, tooltips | `#ffffff` | `#252526` |
+| `--gv-color-bg` | Canvas background | `#f8fafc` | `#1e1e1e` |
+| `--gv-color-text` | Text | `#1e293b` | `#d4d4d4` |
+| `--gv-color-text-muted` | Muted text | `#64748b` | `#9ca3af` |
+| `--gv-color-border` | Borders | `#e2e8f0` | `#3c3c3c` |
+| `--gv-accent` | Accent | `#8B7EC8` | `#A89BD8` |
+| `--gv-focus-ring-color` | Focus ring | `#4A90D9` | `#6CB0F0` |
+| `--gv-selection-ring-color` | Selected node's ring | `#ffffff` | `#ffffff` |
+| `--gv-color-graph-label` | Node labels | `#334155` | `#cbd5e1` |
+| `--gv-badge-fill` | Node badge fill | `#7C3AED` | `#7C3AED` |
+| `--gv-badge-text` | Node badge text | `#ffffff` | `#ffffff` |
+| `--gv-font-sans` | Sans font | `inherit` | `inherit` |
+| `--gv-font-mono` | Mono font | `inherit` | `inherit` |
+| `--gv-radius` | Corner radius | `6px` | `6px` |
+
+Every class is `gv-*`. Each style value's fill and border are
 published on the pane under the name `taxonomy.colorVar(value)` answers —
 `--gv-node-` and the value id in kebab case (a value id such as
 `teachingLab` → `--gv-node-teaching-lab`), or a numbered name when the id kebab-cases to

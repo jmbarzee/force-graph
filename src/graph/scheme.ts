@@ -131,7 +131,7 @@ export function withAlpha(color: string, alpha: number): string {
 /**
  * A stylesheet for a host's own CSS: every style value's fill and border on
  * `:root`, and the dark values that differ under `darkSelector` — by default
- * `[data-theme="dark"]`, the attribute the pane carries on its own root; a
+ * `[data-theme="dark"]`, the attribute the pane reads a host's theme from; a
  * host that marks its theme another way names its own selector. The pane
  * does not read this — it carries `schemeVars` inline — so a host that
  * styles nothing of its own by node value never needs it.

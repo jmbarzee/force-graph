@@ -989,7 +989,7 @@ export const GraphView = React.forwardRef<GraphViewHandle, GraphViewProps>(funct
     <div
       className={`gv-graph-view${className ? ` ${className}` : ''}`}
       ref={containerRef}
-      data-theme={theme}
+      data-gv-theme={theme}
       tabIndex={keyboard === 'pane' ? 0 : undefined}
       onKeyDown={keyboard === 'pane' ? paneKeyDown : undefined}
       style={{ ...schemeStyle, ...(toolbarHeight ? { ['--gv-toolbar-height' as string]: `${toolbarHeight}px` } : {}), ...style } as React.CSSProperties}
