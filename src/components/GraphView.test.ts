@@ -1,7 +1,8 @@
 // @vitest-environment jsdom
 import React, { act } from 'react'
 import { createRoot } from 'react-dom/client'
-import { beforeEach, describe, expect, it, vi } from 'vitest'
+import type { Root } from 'react-dom/client'
+import { afterEach, beforeEach, describe, expect, it, vi } from 'vitest'
 import { GraphView } from './GraphView'
 import type { Coloring, SetColoring } from '../graph/coloring'
 import type { GraphViewHandle, GroupsControl } from './GraphView'
@@ -36,6 +37,15 @@ vi.mock('../graph/simulation', async importOriginal => {
   return { ...actual, Simulation }
 })
 
+// Every root a test mounts, unmounted after it: a view left alive re-renders and rewrites `drawn`.
+const roots: Root[] = []
+function newRoot(el: HTMLElement): Root {
+  const root = createRoot(el)
+  roots.push(root)
+  return root
+}
+afterEach(() => act(() => { for (const root of roots.splice(0)) root.unmount() }))
+
 beforeEach(() => {
   ;(globalThis as { IS_REACT_ACT_ENVIRONMENT?: boolean }).IS_REACT_ACT_ENVIRONMENT = true
   window.matchMedia = () => ({ matches: false }) as MediaQueryList
@@ -56,7 +66,7 @@ async function mount(props: Partial<React.ComponentProps<typeof GraphView>>, sta
   const ref = React.createRef<GraphViewHandle>()
   const reported: FilterState[] = []
   const el = document.createElement('div')
-  const root = createRoot(el)
+  const root = newRoot(el)
   const render = (graph: Graph) => act(async () => {
     root.render(React.createElement(GraphView, { ref, graph, taxonomy, onFilterChange: next => reported.push(next), ...props }))
   })
@@ -143,7 +153,7 @@ it("runs a layout scalar's compute once per edit, for the panel, the overlay and
     scalars: [{ id: 'rank', compute: graph => { computed++; return new Map([...graph.nodes].map((n, i) => [n.id, i])) } }],
   })
   const tuningAt = (gravityY: number) => createTuning({ forces: { bandY: { scalar: 'rank' }, gravityY } }, counted)
-  const root = createRoot(document.createElement('div'))
+  const root = newRoot(document.createElement('div'))
   const render = (tuning: Tuning) => act(async () => {
     root.render(React.createElement(GraphView, { graph: first, taxonomy: counted, tuning, onTuningChange: () => {} }))
   })
@@ -163,7 +173,7 @@ const strokeOf = (id: string) => [...drawn.strokes].find(([edge]) => edge.id ===
 
 it('strokes an edge at the playhead by its series over the peak, and leaves the simulation be', async () => {
   const onPlayheadChange = vi.fn()
-  const root = createRoot(document.createElement('div'))
+  const root = newRoot(document.createElement('div'))
   const render = (playhead: number | null) => act(async () => {
     root.render(React.createElement(GraphView, { graph: played, taxonomy, playhead, onPlayheadChange }))
   })
@@ -234,7 +244,7 @@ describe('coloring.fill', () => {
   async function mountFilled(coloring?: { fill?: Coloring }) {
     let reported: readonly GraphDiagnostic[] = []
     const el = document.createElement('div')
-    const root = createRoot(el)
+    const root = newRoot(el)
     const render = (next?: { fill?: Coloring }) => act(async () => {
       root.render(React.createElement(GraphView, { graph, taxonomy: filled, coloring: next, onDiagnostics: d => { reported = d } }))
     })
@@ -260,7 +270,7 @@ describe('coloring.fill', () => {
   it('neither re-resolves nor re-reports a colouring equal to the last', async () => {
     const of = vi.fn((node: GraphNode) => node.values.team)
     const onDiagnostics = vi.fn()
-    const root = createRoot(document.createElement('div'))
+    const root = newRoot(document.createElement('div'))
     const render = () => act(async () => {
       root.render(React.createElement(GraphView, { graph, taxonomy: filled, coloring: { fill: { by: 'node', keys: [{ id: 'red', label: 'Red' }], of } }, onDiagnostics }))
     })
@@ -344,8 +354,9 @@ describe('edge hover', () => {
       await act(async () => { vi.advanceTimersByTime(150) })
       expect(onEdgeHover).toHaveBeenLastCalledWith(prerequisite)
 
+      // The null is timed from the pointer leaving, however long it keeps moving.
       await act(async () => drawn.hoverEdge(null))
-      await act(async () => { vi.advanceTimersByTime(149) })
+      await act(async () => { vi.advanceTimersByTime(100); drawn.hoverEdge(null); vi.advanceTimersByTime(49) })
       expect(onEdgeHover).toHaveBeenLastCalledWith(prerequisite)
       await act(async () => { vi.advanceTimersByTime(1) })
       expect(onEdgeHover).toHaveBeenLastCalledWith(null)

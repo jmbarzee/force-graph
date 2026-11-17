@@ -804,8 +804,6 @@ export const GraphView = React.forwardRef<GraphViewHandle, GraphViewProps>(funct
     requestFrame, tickFrame, releaseFrame, taxonomy,
   })
 
-  // Hover with a grace period, so the pointer can travel onto a hover box
-  // (the node's carries the host's button) without it vanishing.
   const { hover: handleHoverNode, hold: holdNodeHover } = useHoverGrace(setHoveredNodeId)
   // The edge under the pointer, anchored where the pointer met it; shown only
   // while no node is hovered and only while the edge is drawn.

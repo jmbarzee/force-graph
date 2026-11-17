@@ -212,14 +212,15 @@ function segmentOf(
 /** The edge under the pointer, and the screen point where the pointer is on it. */
 export interface EdgeHover { id: string; x: number; y: number }
 
-/** The edge whose stroke passes within `EDGE_HIT_PX` of a screen point, the nearest when several do. */
+/** The drawn edge whose stroke passes within `EDGE_HIT_PX` of a screen point, the nearest when several do; one stroked at alpha 0 is not drawn. */
 export function edgeAt(
   px: number, py: number, edges: readonly GraphEdge[], nodeMap: ReadonlyMap<string, Point>,
-  vp: Viewport, offsets: ReadonlyMap<string, number>,
+  vp: Viewport, offsets: ReadonlyMap<string, number>, strokes: ReadonlyMap<GraphEdge, EdgeStroke>,
 ): GraphEdge | null {
   let hit: GraphEdge | null = null
   let nearest = EDGE_HIT_PX
   for (const edge of edges) {
+    if (strokes.get(edge)?.alpha === 0) continue
     const src = nodeMap.get(edge.sourceId)
     const tgt = nodeMap.get(edge.targetId)
     if (!src || !tgt) continue
@@ -230,6 +231,12 @@ export function edgeAt(
     if (d <= nearest) { hit = edge; nearest = d }
   }
   return hit
+}
+
+/** The edges in drawing order, the hovered one last, so no other edge crosses it. */
+function hoveredLast(edges: GraphEdge[], id: string | null): GraphEdge[] {
+  const i = id === null ? -1 : edges.findIndex(e => e.id === id)
+  return i < 0 ? edges : [...edges.slice(0, i), ...edges.slice(i + 1), edges[i]]
 }
 
 // All data the draw function needs, stored in a ref to avoid effect teardown
@@ -397,9 +404,10 @@ export function GraphCanvas({
       onNodeDragStart(node.id, wx, wy)
     } else {
       dragState.current = { type: 'pan', startVp: { ...viewport }, sx, sy, moved: false }
+      onHoverEdge(null)
     }
     canvasRef.current?.setPointerCapture(e.pointerId)
-  }, [viewport, hitTest, onNodeDragStart])
+  }, [viewport, hitTest, onNodeDragStart, onHoverEdge])
 
   const handlePointerMove = React.useCallback((e: React.PointerEvent) => {
     const rect = e.currentTarget.getBoundingClientRect()
@@ -410,7 +418,7 @@ export function GraphCanvas({
       // Hover detection
       const node = hitTest(cx, cy)
       onHoverNode(node?.id ?? null)
-      const edge = node ? null : edgeAt(cx, cy, edges, nodeMap, viewport, edgeOffsets)
+      const edge = node ? null : edgeAt(cx, cy, edges, nodeMap, viewport, edgeOffsets, edgeStrokes)
       onHoverEdge(edge && { id: edge.id, x: cx, y: cy })
       return
     }
@@ -429,7 +437,7 @@ export function GraphCanvas({
       const [wx, wy] = screenToWorld(viewport, cx, cy)
       onNodeDragMove(wx, wy)
     }
-  }, [viewport, hitTest, onViewportChange, onNodeDragMove, onHoverNode, onHoverEdge, edges, nodeMap, edgeOffsets])
+  }, [viewport, hitTest, onViewportChange, onNodeDragMove, onHoverNode, onHoverEdge, edges, nodeMap, edgeOffsets, edgeStrokes])
 
   const handlePointerUp = React.useCallback((e: React.PointerEvent) => {
     const ds = dragState.current
@@ -567,7 +575,7 @@ export function GraphCanvas({
       }
 
       // Draw edges
-      for (const edge of d.edges) {
+      for (const edge of hoveredLast(d.edges, d.hoveredEdgeId)) {
         const src = d.nodeMap.get(edge.sourceId)
         const tgt = d.nodeMap.get(edge.targetId)
         if (!src || !tgt) continue

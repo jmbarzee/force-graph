@@ -428,13 +428,13 @@ the console. Everything else is optional.
 - **What to know.** The view's own filter re-seeds on a graph change for
   every axis the user has not touched — a controlled filter never does — and
   `onFilterChange` hears it. `onHover(null)` and `onEdgeHover(null)` arrive
-  150 ms after the pointer leaves, so a tooltip can be reached. A graduated
-  edge is handed as the host's edge it stands for; a derived containment
-  edge, as the derived edge, not an object of the host's. Removing an axis in the bar resets its
-  selection to "match everything" and fires `onFilterChange` before
-  `onAxesChange`; an axis the taxonomy does not declare renders as a header
-  with its remove control and filters nothing. Derived containment edges are
-  `in:<id>` (numbered on a collision) and reach `highlight` and `collapse`.
+  150 ms after the pointer leaves, so a tooltip can be reached; a graduated
+  edge is handed as the host's edge it stands for. Removing an axis in the
+  bar resets its selection to "match everything" and fires `onFilterChange`
+  before `onAxesChange`; an axis the taxonomy does not declare renders as a
+  header with its remove control and filters nothing. Derived containment
+  edges are `in:<id>` (numbered on a collision), not the host's objects, and
+  reach `highlight`, `collapse` and `onEdgeHover`.
   An error diagnostic drops the edge, or the later node of a duplicated id,
   or clears the `parentId`, it names. The pane's theme observer watches every
   `data-theme` in the document unless `systemTheme` is given.
