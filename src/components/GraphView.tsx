@@ -3,7 +3,7 @@
 
 import React from 'react'
 import './GraphView.css'
-import { nodesById, readableGraph, isContainment, unitWeight, withContainmentEdges } from '../graph/model'
+import { nodesById, readableGraph, isContainment, withContainmentEdges } from '../graph/model'
 import type { Graph, GraphEdge, GraphNode } from '../graph/model'
 import type { FilterState, AxisLocks } from '../filter/types'
 import { GROUPS, changedAxes, initialFilter, filterStatesEqual, hiddenMatchesOf, listEqual, locksEqual, reseedFilter, selectionFor, selects } from '../filter/types'
@@ -25,7 +25,7 @@ import type { ThemeChoice } from './graph-view/useTheme'
 import { axisOptions, layoutAxisOptions, pairTuning, sprungEdges } from '../graph/simulation'
 import { copyGroups, copyKeyOf } from '../graph/model'
 import type { NodeScaleParams } from '../graph/node-scale'
-import { CONTAINMENT_STROKE, NEUTRAL_STROKE } from '../graph/shapes'
+import { CONTAINMENT_STROKE, NEUTRAL_STROKE, weighted } from '../graph/shapes'
 import { defaultTuningFor, tuningsEqual, makeTuning, openTuning } from '../graph/tuning-internal'
 import type { Tuning } from '../graph/tuning'
 import { TaxonomyContext, useTaxonomy } from './graph-view/useTaxonomy'
@@ -583,8 +583,7 @@ export const GraphView = React.forwardRef<GraphViewHandle, GraphViewProps>(funct
     for (const edge of visibleEdges) {
       const type = edgeTypes.get(edge.id)
       const base = type !== undefined ? taxonomy.edgeStrokeFor(type) : isContainment(edge) ? CONTAINMENT_STROKE : NEUTRAL_STROKE
-      const w = unitWeight(edge)
-      strokes.set(edge, w ? { ...base, width: base.width * (1 + w) } : base)
+      strokes.set(edge, weighted(base, edge))
     }
     return strokes
   }, [visibleEdges, edgeTypes, taxonomy])

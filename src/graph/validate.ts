@@ -121,7 +121,7 @@ export function validateGraph(graph: Graph, taxonomy: Taxonomy): GraphDiagnostic
       containers.set(edge.sourceId, set)
     }
     if (edge.weight !== undefined && unitWeight(edge) !== edge.weight) {
-      out.push({ severity: 'warning', code: 'edge-weight-invalid', edgeId: edge.id, message: `edge ${JSON.stringify(edge.id)} has weight ${String(edge.weight)}, outside [0, 1]; the view clamps it, and draws one not finite as no weight` })
+      out.push({ severity: 'warning', code: 'edge-weight-invalid', edgeId: edge.id, message: `edge ${JSON.stringify(edge.id)} has weight ${String(edge.weight)}, which is not a weight in [0, 1]; the view clamps it, and draws one not finite as no weight` })
     }
     let typeId: string | undefined
     try {

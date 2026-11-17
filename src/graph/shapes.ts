@@ -12,6 +12,8 @@
 // the one into the other once, so the draw loop never asks "was this given?".
 
 import type { AxisId, AxisValue } from './axis'
+import type { GraphEdge } from './model'
+import { unitWeight } from './model'
 import type { EdgeStroke, ThemedColor } from './scheme'
 
 // ── Node styles ─────────────────────────────────────────────────────────────
@@ -232,6 +234,12 @@ export interface ResolvedEdgeType extends EdgeType {
 export const NEUTRAL_STROKE: EdgeStroke = { color: { light: '#94A3B8', dark: '#64748B' }, alpha: 0.7, dash: [], width: 1.2 }
 /** The stroke a containment type starts from, and the stroke of a containment edge no type claims: the same grey, faint and dashed. */
 export const CONTAINMENT_STROKE: EdgeStroke = { color: { light: '#94A3B8', dark: '#64748B' }, alpha: 0.35, dash: [3, 4], width: 1 }
+
+/** The stroke widened by the edge's weight, up to double; the same stroke when it has none. */
+export function weighted(stroke: EdgeStroke, edge: Pick<GraphEdge, 'weight'>): EdgeStroke {
+  const w = unitWeight(edge)
+  return w ? { ...stroke, width: stroke.width * (1 + w) } : stroke
+}
 
 /** The values at one end of an edge type, as a list: `every` declared value where the end is left out. */
 export function endpointValues(declared: AxisValue | readonly AxisValue[] | undefined, every: readonly AxisValue[]): readonly AxisValue[] {
