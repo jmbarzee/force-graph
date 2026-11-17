@@ -6,7 +6,7 @@
 //   ForceMap2D  — a 2D map of draggable tokens on shared axes, with a global
 //                 "scale all" slider on each axis. A token with a single
 //                 colour renders a solid dot (Push); two colours render a
-//                 split dot (Pull).
+//                 split dot (Pull). Chains join tokens by a faint line.
 //   ForceCurves — a boxed read-out plot that renders pre-computed polylines
 //                 (per item), an optional baseline, and per-item vertical
 //                 markers, with one global `exp` slider beneath.
@@ -65,14 +65,18 @@ export interface MapToken {
   // Solid outline (dependency) vs dashed outline (containment), mirroring the
   // canvas edge styling. For Push every token is solid.
   outline: 'solid' | 'dashed'
+  // A second ring: the token stands for several (a collapsed ladder).
+  stacked?: boolean
   label: string
   tooltip?: string
 }
 
 export function ForceMap2D({
-  tokens, xAxis, yAxis, onDrag, hoveredId, onHover, xSlider, ySlider, ariaLabel,
+  tokens, chains = [], xAxis, yAxis, onDrag, hoveredId, onHover, xSlider, ySlider, ariaLabel,
 }: {
   tokens: MapToken[]
+  // Token ids to join by a faint polyline under the tokens, one list per chain.
+  chains?: readonly (readonly string[])[]
   xAxis: AxisSpec
   yAxis: AxisSpec
   onDrag: (id: string, x: number, y: number) => void
@@ -139,6 +143,7 @@ export function ForceMap2D({
   // chosen axis — is still a set of tokens a pointer can tell apart. Only the
   // drawn position moves; a drag still writes the token's own value.
   const placed = spreadCoincident(tokens.map(t => ({ cx: xForVal(t.x), cy: yForVal(t.y) })))
+  const placedById = new Map(tokens.map((t, i) => [t.id, placed[i]]))
 
   return (
     <Plot
@@ -182,6 +187,13 @@ export function ForceMap2D({
         {hGrid.map(y => (
           <line key={`gy${y}`} x1={0} y1={y} x2={MAP_W} y2={y} className="gv-spring-grid" />
         ))}
+        {chains.map(chain => (
+          <polyline
+            key={chain.join(' ')}
+            points={chain.flatMap(id => placedById.get(id) ?? []).map(p => `${p.cx.toFixed(1)},${p.cy.toFixed(1)}`).join(' ')}
+            className="gv-spring-chain"
+          />
+        ))}
 
         {tokens.map((token, i) => {
           const { cx, cy } = placed[i]
@@ -213,6 +225,7 @@ export function ForceMap2D({
                 className="gv-spring-token-outline"
                 strokeDasharray={token.outline === 'dashed' ? '2 2' : undefined}
               />
+              {token.stacked && <circle r={TOKEN_R + 2.5} fill="none" className="gv-spring-token-outline" />}
               <text y={TOKEN_R + 11} textAnchor="middle" className="gv-spring-token-label">{token.label}</text>
             </g>
           )

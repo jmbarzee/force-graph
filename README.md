@@ -99,6 +99,7 @@ never by spreading the built object.
   | `physics.band.x` | 0 to 380 (`BAND_FRAME.x`) |
   | `whenHidden` | `'ascend'`: a dependency edge touching a hidden node re-points to its nearest visible ancestor; `'splice'` follows the node's own edges through |
   | `summaryKind` | `'degree'` (`→3 ←2` in the hover box); `'children'` counts what the node contains; `'none'` shows neither |
+  | `ladder` | none: the value is a rung of no ladder |
 
   `fallbackStyle` draws a value nobody declared; `styleLabel` names the axis
   in the controls.
@@ -541,10 +542,7 @@ What is not built is filed as issues:
   when the filter hides every node
   ([#6](https://github.com/jmbarzee/force-graph/issues/6)).
 - **The control panel** — named presets
-  ([#29](https://github.com/jmbarzee/force-graph/issues/29)), grouping a ladder
-  of values and the Misc tab's read-outs
-  ([#31](https://github.com/jmbarzee/force-graph/issues/31)), a force tab with
-  nothing visible ([#4](https://github.com/jmbarzee/force-graph/issues/4)).
+  ([#29](https://github.com/jmbarzee/force-graph/issues/29)).
 - **The package** — the pane's strings in other languages
   ([#13](https://github.com/jmbarzee/force-graph/issues/13)), the React 19
   types gate ([#14](https://github.com/jmbarzee/force-graph/issues/14)).

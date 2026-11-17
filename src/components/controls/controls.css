@@ -90,4 +90,26 @@
 .gv-ctl-curve-line { fill: none; stroke: var(--gv-accent); stroke-width: 2; }
 .gv-ctl-curve-mark { stroke: var(--gv-color-text-muted); stroke-width: 1; stroke-dasharray: 2 2; opacity: 0.6; }
 .gv-ctl-curve-mark-label { font-family: var(--gv-font-mono); font-size: 10px; fill: var(--gv-color-text-muted); }
+
+/* Ladders: a faint backdrop behind a ladder's columns, and a row of toggles
+   under the plot, one per drawn ladder, pressed while collapsed. */
+.gv-ctl-ladder-backdrop { fill: var(--gv-color-text-muted); opacity: 0.08; }
+.gv-ctl-ladder-label { font-size: 10px; fill: var(--gv-color-text-muted); }
+.gv-ctl-ladder-toggles { display: flex; flex-wrap: wrap; gap: 4px; justify-content: center; margin-top: 4px; }
+.gv-ctl-ladder-toggle {
+  padding: 1px 8px;
+  font: inherit;
+  font-size: 11px;
+  color: var(--gv-color-text-muted);
+  background: transparent;
+  border: 1px solid var(--gv-color-border);
+  border-radius: 10px;
+  cursor: pointer;
+}
+.gv-ctl-ladder-toggle:hover { color: var(--gv-accent); }
+.gv-ctl-ladder-toggle[aria-pressed="true"] {
+  color: var(--gv-accent);
+  background: color-mix(in srgb, var(--gv-accent) var(--gv-accent-tint-active), transparent);
+  border-color: color-mix(in srgb, var(--gv-accent) var(--gv-accent-tint-ring), transparent);
+}
 }

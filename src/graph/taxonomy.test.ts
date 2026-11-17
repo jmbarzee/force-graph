@@ -72,3 +72,10 @@ describe('filterAxes', () => {
     expect(() => createTaxonomy({ styleAxis: 'kind', styles, filterAxes: [{ id: '@groups', emptyMeans: 'none' }] })).toThrow(/"@groups" is the group filter's entry/)
   })
 })
+
+describe('createTaxonomy', () => {
+  it('refuses a ladder id that is empty or a value’s', () => {
+    expect(() => createTaxonomy({ styleAxis: 'kind', styles: [{ ...style('service'), ladder: '' }] })).toThrow(/styles\.service\.ladder is empty/)
+    expect(() => createTaxonomy({ styleAxis: 'kind', styles: [{ ...style('service'), ladder: 'queue' }, style('queue')] })).toThrow(/styles\.service\.ladder is "queue", a style value's id/)
+  })
+})

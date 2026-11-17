@@ -33,6 +33,7 @@ export const VALUES: readonly NodeStyle[] = [
     color: { light: { fill: '#334155', border: '#0F172A' }, dark: { fill: '#94A3B8', border: '#475569' } },
     size: { r: 22, iconSize: 18 },
     summaryKind: 'children',
+    ladder: 'organisation',
   },
   {
     id: 'department',
@@ -42,6 +43,7 @@ export const VALUES: readonly NodeStyle[] = [
     color: { light: { fill: '#0F766E', border: '#134E4A' }, dark: { fill: '#2DD4BF', border: '#0F766E' } },
     size: { r: 16, iconSize: 14 },
     summaryKind: 'children',
+    ladder: 'organisation',
   },
   {
     id: 'course',
@@ -50,6 +52,7 @@ export const VALUES: readonly NodeStyle[] = [
     abbreviation: 'Co',
     color: { light: { fill: '#B45309', border: '#78350F' }, dark: { fill: '#F59E0B', border: '#B45309' } },
     size: { r: 10, iconSize: 11 },
+    ladder: 'teaching',
   },
   {
     id: 'lab',
@@ -58,6 +61,7 @@ export const VALUES: readonly NodeStyle[] = [
     abbreviation: 'Lb',
     color: { light: { fill: '#BE185D', border: '#831843' }, dark: { fill: '#F472B6', border: '#BE185D' } },
     size: { r: 7, iconSize: 9 },
+    ladder: 'teaching',
   },
 ]
 
