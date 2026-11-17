@@ -1,7 +1,9 @@
 import { describe, expect, it, vi } from 'vitest'
-import { fillOf, pairFor, resolveColoring } from './coloring'
+import { coloringsEqual, fillOf, glowOf, pairFor, resolveColoring } from './coloring'
 import type { Coloring, SetColoring } from './coloring'
-import type { GraphNode } from './model'
+import { groupSlotsOf } from './groups'
+import type { NodeGroup } from './groups'
+import type { GraphEdge, GraphNode } from './model'
 import { PALETTE, pairOf } from './scheme'
 import type { NodeStyle } from './shapes'
 import { createTaxonomy } from './taxonomy'
@@ -94,6 +96,42 @@ describe('resolveColoring by groups', () => {
     expect(derived.of.get('b')).toEqual(['x', 'y'])
     const listed = resolveColoring({ by: 'groups' }, { nodes, edges: [] }, taxonomy, [{ id: 'x', nodeIds: new Set(['a']) }])
     expect(listed.keys.get('x')!.label).toBe('x')
+  })
+
+  it('leaves the groups’ own warnings to nodeGroupsOf', () => {
+    expect(resolveColoring({ by: 'groups' }, { nodes, edges: [] }, taxonomy, [{ id: 'x', nodeIds: new Set(['a']), color: 'nope' }]).diagnostics).toEqual([])
+  })
+})
+
+describe('glowOf', () => {
+  it('follows the groups when absent, each in its groupSlotsOf slot and carrying its weight', () => {
+    const groups: NodeGroup[] = Array.from({ length: 11 }, (_, i) => ({ id: `g${i}`, nodeIds: new Set([`n${i}`]), weight: i / 10 }))
+    const edges: GraphEdge[] = [{ id: 'e', sourceId: 'n0', targetId: 'n10' }]
+    const { sources } = glowOf(undefined, { nodes: groups.map(g => node([...g.nodeIds][0]!, {})), edges }, taxonomy, groups)
+    const slots = groupSlotsOf(groups, edges)
+    expect(slots[10]).toBe(1)
+    expect(sources.map(s => [s.id, [...s.nodeIds], s.color, s.weight])).toEqual(groups.map((g, i) => [g.id, [...g.nodeIds], PALETTE[slots[i]!], g.weight]))
+  })
+
+  it('glows each axis value’s nodes as one source, in its slot', () => {
+    const { sources } = glowOf({ by: 'axis', axis: 'team' }, { nodes, edges: [] }, taxonomy, [])
+    expect(sources.map(s => [s.id, [...s.nodeIds], s.color])).toEqual([['blue', ['b'], PALETTE[0]], ['green', ['c'], PALETTE[1]], ['red', ['a'], PALETTE[2]]])
+  })
+
+  it('glows each node key’s nodes as one source, with its weight, and reports what resolving reports', () => {
+    const { sources, diagnostics } = glowOf({ by: 'node', keys: [{ id: 'service', label: 'Service', weight: 0.5 }], of: n => n.values.kind }, { nodes, edges: [] }, taxonomy, [])
+    expect(sources.map(s => [s.id, [...s.nodeIds], s.weight])).toEqual([['service', ['b', 'c'], 0.5]])
+    expect(diagnostics.map(d => d.code)).toEqual(['key-undeclared'])
+  })
+})
+
+describe('coloringsEqual', () => {
+  it('holds the groups equal, and keys apart by weight', () => {
+    expect(coloringsEqual({ by: 'groups' }, { by: 'groups' })).toBe(true)
+    expect(coloringsEqual({ by: 'groups' }, { by: 'axis', axis: 'team' })).toBe(false)
+    const keyed = (weight: number): Coloring => ({ by: 'axis', axis: 'team', keys: [{ id: 'red', label: 'Red', weight }] })
+    expect(coloringsEqual(keyed(0.5), keyed(0.5))).toBe(true)
+    expect(coloringsEqual(keyed(0.5), keyed(1))).toBe(false)
   })
 })
 

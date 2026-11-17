@@ -1,7 +1,7 @@
 import { valuesOn } from './axis'
 import type { AxisId, AxisValue } from './axis'
-import { checkedKey, groupsByNode, nodeGroupsOf } from './groups'
-import type { Groups, LegendKey } from './groups'
+import { checkedKey, groupSlotsOf, groupsByNode, nodeGroupsOf } from './groups'
+import type { GlowSource, Groups, LegendKey } from './groups'
 import type { Graph, GraphNode } from './model'
 import { cssSuffix, hueOf, pairOf } from './scheme'
 import type { ThemedColor, ThemedHue } from './scheme'
@@ -18,8 +18,8 @@ export type SetColoring = Coloring | { by: 'groups' }
 
 /** A colouring over one graph. */
 export interface ResolvedColoring {
-  /** Every key, in slot order, with its legend label and hue. */
-  keys: ReadonlyMap<string, { label: string; hue: ThemedHue }>
+  /** Every key, in slot order, with its legend label, hue and glow weight. */
+  keys: ReadonlyMap<string, { label: string; hue: ThemedHue; weight?: number }>
   /** Every node's keys, by node id; a keyless node's is empty. */
   of: ReadonlyMap<string, readonly string[]>
   /** `key-color-invalid` once per key, `key-undeclared` once per answered key no key declares. */
@@ -32,22 +32,25 @@ const NONE: readonly string[] = Object.freeze([])
  * Each node's keys and each key's hue. Declared keys win; an axis without
  * them takes its values across the graph in its chips' order, or the style
  * axis's declared order and fills. A key with no colour takes the palette
- * slot of its place among the keys, so a filter recolours nothing.
+ * slot of its place among the keys, so a filter recolours nothing; a group,
+ * its `groupSlotsOf` slot. The groups' own warnings are `nodeGroupsOf`'s to report.
  */
 export function resolveColoring(coloring: SetColoring, graph: Graph, taxonomy: Taxonomy, groups: Groups): ResolvedColoring {
   const diagnostics: GraphDiagnostic[] = []
-  const keys = new Map<string, { label: string; hue: ThemedHue }>()
+  const keys = new Map<string, { label: string; hue: ThemedHue; weight?: number }>()
   const of = new Map<string, readonly string[]>()
   const declare = (list: readonly LegendKey[]) => {
-    for (const k of list) if (!keys.has(k.id)) keys.set(k.id, { label: k.label, hue: hueOf(checkedKey(k, diagnostics).color, keys.size) })
+    for (const k of list) if (!keys.has(k.id)) keys.set(k.id, { label: k.label, hue: hueOf(checkedKey(k, diagnostics).color, keys.size), weight: k.weight })
   }
 
   if (coloring.by === 'groups') {
-    const listed = nodeGroupsOf(groups, graph.nodes)
-    diagnostics.push(...listed.diagnostics)
+    const listed = nodeGroupsOf(groups, graph.nodes).groups
+    const slots = groupSlotsOf(listed, graph.edges)
     const labels = new Map('of' in groups ? groups.keys.map(k => [k.id, k.label]) : [])
-    declare(listed.groups.map(g => ({ id: g.id, label: labels.get(g.id) ?? g.id, color: g.color })))
-    const byNode = groupsByNode(listed.groups)
+    listed.forEach((g, i) => {
+      if (!keys.has(g.id)) keys.set(g.id, { label: labels.get(g.id) ?? g.id, hue: hueOf(g.color, slots[i]), weight: g.weight })
+    })
+    const byNode = groupsByNode(listed)
     for (const node of graph.nodes) of.set(node.id, byNode.get(node.id) ?? NONE)
     return { keys, of, diagnostics }
   }
@@ -89,15 +92,17 @@ export function resolveColoring(coloring: SetColoring, graph: Graph, taxonomy: T
   return { keys, of, diagnostics }
 }
 
-/** Whether two colourings say the same: `by`, `axis`, `keys` by id, label and colour, and `of` by identity. */
-export function coloringsEqual(a: Coloring | undefined, b: Coloring | undefined): boolean {
+/** Whether two colourings say the same: `by`, `axis`, `keys` by id, label, colour and weight, and `of` by identity. */
+export function coloringsEqual(a: SetColoring | undefined, b: SetColoring | undefined): boolean {
   if (a === b) return true
-  if (!a || !b || a.by !== b.by || !keysEqual(a.keys, b.keys)) return false
+  if (!a || !b || a.by !== b.by) return false
+  if (a.by === 'groups') return true
+  if (!keysEqual(a.keys, (b as Coloring).keys)) return false
   return a.by === 'axis' ? a.axis === (b as typeof a).axis : a.of === (b as typeof a).of
 }
 
 const keysEqual = (a: readonly LegendKey[] | undefined, b: readonly LegendKey[] | undefined): boolean =>
-  a === b || (!!a && !!b && a.length === b.length && a.every((k, i) => k.id === b[i].id && k.label === b[i].label && colorsEqual(k.color, b[i].color)))
+  a === b || (!!a && !!b && a.length === b.length && a.every((k, i) => k.id === b[i].id && k.label === b[i].label && colorsEqual(k.color, b[i].color) && k.weight === b[i].weight))
 
 const colorsEqual = (a: LegendKey['color'], b: LegendKey['color']): boolean =>
   a === b || (typeof a === 'object' && typeof b === 'object' && a.light === b.light && a.dark === b.dark)
@@ -162,4 +167,16 @@ function cssVarsFor(keys: readonly string[]): Map<string, string> {
 export function pairFor(fill: Fill, id: string, fallback: ThemedColor): ThemedColor {
   const key = fill.of.get(id)
   return (key !== undefined && fill.keys.get(key)?.color) || fallback
+}
+
+/**
+ * What the glow follows: one source per key of a set colouring, its members
+ * the nodes holding the key, coloured by the key's hue and swelling by its
+ * weight. Absent, the colouring is the groups.
+ */
+export function glowOf(coloring: SetColoring = { by: 'groups' }, graph: Graph, taxonomy: Taxonomy, groups: Groups): { sources: readonly GlowSource[]; diagnostics: readonly GraphDiagnostic[] } {
+  const { keys, of, diagnostics } = resolveColoring(coloring, graph, taxonomy, groups)
+  const members = new Map([...keys.keys()].map(k => [k, new Set<string>()]))
+  for (const [id, held] of of) for (const k of held) members.get(k)!.add(id)
+  return { sources: [...keys].map(([id, { hue, weight }]) => ({ id, nodeIds: members.get(id)!, color: hue, weight })), diagnostics }
 }

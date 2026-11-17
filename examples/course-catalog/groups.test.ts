@@ -1,12 +1,15 @@
 import { describe, expect, it } from 'vitest'
-import { activeGroupsOf, groupSlotsOf, nodeGroupsOf } from '../../src/graph/groups'
+import { glowOf } from '../../src/graph/coloring'
+import { activeGroupsOf, nodeGroupsOf } from '../../src/graph/groups'
 import { catalog } from './data'
 import { buildGraph, programmeGroups } from './graph'
+import { CAMPUS, taxonomy } from './taxonomy'
 
 const graph = buildGraph(catalog)
-const { groups, diagnostics } = nodeGroupsOf(programmeGroups(catalog), graph.nodes)
-const slots = groupSlotsOf(groups, graph.edges)
-const colours = (visible: ReadonlySet<string>) => new Map(activeGroupsOf(groups, slots, visible).map(g => [g.id, g.color]))
+const programmes = programmeGroups(catalog)
+const { groups, diagnostics } = nodeGroupsOf(programmes, graph.nodes)
+const { sources } = glowOf(undefined, graph, taxonomy, programmes)
+const colours = (visible: ReadonlySet<string>) => new Map(activeGroupsOf(sources, visible).map(g => [g.id, g.color]))
 
 describe('programme groups', () => {
   it('derive every programme from the payload, each with members', () => {
@@ -33,5 +36,13 @@ describe('programme groups', () => {
         }
       }
     }
+  })
+})
+
+describe('glow by campus', () => {
+  it('glows each campus as one set, and no programme', () => {
+    const byCampus = glowOf({ by: 'axis', axis: CAMPUS }, graph, taxonomy, programmes).sources
+    expect(byCampus.map(s => s.id).sort()).toEqual([...new Set(graph.nodes.flatMap(n => n.values[CAMPUS] ?? []))].sort())
+    for (const s of byCampus) for (const id of s.nodeIds) expect(graph.nodes.find(n => n.id === id)!.values[CAMPUS]).toBe(s.id)
   })
 })

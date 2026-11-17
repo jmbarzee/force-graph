@@ -9,7 +9,7 @@
 
 import type { GraphEdge, GraphNode } from './model'
 import type { Theme, ThemedHue } from './scheme'
-import { hueOf, isSchemeColor, PALETTE } from './scheme'
+import { isSchemeColor, PALETTE } from './scheme'
 import type { GraphDiagnostic } from './validate'
 
 // Glow intensity multiplier for the group its control emphasises (hovered in
@@ -37,6 +37,9 @@ export interface NodeGroup {
   /** 0..1: how far the glow's halo and corridor swell; absent, they do not. */
   weight?: number
 }
+
+/** A group the glow draws, its colour settled for both themes. */
+export type GlowSource = NodeGroup & { color: ThemedHue }
 
 /** One key of a set-shaped channel, in the order its palette slots follow. */
 export interface LegendKey {
@@ -176,18 +179,18 @@ export interface GlowGroup extends ActiveGroup {
 
 /**
  * The groups as drawn: the ones `shown`, each restricted to the visible set
- * (filter-as-source-of-truth), the empty dropped, each coloured by its slot
- * in the theme's palette — so hiding one group recolours none of the others.
+ * (filter-as-source-of-truth), the empty dropped, each in its colour for the
+ * theme — so hiding one group recolours none of the others.
  */
-export function activeGroupsOf(groups: readonly NodeGroup[], slots: readonly number[], visibleIds: ReadonlySet<string>, shown: (id: string) => boolean = () => true, theme: Theme = 'dark', emphasized: string | null = null): GlowGroup[] {
+export function activeGroupsOf(groups: readonly GlowSource[], visibleIds: ReadonlySet<string>, shown: (id: string) => boolean = () => true, theme: Theme = 'dark', emphasized: string | null = null): GlowGroup[] {
   const out: GlowGroup[] = []
-  groups.forEach((g, i) => {
-    if (!shown(g.id)) return
+  for (const g of groups) {
+    if (!shown(g.id)) continue
     const nodeIds = new Set<string>()
     for (const id of g.nodeIds) if (visibleIds.has(id)) nodeIds.add(id)
-    if (nodeIds.size === 0) return
-    out.push({ id: g.id, strength: g.id === emphasized ? HOVER_STRENGTH : 1, nodeIds, color: hueOf(g.color, slots[i])[theme], weight: g.weight })
-  })
+    if (nodeIds.size === 0) continue
+    out.push({ id: g.id, strength: g.id === emphasized ? HOVER_STRENGTH : 1, nodeIds, color: g.color[theme], weight: g.weight })
+  }
   return out
 }
 

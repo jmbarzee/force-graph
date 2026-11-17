@@ -3,8 +3,8 @@ import React, { act } from 'react'
 import { createRoot } from 'react-dom/client'
 import { beforeEach, describe, expect, it, vi } from 'vitest'
 import { GraphView } from './GraphView'
-import type { Coloring } from '../graph/coloring'
-import type { GraphViewHandle } from './GraphView'
+import type { Coloring, SetColoring } from '../graph/coloring'
+import type { GraphViewHandle, GroupsControl } from './GraphView'
 import { createTaxonomy } from '../graph/taxonomy'
 import { createTuning } from '../graph/tuning'
 import type { Tuning } from '../graph/tuning'
@@ -269,6 +269,35 @@ describe('coloring.fill', () => {
     const view = await mountFilled(byTeam)
     await view.render({ ...byTeam })
     expect(view.reported().filter(d => d.code === 'tint-undeclared')).toHaveLength(1)
+  })
+})
+
+describe('coloring.glow', () => {
+  /** Mount a view over `groups`, re-rendered with each glow, and what its control was last handed. */
+  async function mountGlow(glow?: SetColoring) {
+    let last: [readonly ActiveGroup[], GroupsControl] | undefined
+    const root = createRoot(document.createElement('div'))
+    const render = (next?: SetColoring) => act(async () => {
+      root.render(React.createElement(GraphView, { graph: first, taxonomy, groups, coloring: { glow: next }, groupsControl: (...args) => { last = args; return null } }))
+    })
+    await render(glow)
+    return { render, last: () => last! }
+  }
+
+  it('follows the groups when absent, and repaints a new glow without rebuilding the simulation', async () => {
+    const view = await mountGlow()
+    expect(view.last()[0].map(g => g.id)).toEqual(['red', 'blue'])
+    expect(view.last()[1].toggle).toBeDefined()
+    const built = drawn.simulations.length
+    await view.render({ by: 'axis', axis: 'team' })
+    expect(view.last()[0].map(g => [g.id, [...g.nodeIds]])).toEqual([['a', ['n0']], ['b', ['n1']]])
+    expect(drawn.simulations.length).toBe(built)
+  })
+
+  it('shows every key and toggles none while the glow follows another colouring', async () => {
+    const [, control] = (await mountGlow({ by: 'axis', axis: 'team' })).last()
+    expect(control.shown('a')).toBe(true)
+    expect(control.toggle).toBeUndefined()
   })
 })
 
