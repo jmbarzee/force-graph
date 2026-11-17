@@ -69,8 +69,9 @@ it('drags a node on a Ctrl+drag that starts on it', async () => {
 
 it('selects nothing when a lasso or a node drag is cancelled', async () => {
   await fire('pointerdown', 50, 50, true)
-  await fire('pointermove', 150, 150, true)
-  await fire('pointercancel', 150, 150, true)
+  for (const [x, y] of [[150, 50], [150, 150], [50, 150]] as const) await fire('pointermove', x, y, true)
+  await fire('pointercancel', 50, 150, true)
+  await fire('pointerup', 50, 150, true)
   await fire('pointerdown', 100, 100)
   await fire('pointercancel', 100, 100)
   await fire('pointerup', 100, 100)

@@ -304,9 +304,10 @@ view's own selection drops them.
 
 ## Copies
 
-When a hovered or selected node has sister copies — nodes sharing its `copyKey` — every
-visible one wears a halo in its own colour. A sister is not added to the
-highlight: one off the chain dims with the rest, and the halo marks it.
+When a hovered or selected node has sister copies — nodes sharing its
+`copyKey` — every visible one wears a halo in its own colour. A sister is not
+added to the highlight: one off the chain dims with the rest, and the halo
+marks it.
 Hovering one listing of a cross-listed course (Biochemistry, CHEM 310 and
 BIOL 310) halos every listing.
 
@@ -328,8 +329,9 @@ group joined to it by an edge holds — so touching groups differ in hue while
 the palette has a slot free, and hiding one group recolours no other. A
 group's `weight` (0..1) swells its halo and corridor, up to double; hue and
 brightness stay. A focused group — the one `emphasize` names, or the one
-holding a hovered or selected node — brightens and swells. In the catalog each degree
-programme is a group, and its legend's checkboxes write the group filter.
+holding a hovered or selected node — brightens and swells. In the catalog
+each degree programme is a group, and its legend's checkboxes write the group
+filter.
 
 ## Appearance
 
