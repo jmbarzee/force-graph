@@ -138,9 +138,7 @@ never by spreading the built object.
   elsewhere, first encounter alone), `labelFor`,
   `abbreviationFor`, `iconFor` and `tooltipFor` name and adorn values
   (defaults: the style's names and icon on the style axis, the value itself
-  and no icon elsewhere, the abbreviation from the label, no tooltip;
-  `labelFor` is the static fallback for names the view's
-  [`labels`](#the-view) give),
+  and no icon elsewhere, the abbreviation from the label, no tooltip),
   `initialSelection(values)` is the first open's selection (default every
   value on an allow-list, none on a narrowing axis), `presentation` is
   `'chip'` or `'tag'`.
@@ -295,11 +293,12 @@ the console. Everything else is optional.
   <GraphView graph={graph} taxonomy={taxonomy} defaultFilter={saved} />
   ```
 - **Labels.** `labels` names values per axis, beside the graph, for names
-  that arrive with the data: a chip, a control's bucket and its abbreviation,
-  and a search result's style read a value's label from `labels`, then from
-  the descriptor's `labelFor`, then the value. The value stays the filter's key, the chip's identity and
-  what `filterToJSON` writes, so two values sharing a name stay two chips.
-  Keep one object until a name changes.
+  that arrive with the data: a chip, a control's bucket (and, off the style
+  axis, its abbreviation), and a search result's style read a value's label
+  from `labels`, then from the descriptor's `labelFor`, then the value. The
+  value stays the filter's key, the chip's identity and what `filterToJSON`
+  writes, so two values sharing a name stay two chips. Keep one object until
+  a name changes.
 
   ```tsx
   const labels = { login: { ada: 'Ada Lovelace', gh: 'Grace Hopper' } }
