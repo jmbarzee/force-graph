@@ -4,15 +4,15 @@
 // it in each, so the views' toolbars stay in lockstep.
 //
 // How an axis's chips look is the descriptor's `presentation`; the bar names
-// no axis. A view-specific adornment on the search control (a match counter,
-// a hidden-match badge) comes in as `searchExtra`.
+// no axis. Given its records and how one matches, the bar badges the search
+// matches its filter hides; a pane that computes its own passes them in.
 
 import { TaxonomyContext } from './graph-view/useTaxonomy'
-import type { AxisId, AxisValue } from '../graph/axis'
+import type { AxisId, AxisValue, AxisValues } from '../graph/axis'
 import { countsOn, valuesOn } from '../graph/axis'
 import type { Graph } from '../graph/model'
 import type { Taxonomy } from '../graph/taxonomy'
-import { useControllable, useStable } from './graph-view/useControllable'
+import { useControllable, useLatest, useStable } from './graph-view/useControllable'
 import { useTheme } from './graph-view/useTheme'
 import type { ThemeChoice } from './graph-view/useTheme'
 import { scopeStyle } from '../styles/tokens'
@@ -32,7 +32,9 @@ function tintOf(chipId: string, tint: AxisValue, taxonomy: Taxonomy, said: Set<s
   }
   return tint
 }
-import { selectionFor } from '../filter/types'
+import { hiddenMatchesOf, passesSelection, selectionFor } from '../filter/types'
+import { NO_OVERRIDES } from '../filter/linked'
+import type { LinkedViewState } from '../filter/linked'
 import React from 'react'
 import './FilterBar.css'
 import type { ResolvedAxisDescriptor } from '../graph/axis'
@@ -67,7 +69,7 @@ export interface FilterBarChrome {
  * here, so a host's second view renders the same bar without rebuilding the
  * pane's internals.
  */
-export type FilterBarProps = FilterBarBaseProps & (
+export type FilterBarProps<R extends SearchRecord = SearchRecord> = FilterBarBaseProps<R> & (
   | {
       /** Values available per axis — the one source every axis's chips are built from; an axis with no entry renders an empty, disabled section rather than vanishing. */
       values: ReadonlyMap<string, readonly string[]>
@@ -80,7 +82,10 @@ export type FilterBarProps = FilterBarBaseProps & (
     }
 )
 
-interface FilterBarBaseProps {
+/** A record the bar's search runs over: its id, and its values per axis. */
+type SearchRecord = { id: string; values?: AxisValues }
+
+interface FilterBarBaseProps<R extends SearchRecord> {
   /** The taxonomy, when not supplied through `TaxonomyContext`. */
   taxonomy?: Taxonomy
   /** Which controls are offered. Default: the search; the lock toggles when the host controls `locks` with `onLocksChange`. */
@@ -104,20 +109,25 @@ interface FilterBarBaseProps {
   /** Which axes are locked. Controlling it with `onLocksChange` shows the lock toggles; a value without its callback is read-only and shows none unless `chrome.locks` asks. */
   locks?: AxisLocks
   onLocksChange?: (next: AxisLocks) => void
-  /** Axes a focus just overrode the lock of. The bar flashes them once, for 600 ms, whenever the value changes; the host need not clear it. */
-  overriddenLocks?: ReadonlySet<AxisId>
+  /** Axes a focus just overrode the lock of. The bar flashes them once, for 600 ms, whenever `key` changes; the host need not clear it. */
+  overriddenLocks?: LinkedViewState['overriddenLocks']
   /** The values that just turned on, per axis — drives the chip flash. Default: tracked here from the filter's changes. */
   recentlyChanged?: RecentlyChanged
   /** The search control. Default: the bar's own, closed and empty. */
   search?: SearchState
   onSearchChange?: (next: SearchState) => void
-  /** The search input, for a host that focuses it from its own shortcut. */
+  /** The search input, for a host that focuses it from its own shortcut. Absent, a shown bar binds `/` to it while focus is not in an editable field. */
   searchInputRef?: React.RefObject<HTMLInputElement>
+  /** Default: "Search", with the key when the bar binds `/`. */
   searchTitle?: string
   searchPlaceholder?: string
-  /** View-specific search adornment rendered inside the search control. */
+  /** Every record the view holds, shown or hidden: with `matches`, the bar badges each chip with the matches it hides and the search with their total. */
+  records?: readonly R[]
+  /** Whether a record matches the search's query. */
+  matches?: (record: R, query: string) => boolean
+  /** Search adornment rendered inside the search control. Default: the "+N" of the matches `records` hides. */
   searchExtra?: React.ReactNode
-  /** Search matches hidden by a chip, per axis and value — the badge the chip hiding them wears. Optional. */
+  /** Search matches hidden by a chip, per axis and value — the badge the chip hiding them wears. Default: read off `records`. */
   hiddenMatches?: ReadonlyMap<string, ReadonlyMap<string, number>>
   /** The axes shown, in order; may be empty. Default: every declared axis, editable in place. */
   axes?: readonly string[]
@@ -127,6 +137,21 @@ interface FilterBarBaseProps {
   findings?: React.ReactNode
   /** Flash the whole bar once whenever this value changes to something truthy — a counter a host bumps when its data reloads. */
   refreshFlash?: boolean | number
+}
+
+/** The "+N" a search wears for the matches its filter hides; nothing for none. */
+export function hiddenMatchBadge(count: number): React.ReactNode {
+  return count > 0 ? (
+    <span className="gv-header-search-badge" title={`${count} match${count !== 1 ? 'es' : ''} hidden by filters`}>
+      +{count}
+    </span>
+  ) : null
+}
+
+/** Whether an element renders: neither it nor an ancestor is `display: none`. */
+function rendered(element: HTMLElement): boolean {
+  for (let e: HTMLElement | null = element; e; e = e.parentElement) if (getComputedStyle(e).display === 'none') return false
+  return true
 }
 
 /** The first line of a row's items, laid out at these offsets from its top: its height, and how many items wrap past it. */
@@ -211,7 +236,7 @@ const LOOKS = {
  * findings under them. The pane renders it for itself; a host renders it in
  * a second view with the same props, through `useLinkedViews`.
  */
-export function FilterBar({
+export function FilterBar<R extends SearchRecord = SearchRecord>({
   taxonomy: taxonomyProp,
   chrome,
   theme: themeChoice = 'system',
@@ -224,20 +249,22 @@ export function FilterBar({
   onFilterChange,
   locks: locksProp,
   onLocksChange,
-  overriddenLocks = NO_LOCKS,
+  overriddenLocks = NO_OVERRIDES,
   recentlyChanged: hostRecentlyChanged,
   search: searchProp,
   onSearchChange,
   searchInputRef: hostInputRef,
-  searchTitle = 'Search (/)',
+  searchTitle,
   searchPlaceholder = 'Search…',
+  records,
+  matches,
   searchExtra,
   hiddenMatches,
   findings,
   refreshFlash,
   axes: hostAxes,
   onAxesChange,
-}: FilterBarProps) {
+}: FilterBarProps<R>) {
   const fromContext = React.useContext(TaxonomyContext)
   const taxonomy = taxonomyProp ?? fromContext
   if (!taxonomy) throw new Error('FilterBar has no taxonomy: pass `taxonomy`, or mount it inside <TaxonomyContext.Provider value={…}>.')
@@ -249,19 +276,19 @@ export function FilterBar({
   const locks = useStable(rawLocks, locksEqual)
   const showLocks = chrome?.locks ?? (locksProp !== undefined && onLocksChange !== undefined)
   const showSearch = chrome?.search ?? true
-  // The lock flash is the bar's: a new set of overridden locks lights them for
+  // The lock flash is the bar's: a new key lights the overridden locks for
   // 600 ms and goes out by itself, so a host passes the reconciler's answer
   // and nothing more.
   const [flashing, setFlashing] = React.useState<ReadonlySet<string>>(NO_LOCKS)
   React.useEffect(() => {
-    // Every change sets the state, the empty one included: the cleanup has
+    // Every new key sets the state, an empty set included: the cleanup has
     // already cancelled the previous timer, so an empty set arriving mid-flash
     // must put the light out itself.
-    setFlashing(overriddenLocks)
-    if (overriddenLocks.size === 0) return
+    setFlashing(overriddenLocks.axes)
+    if (overriddenLocks.axes.size === 0) return
     const timer = setTimeout(() => setFlashing(NO_LOCKS), 600)
     return () => clearTimeout(timer)
-  }, [overriddenLocks])
+  }, [overriddenLocks.key]) // eslint-disable-line react-hooks/exhaustive-deps
   // The whole-bar flash likewise: once per change of the value, not for as
   // long as a boolean stays set.
   const [refreshing, setRefreshing] = React.useState(false)
@@ -324,6 +351,12 @@ export function FilterBar({
     () => hostCounts ?? (graph ? countsOn(graph.nodes, axes) : undefined),
     [hostCounts, graph, axes],
   )
+  // The search's matches the filter hides, read off the host's records.
+  const hidden = React.useMemo(() => {
+    if (!records || !matches || !searchQuery) return undefined
+    const visibleIds = new Set(records.filter(node => passesSelection({ filter, taxonomy, axes, node })).map(r => r.id))
+    return hiddenMatchesOf({ nodes: records, filter, taxonomy, axes, visibleIds, matches: r => matches(r, searchQuery) })
+  }, [records, matches, searchQuery, filter, taxonomy, axes])
 
   // What a section is made of: the values the host read off its data, their
   // counts and hidden matches, and the classes its declared presentation
@@ -332,7 +365,7 @@ export function FilterBar({
   const lookFor = (axis: string, descriptor?: ResolvedAxisDescriptor) => ({
     values: [...(valuesByAxis.get(axis) ?? [])],
     counts: counts?.get(axis),
-    hidden: hiddenMatches?.get(axis),
+    hidden: (hiddenMatches ?? hidden?.hiddenByAxis)?.get(axis),
     ...LOOKS[descriptor?.presentation ?? 'chip'],
   })
 
@@ -344,14 +377,28 @@ export function FilterBar({
   // so a stale open flag cannot show it again on a later render.
   React.useEffect(() => { if (available.length < 2) setAddOpen(false) }, [available.length])
 
-  const toggleSearch = () => {
-    if (searchActive) {
-      setSearch({ query: '', active: false })
-    } else {
-      setSearch({ query: searchQuery, active: true })
-      setTimeout(() => searchInputRef.current?.focus(), 50)
-    }
+  const openSearch = () => {
+    if (!searchActive) setSearch({ query: searchQuery, active: true })
+    setTimeout(() => searchInputRef.current?.focus(), 50)
   }
+  const toggleSearch = () => (searchActive ? setSearch({ query: '', active: false }) : openSearch())
+
+  // `/` opens the search of the bar on screen, unless the host focuses the
+  // input from its own shortcut or focus is in a field the key types into.
+  const bindsSlash = showSearch && hostInputRef === undefined
+  const openSearchRef = useLatest(openSearch)
+  React.useEffect(() => {
+    if (!bindsSlash) return
+    const onKey = (e: KeyboardEvent) => {
+      if (e.key !== '/' || e.defaultPrevented || e.metaKey || e.ctrlKey || e.altKey) return
+      if (e.target instanceof Element && e.target.closest('input, textarea, select, [contenteditable]')) return
+      if (!rootRef.current || !rendered(rootRef.current)) return
+      e.preventDefault()
+      openSearchRef.current()
+    }
+    document.addEventListener('keydown', onKey)
+    return () => document.removeEventListener('keydown', onKey)
+  }, [bindsSlash, openSearchRef])
 
   return (
     <div className={`gv-canvas-header${refreshing ? ' refresh-flash' : ''}`} ref={rootRef} data-gv-theme={theme} style={schemeStyle}>
@@ -481,7 +528,7 @@ export function FilterBar({
 
       {showSearch && <div className="gv-header-controls-section">
         <div className={`gv-header-search ${searchActive ? 'active' : ''}`}>
-          <button className="gv-header-search-toggle" onClick={toggleSearch} title={searchTitle}>
+          <button className="gv-header-search-toggle" onClick={toggleSearch} title={searchTitle ?? (bindsSlash ? 'Search (/)' : 'Search')}>
             <SearchIcon size={14} />
           </button>
           {searchActive && (
@@ -495,7 +542,7 @@ export function FilterBar({
               onKeyDown={e => { if (e.key === 'Escape') toggleSearch() }}
             />
           )}
-          {searchExtra}
+          {searchExtra ?? hiddenMatchBadge(hidden?.hiddenCount ?? 0)}
         </div>
       </div>}
 

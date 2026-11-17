@@ -354,7 +354,7 @@ import { FilterBar, GraphView, passesSelection, useLinkedViews } from '@jmbarzee
 import type { Graph, Taxonomy } from '@jmbarzee/force-graph'
 
 export function TwoViews({ taxonomy, graph }: { taxonomy: Taxonomy; graph: Graph }) {
-  const linked = useLinkedViews({ taxonomy, views: ['list', 'graph'], graph })
+  const linked = useLinkedViews({ taxonomy, views: ['list', 'graph'], graph: { list: graph, graph } })
   const list = linked.of('list')
   const shown = graph.nodes.filter(node => passesSelection({ filter: list.filter, taxonomy, axes: list.axes, node }))
   // `linked.focus` switches to the view, widens its filter to show the node
@@ -363,7 +363,7 @@ export function TwoViews({ taxonomy, graph }: { taxonomy: Taxonomy; graph: Graph
     ? <GraphView graph={graph} taxonomy={taxonomy} {...linked.of('graph')} nodeAction={{ label: 'Show in list', onSelect: node => linked.focus('list', node) }} />
     : (
       <div>
-        <FilterBar taxonomy={taxonomy} graph={graph} {...list} />
+        <FilterBar taxonomy={taxonomy} graph={graph} {...list} records={graph.nodes} matches={(n, query) => n.name.includes(query)} />
         <ul>{shown.map(n => <li key={n.id} onDoubleClick={() => linked.focus('graph', n)}>{n.name}</li>)}</ul>
       </div>
     )
@@ -371,23 +371,33 @@ export function TwoViews({ taxonomy, graph }: { taxonomy: Taxonomy; graph: Graph
 ```
 
 `linked.of(view)` is the view's `filter`, `locks`, `axes`, their callbacks,
-`overriddenLocks`, the shared `search` with its callback, and the `focus` the
-last `linked.focus` asked of it with `onFocusResult` (a `FilterBar` ignores
-those two); it throws for a view the hook was not given (`views` is read
-once). `linked.active` is the view shown.
+`overriddenLocks` (the locks the last focus overrode, under a `key` the bar
+flashes once per), the shared `search` with its callback, and the `focus` the
+last `linked.focus` asked of it — its `target`, and the node's `id` when it
+was a node — with `onFocusResult` (a `FilterBar` ignores those two); it throws
+for a view the hook was not given (`views` is read once). `linked.active` is
+the view shown. `graph` is each view's own: it seeds the view's filter, a
+later one re-seeds that view, and a focus into it widens by whole chips.
 `linked.switchTo(to, transition?)` switches from the active view and makes
 `to` active, reconciling as [SPEC § Linked views](SPEC.md#linked-views) says
-(a manual switch is the default). `linked.focus(view, node)` is the focus switch and the request in one.
-`linked.updateFilter(view, fn)` rewrites one view's filter and
-`linked.updateFilters(fn)` every view's (a stale value pruned when the data
-changes — `reseedFilter` is the rule the hook itself applies to every view
-when `graph` changes, on the axes the user has not touched); `linked.state`,
+(a manual switch is the default). `linked.focus(view, target)` is the focus
+switch and the request in one, for a node or a `FocusTarget` — the values a
+record of the host's names, which `matchesFocus(record, target)` finds.
+`linked.updateFilter(view, fn)` rewrites one view's filter, the axes `fn`
+changes counting as the user's, and `linked.updateFilters(fn)` every view's (a
+stale value pruned when the data changes — `reseedFilter` is the rule the hook
+itself applies to a view when its `graph` changes, on the axes the user has
+not touched); `linked.state`,
 `linked.active` and `linked.search` are everything,
 for a host that persists them. The bar carries its own theme and scheme
 (`theme`, default `'system'`; `systemTheme` says what that means), so it needs
 no wrapper; give it the `graph` (or the `values` per axis — `valuesOn(records,
 axis)` reads them off any subjects carrying `values`) and, if the host reads
-its own data, the `counts`. The lock toggles appear only when `locks` is
+its own data, the `counts`. Given every record the view holds as `records`
+and `matches(record, query)`, the bar badges each chip with the search
+matches it hides and the search with their "+N". A shown bar binds `/` to its
+search while focus is not in an editable field; a host that binds its own
+passes `searchInputRef`. The lock toggles appear only when `locks` is
 controlled with its callback — `useLinkedViews` does — or `chrome.locks` asks.
 The bar tracks the values that just turned on for its chip flash
 (`RecentlyChanged`, a set per axis); a host with its own rule passes
@@ -405,9 +415,7 @@ are ids, and with the `graph` a focus widens to the whole chip holding its
 target's value. `selectionFor`, `withSelection`, `withLock`, `toggleGroup` and
 `filterStatesEqual` are the filter operations the bar itself uses;
 `toggleValue` flips one value for a host's own control. A focus into the graph
-is `focusNode(id)` or the `focus` prop; a focus into the other view is the
-host's (`matchesFocus(node, target)` finds the node a `FocusTarget`'s values
-name).
+is `focusNode(id)` or the `focus` prop.
 
 ## Theming
 

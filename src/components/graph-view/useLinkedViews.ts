@@ -7,10 +7,10 @@ import React from 'react'
 import type { AxisId } from '../../graph/axis'
 import type { Graph, GraphNode } from '../../graph/model'
 import type { Taxonomy } from '../../graph/taxonomy'
-import { NO_LOCKS, linkedSwitch } from '../../filter/linked'
+import { NO_OVERRIDES, linkedSwitch } from '../../filter/linked'
 import type { LinkedViewState } from '../../filter/linked'
 import { changedAxes, initialFilter, reseedFilter } from '../../filter/types'
-import type { AxisLocks, FilterState, ReconcileResult, ViewTransition } from '../../filter/types'
+import type { AxisLocks, FilterState, FocusTarget, ReconcileResult, ViewTransition } from '../../filter/types'
 import type { SearchState } from '../FilterBar'
 import type { FocusRequest } from './focus'
 import { useLatest } from './useControllable'
@@ -31,14 +31,14 @@ export interface LinkedViewProps {
   axes: readonly AxisId[]
   /** A change to the axes shown. */
   onAxesChange: (next: readonly AxisId[]) => void
-  /** The locks the last switch into this view overrode — a focus's, which the bar flashes once per set; a manual switch clears it. */
-  overriddenLocks: ReadonlySet<AxisId>
+  /** The locks the last switch into this view overrode, which the bar flashes once per key; a manual switch clears them. */
+  overriddenLocks: LinkedViewState['overriddenLocks']
   /** The search the views share: the same value and callback in every view's props. */
   search: SearchState
   /** A change to the shared search. */
   onSearchChange: (next: SearchState) => void
-  /** The focus `linked.focus` asked of this view, until the pane reports it; a `FilterBar` ignores it. */
-  focus: FocusRequest | null
+  /** The focus `linked.focus` asked of this view, until the pane reports it: its `target`, and the node's `id` when it was a node. A `FilterBar` ignores it; a host's own view reveals the record the target names. */
+  focus: { id?: string; key: number; target: FocusTarget } | null
   /** The pane's report on `focus`, which clears it. */
   onFocusResult: (request: FocusRequest, shown: boolean) => void
 }
@@ -49,10 +49,10 @@ export interface LinkedViewsOptions<V extends string> {
   taxonomy: Taxonomy
   /** The views, by the names the host switches between. Read once. */
   views: readonly V[]
-  /** Where each view starts; a part left out defaults — the taxonomy's default filter over `graph`, no locks, every declared axis. Read once. A filter given here counts as the user's on every axis where it differs from that default. */
+  /** Where each view starts; a part left out defaults — the taxonomy's default filter over the view's `graph`, no locks, every declared axis. Read once. A filter given here counts as the user's on every axis where it differs from that default. */
   initial?: (view: V) => { filter?: FilterState; locks?: AxisLocks; axes?: readonly AxisId[] } | undefined
-  /** The graph the views show: the default filter is seeded from it, a later one re-seeds every view on the axes the user has not touched, and a focus widens by its whole chips. */
-  graph?: Pick<Graph, 'nodes'>
+  /** The graph each view shows, by view: its default filter is seeded from it, a later one re-seeds that view on the axes the user has not touched, and a focus into it widens by its whole chips. */
+  graph?: Partial<Record<V, Pick<Graph, 'nodes'>>>
   /** The view shown first. Default: the first of `views`. Read once. */
   start?: V
   /** Where the shared search starts — a persisted query, say. Default: closed and empty. Read once. */
@@ -74,12 +74,13 @@ export interface LinkedViews<V extends string> {
    */
   switchTo(to: V, transition?: ViewTransition): ReconcileResult
   /**
-   * Show `node` in `view`: a focus switch to it, and — for a `GraphView` —
-   * a request in `of(view).focus` that centres on and selects the node once
-   * it is in the graph, cleared when the pane reports it.
+   * Show `target` — a node, or the values a record of the host's names — in
+   * `view`: a focus switch to it, and the target in `of(view).focus`. A
+   * `GraphView` centres on and selects a node once it is in the graph, and
+   * the request clears when the pane reports it.
    */
-  focus(view: V, node: GraphNode): ReconcileResult
-  /** Rewrite one view's filter from its current value — a host rule that follows one view's data. */
+  focus(view: V, target: GraphNode | FocusTarget): ReconcileResult
+  /** Rewrite one view's filter from its current value — a host rule that follows one view's data; the axes `fn` changes count as the user's, and a later graph leaves them alone. */
   updateFilter(view: V, fn: (filter: FilterState) => FilterState): void
   /** Rewrite every view's filter at once — a stale value pruned when the data changes. */
   updateFilters(fn: (filter: FilterState, view: V) => FilterState): void
@@ -105,11 +106,11 @@ function recordOver<V extends string, T>(views: readonly V[], make: (view: V) =>
  * overrode, the focus asked of it — with each view's props (`of`), the view
  * shown (`active`), `switchTo` and `focus`, a per-view or all-views filter
  * rewrite, the shared `search`, and the whole as `state`. `views`, `initial`,
- * `start` and `initialSearch` are read once. A later `graph` re-seeds every
- * view on the axes the user has not touched — the ones no write through
- * `onFilterChange` named, and on which a filter `initial` gave did not differ
- * from the default — so a host that mounts empty is not left blank and the
- * user's own selections stand.
+ * `start` and `initialSearch` are read once. A later graph for a view
+ * re-seeds it on the axes the user has not touched — the ones no write
+ * through `onFilterChange` or `updateFilter` named, and on which a filter
+ * `initial` gave did not differ from the default — so a host that mounts
+ * empty is not left blank and the user's own selections stand.
  */
 export function useLinkedViews<V extends string>({ taxonomy, views, initial, graph, start, initialSearch }: LinkedViewsOptions<V>): LinkedViews<V> {
   // The axes the user has touched, per view: state, not an inference — a
@@ -119,18 +120,18 @@ export function useLinkedViews<V extends string>({ taxonomy, views, initial, gra
   const touchedRef = React.useRef<Record<V, Set<AxisId>>>(recordOver(views, () => new Set<AxisId>()))
   const [state, setState] = React.useState<Readonly<Record<V, LinkedViewState>>>(() => recordOver(views, view => {
     const given = initial?.(view)
-    const seed = initialFilter(taxonomy, graph ?? { nodes: [] })
+    const seed = initialFilter(taxonomy, graph?.[view] ?? { nodes: [] })
     if (given?.filter !== undefined) for (const axis of changedAxes(seed, given.filter)) touchedRef.current[view].add(axis)
     return {
       filter: given?.filter ?? seed,
       locks: given?.locks ?? new Map(),
       axes: given?.axes ?? taxonomy.filterAxes.map(d => d.id),
-      overriddenLocks: NO_LOCKS,
+      overriddenLocks: NO_OVERRIDES,
     }
   }))
   const [active, setActive] = React.useState<V>(() => start ?? views[0]!)
   const [search, setSearch] = React.useState<SearchState>(() => initialSearch ?? { query: '', active: false })
-  const [focusRequests, setFocusRequests] = React.useState<Readonly<Record<V, FocusRequest | null>>>(() => recordOver(views, () => null))
+  const [focusRequests, setFocusRequests] = React.useState<Readonly<Record<V, LinkedViewProps['focus']>>>(() => recordOver(views, () => null))
   const focusSeq = React.useRef(0)
   const stateRef = useLatest(state)
   const activeRef = useLatest(active)
@@ -155,24 +156,26 @@ export function useLinkedViews<V extends string>({ taxonomy, views, initial, gra
 
   const props = React.useMemo(() => recordOver(views, (view): LinkedViewProps => ({ ...state[view], ...callbacks[view], search, focus: focusRequests[view] })), [state, callbacks, search, focusRequests]) // eslint-disable-line react-hooks/exhaustive-deps
 
-  // A graph that arrives after the mount re-seeds every view on the axes the
-  // user has not touched — so a host that mounts empty while its data loads
-  // is not left with a list that shows nothing, and a value first seen later
-  // is not born hidden. The user's selections stand.
+  // A graph that arrives for a view after the mount re-seeds that view on the
+  // axes the user has not touched — so a host that mounts empty while its
+  // data loads is not left with a list that shows nothing, and a value first
+  // seen later is not born hidden. The user's selections stand. Run every
+  // render, since `graph` is a new record each time: its graphs compare one
+  // by one.
   const seededFromRef = React.useRef(graph)
   React.useEffect(() => {
-    if (seededFromRef.current === graph || graph === undefined) return
+    const seeded = seededFromRef.current
     seededFromRef.current = graph
-    setState(prev => {
-      let changed = false
-      const out: Record<V, LinkedViewState> = { ...prev }
-      for (const view of Object.keys(prev) as V[]) {
-        const filter = reseedFilter(prev[view].filter, taxonomyRef.current, graph, touchedRef.current[view])
-        if (filter !== prev[view].filter) { changed = true; out[view] = { ...prev[view], filter } }
-      }
-      return changed ? out : prev
+    const fresh = new Map(views.flatMap(view => {
+      const next = graph?.[view]
+      return next === undefined || next === seeded?.[view] ? [] : [[view, next] as const]
+    }))
+    if (fresh.size === 0) return
+    updateFilters((filter, view) => {
+      const next = fresh.get(view)
+      return next === undefined ? filter : reseedFilter(filter, taxonomyRef.current, next, touchedRef.current[view])
     })
-  }, [graph]) // eslint-disable-line react-hooks/exhaustive-deps
+  })
 
   const switchTo = React.useCallback((to: V, transition: ViewTransition = { kind: 'manual' }): ReconcileResult => {
     const from = activeRef.current
@@ -180,23 +183,26 @@ export function useLinkedViews<V extends string>({ taxonomy, views, initial, gra
     // the write is a functional update, so it composes with a write queued in
     // the same tick — a bar's own, or an `updateFilter` just before — rather
     // than overwriting it.
-    const { state: next, result } = linkedSwitch(stateRef.current, taxonomyRef.current, to, from, transition, graphRef.current)
+    const graph = graphRef.current?.[to]
+    const { state: next, result } = linkedSwitch(stateRef.current, taxonomyRef.current, to, from, transition, graph)
     stateRef.current = next
-    setState(prev => linkedSwitch(prev, taxonomyRef.current, to, from, transition, graphRef.current).state)
+    setState(prev => linkedSwitch(prev, taxonomyRef.current, to, from, transition, graph).state)
     activeRef.current = to
     setActive(to)
     return result
   }, [stateRef, activeRef, taxonomyRef, graphRef])
 
-  const focus = React.useCallback((view: V, node: GraphNode): ReconcileResult => {
-    const result = switchTo(view, { kind: 'focus', target: { values: node.values } })
-    setFocusRequests(prev => ({ ...prev, [view]: { id: node.id, key: ++focusSeq.current } }))
+  const focus = React.useCallback((view: V, target: GraphNode | FocusTarget): ReconcileResult => {
+    const result = switchTo(view, { kind: 'focus', target })
+    const id = 'id' in target ? target.id : undefined
+    setFocusRequests(prev => ({ ...prev, [view]: { id, key: ++focusSeq.current, target } }))
     return result
   }, [switchTo])
 
   const updateFilter = React.useCallback((view: V, fn: (filter: FilterState) => FilterState) => {
     setState(prev => {
       const filter = fn(prev[view].filter)
+      for (const axis of changedAxes(prev[view].filter, filter)) touchedRef.current[view].add(axis)
       return filter === prev[view].filter ? prev : { ...prev, [view]: { ...prev[view], filter } }
     })
   }, [])

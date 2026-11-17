@@ -8,6 +8,8 @@ import type { Graph, GraphEdge, GraphNode } from '../graph/model'
 import type { FilterState, AxisLocks } from '../filter/types'
 import { changedAxes, initialFilter, filterStatesEqual, hiddenMatchesOf, listEqual, locksEqual, passesDescriptors, reseedFilter } from '../filter/types'
 import { reconcileFilter } from '../filter/reconcile'
+import { NO_OVERRIDES } from '../filter/linked'
+import type { LinkedViewState } from '../filter/linked'
 import type { ForceParams, SimNode, Simulation } from '../graph/simulation'
 import { bandOverlay, layoutFrame, resolvePhysics } from '../graph/forces'
 import { countsOn, isIdentityMapping, valuesOn } from '../graph/axis'
@@ -34,7 +36,7 @@ import { GraphCanvas } from './GraphCanvas'
 import { CanvasErrorBoundary } from './CanvasErrorBoundary'
 import { GraphControlPanel } from './GraphControlPanel'
 import { activeGroupsOf, boostGroupsForNodes, cohesionOf, groupSlotsOf, nodeGroupsOf, type ActiveGroup, type Groups, type NodeGroup } from '../graph/groups'
-import { FilterBar } from './FilterBar'
+import { FilterBar, hiddenMatchBadge } from './FilterBar'
 import type { SearchState } from './FilterBar'
 export type { SearchState } from './FilterBar'
 import { useRecentlyChanged } from './graph-view/useRecentlyChanged'
@@ -45,7 +47,7 @@ import { useVisibleGraph } from './graph-view/useVisibleGraph'
 import { neighborhoodOf } from './graph-view/visibleGraph'
 import { useSimulationLoop } from './graph-view/useSimulationLoop'
 import { useControllable, useControlledWarning, useLatest, useStable } from './graph-view/useControllable'
-import { sameFocusRequest } from './graph-view/focus'
+import { namesNode, sameFocusRequest } from './graph-view/focus'
 import type { FocusRequest } from './graph-view/focus'
 export type { FocusRequest } from './graph-view/focus'
 import { useIsomorphicLayoutEffect } from './graph-view/useIsomorphicLayoutEffect'
@@ -171,10 +173,11 @@ export interface GraphViewProps {
    * A request to reveal, centre and select a node — the declarative form of
    * the handle's `focusNode`. Compared by value: a new `id` or `key` is a new
    * request. It waits until its node is in the graph, then `onFocusResult`
-   * reports whether the filter could show it. Null, or a newer request,
-   * withdraws a waiting one, unreported.
+   * reports whether the filter could show it. Null, a newer request, or one
+   * without an `id` (a `useLinkedViews` focus by values) withdraws a waiting
+   * one, unreported.
    */
-  focus?: FocusRequest | null
+  focus?: Partial<FocusRequest> | null
   /** A focus request's outcome, once its node is in the graph: whether the node ended visible. A withdrawn request is not reported. */
   onFocusResult?: (request: FocusRequest, shown: boolean) => void
   /** Added to the root's class list; the root keeps its own. */
@@ -212,8 +215,8 @@ export interface GraphViewProps {
   onLocksChange?: (next: AxisLocks) => void
   /** Where the view's own locks start when the host does not control them. Read once. */
   defaultLocks?: AxisLocks
-  /** The locks a host-side focus into this view overrode (`useLinkedViews`'s `switchTo`); flashed once, beside the view's own. */
-  overriddenLocks?: ReadonlySet<string>
+  /** The locks a host-side focus into this view overrode (`useLinkedViews`'s `switchTo`); flashed once per key, as the view's own are. */
+  overriddenLocks?: LinkedViewState['overriddenLocks']
   /** The axes shown, in order. Default: `defaultAxes`, else every declared filter axis. Editable in the bar unless controlled without a callback. */
   axes?: readonly string[]
   /** Every change to the axes shown. */
@@ -268,7 +271,6 @@ export interface GraphViewProps {
   onThemeResolved?: (theme: Theme) => void
 }
 
-const NO_FLASH: ReadonlySet<string> = new Set()
 const NO_GROUPS: readonly NodeGroup[] = []
 
 /**
@@ -539,20 +541,13 @@ export const GraphView = React.forwardRef<GraphViewHandle, GraphViewProps>(funct
     setLayout(next)
   }, [layoutRef, setLayout])
 
-  // The locks a focus overrode flash once, for 600 ms, then clear. The view's
-  // own state: a host never sees it.
-  const [flashLocks, setFlashLocks] = React.useState<ReadonlySet<string>>(NO_FLASH)
+  // The locks a focus overrode — the view's own, or a host's under a new
+  // key — go to the bar under a key of the view's, which it flashes once.
+  const [flashLocks, setFlashLocks] = React.useState(NO_OVERRIDES)
+  const flash = React.useCallback((axes: ReadonlySet<AxisId>) => setFlashLocks(prev => ({ axes, key: prev.key + 1 })), [])
   React.useEffect(() => {
-    if (flashLocks.size === 0) return
-    const timer = setTimeout(() => setFlashLocks(NO_FLASH), 600)
-    return () => clearTimeout(timer)
-  }, [flashLocks])
-  // The host's overridden locks (a focus it reconciled itself) are an event,
-  // not a value: folded into the view's own flash when they arrive, so the one
-  // timer puts both out and an old set never re-lights.
-  React.useEffect(() => {
-    if (hostOverridden && hostOverridden.size > 0) setFlashLocks(prev => new Set([...prev, ...hostOverridden]))
-  }, [hostOverridden])
+    if (hostOverridden && hostOverridden.axes.size > 0) flash(hostOverridden.axes)
+  }, [hostOverridden?.key]) // eslint-disable-line react-hooks/exhaustive-deps
 
   // Visible subgraph derived from the live sim (filter + edge graduation +
   // summaries + downstream-depth scores), recomputed on filter / sim-rebuild.
@@ -788,7 +783,7 @@ export const GraphView = React.forwardRef<GraphViewHandle, GraphViewProps>(funct
     const applied = filterWritable ? result.filter : base
     if (applied !== base) {
       writeFilter(applied, [])
-      if (result.overriddenLocks.size > 0) setFlashLocks(result.overriddenLocks)
+      if (result.overriddenLocks.size > 0) flash(result.overriddenLocks)
     }
     // Whether the filter shows the node: a value absent on a hiding axis
     // cannot be revealed by widening, and the host should know.
@@ -800,7 +795,7 @@ export const GraphView = React.forwardRef<GraphViewHandle, GraphViewProps>(funct
       setRunning(true)
     }
     return true
-  }, [graphIndex, graph, filterRef, filterWritable, writeFilter, locks, axes, filterAxes, running, setRunning, simRef, requestFrame, requestSelect, taxonomy])
+  }, [graphIndex, graph, filterRef, filterWritable, writeFilter, flash, locks, axes, filterAxes, running, setRunning, simRef, requestFrame, requestSelect, taxonomy])
   // The declarative focus. A request is new when its id or key differs from
   // the last one; it waits until its node is in the graph, then runs the
   // focus recipe once and reports whether the node could be shown. A null
@@ -809,7 +804,7 @@ export const GraphView = React.forwardRef<GraphViewHandle, GraphViewProps>(funct
   const pendingFocusRef = React.useRef<FocusRequest | null>(null)
   const onFocusResultRef = useLatest(onFocusResult)
   React.useEffect(() => {
-    if (!focus) { lastFocusRef.current = null; pendingFocusRef.current = null; return }
+    if (!namesNode(focus)) { lastFocusRef.current = null; pendingFocusRef.current = null; return }
     if (sameFocusRequest(lastFocusRef.current, focus)) return
     lastFocusRef.current = focus
     pendingFocusRef.current = focus
@@ -974,13 +969,6 @@ export const GraphView = React.forwardRef<GraphViewHandle, GraphViewProps>(funct
   const nodeCount = visibleNodes.length
   const edgeCount = visibleEdges.length
 
-  // Graph-view search adornment: the hidden-match "+N" badge.
-  const searchExtra = hiddenMatchCount > 0 ? (
-    <span className="gv-header-search-badge" title={`${hiddenMatchCount} match${hiddenMatchCount !== 1 ? 'es' : ''} hidden by filters`}>
-      +{hiddenMatchCount}
-    </span>
-  ) : null
-
   return (
     <TaxonomyContext.Provider value={taxonomy}>
     <CanvasErrorBoundary what="graph view">
@@ -1069,7 +1057,7 @@ export const GraphView = React.forwardRef<GraphViewHandle, GraphViewProps>(funct
             searchInputRef={searchInputRef}
             searchTitle={searchTitle}
             searchPlaceholder={searchPlaceholder}
-            searchExtra={searchExtra}
+            searchExtra={hiddenMatchBadge(hiddenMatchCount)}
             hiddenMatches={hiddenMatches}
             findings={findings}
           />
