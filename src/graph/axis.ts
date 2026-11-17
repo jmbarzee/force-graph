@@ -205,7 +205,7 @@ export interface ResolvedAxisDescriptor extends AxisNamer {
 export interface StyleNamer {
   /** The style axis: a descriptor on it takes these names by default. */
   axis: AxisId
-  /** The style values, in declaration order: the style axis's default `order`. */
+  /** The style values, in declaration order. */
   values: readonly AxisValue[]
   /** A style value's label. */
   labelFor(value: AxisValue): string

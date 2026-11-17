@@ -406,11 +406,9 @@ export const GraphView = React.forwardRef<GraphViewHandle, GraphViewProps>(funct
   const groupsOf = React.useMemo(() => groupsByNode(nodeGroups), [nodeGroups])
   const diagnostics = React.useMemo(() => groupDiagnostics.length ? [...graphDiagnostics, ...groupDiagnostics] : graphDiagnostics, [graphDiagnostics, groupDiagnostics])
   const graphIndex = React.useMemo(() => nodesById(graph.nodes), [graph])
-  // The chip badges: the host's reading of its own data, or a count of the
-  // graph's entities per axis and value, faceted when the host asks.
   const counts = React.useMemo(
     () => (typeof hostCounts === 'object' ? hostCounts : countsOn(graph.nodes, axes, hostCounts && { filter, taxonomy })),
-    [hostCounts, graph, axes, filter, taxonomy],
+    [hostCounts, graph, axes, hostCounts === 'faceted' && filter, taxonomy],
   )
   // Every node's copies, by the key they share — derived here, once per graph.
   const copies = React.useMemo(() => copyGroups(graph), [graph])

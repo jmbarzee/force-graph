@@ -101,7 +101,7 @@ interface FilterBarBaseProps<R extends SearchRecord> {
   systemTheme?: Theme
   /** Per theme, the tokens `createTheme` overrides on the bar's root. A pane's bar takes the pane's. */
   tokens?: ThemeTokens
-  /** Chip badge counts per axis and value, read by the host off its own data. Absent: the graph's entity counts (the copies of one `copyKey` once) when `graph` is given, else no badges; `faceted`, those counts under the other axes' selections. */
+  /** Chip badge counts per axis and value, read by the host off its own data. Absent: the graph's entity counts (the copies of one `copyKey` once) when `graph` is given, else no badges; `faceted`, those counts under the other axes' selections (needs `graph`; with only `values`, no badges). */
   counts?: ReadonlyMap<string, ReadonlyMap<string, number>> | 'faceted'
   filter: FilterState
   /** Every change the user makes, with the axis they changed — for a host that keeps which axes are the user's (`reseedFilter`). */
@@ -349,7 +349,7 @@ export function FilterBar<R extends SearchRecord = SearchRecord>({
   }, [filter]) // eslint-disable-line react-hooks/exhaustive-deps
   const counts = React.useMemo(
     () => (typeof hostCounts === 'object' ? hostCounts : graph && countsOn(graph.nodes, axes, hostCounts && { filter, taxonomy })),
-    [hostCounts, graph, axes, filter, taxonomy],
+    [hostCounts, graph, axes, hostCounts === 'faceted' && filter, taxonomy],
   )
   const hidden = React.useMemo(() => {
     if (!records || !matches || !searchQuery) return undefined

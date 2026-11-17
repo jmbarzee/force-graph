@@ -128,8 +128,8 @@ never by spreading the built object.
   (`keepCamera`: a narrowing axis does, an allow-list refits) — and may be
   overridden. `chipsFor(values)` groups values into chips (default one per
   value; on the style axis they wear the value's icon and tint; a chip none
-  of whose values the data presents is not offered), `order` puts the
-  chips of the values it lists first, in its order, and the rest after them in
+  of whose values the data presents is not offered), `order` lists the
+  values `chipsFor` receives first, in its order, the rest after them in
   first-encounter order (default: the `styles` order on the style axis;
   elsewhere, first encounter alone), `labelFor`,
   `abbreviationFor`, `iconFor` and `tooltipFor` name and adorn values
@@ -405,8 +405,9 @@ no wrapper; give it the `graph` (or the `values` per axis — `valuesOn(records,
 axis)` reads them off any subjects carrying `values`) and, if the host reads
 its own data, the `counts` (or `'faceted'`, with the `graph`). Given every
 record the view holds as `records` and `matches(record, query)`, the bar
-badges each chip with the search matches it hides and the search with their "+N". A shown bar binds `/` to its
-search while focus is not in an editable field; a host that binds its own
+badges each chip with the search matches it hides and the search with their
+"+N". A shown bar binds `/` to its search while focus is not in an editable
+field; a host that binds its own
 passes `searchInputRef`. The lock toggles appear only when `locks` is
 controlled with its callback — `useLinkedViews` does — or `chrome.locks` asks.
 The bar tracks the values that just turned on for its chip flash
