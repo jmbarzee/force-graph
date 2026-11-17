@@ -99,6 +99,13 @@ export interface NodeStyle {
    * (`2 Sv · 1 Pd`); its dependency degree (`→3 ←2`); or nothing.
    */
   summaryKind?: 'children' | 'degree' | 'none'
+  /**
+   * The ladder this value is a rung of: style values sharing a ladder id are
+   * one family, its rungs in declaration order, which the push map and the
+   * band plots set apart and can collapse to one row tuned as one. Neither
+   * empty nor another value's id. Absent, a value on its own.
+   */
+  ladder?: string
 }
 
 /**
@@ -128,6 +135,8 @@ export interface ResolvedNodeStyle {
   whenHidden: 'ascend' | 'splice'
   /** The glanceable summary for a node of this value. */
   summaryKind: 'children' | 'degree' | 'none'
+  /** The ladder this value is a rung of, if any. */
+  ladder?: string
 }
 
 // ── Edge types ──────────────────────────────────────────────────────────────

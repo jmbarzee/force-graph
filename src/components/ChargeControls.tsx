@@ -12,6 +12,8 @@ import type { ResolvedPhysics } from '../graph/forces'
 
 import { useTaxonomy } from './graph-view/useTaxonomy'
 import { bucketColor } from './controls/bucketColor'
+import { alikeShift, laddersOn, rowsOf } from './controls/ladders'
+import { LadderToggles, useCollapsed } from './controls/LadderToggles'
 import { ForceMap2D, ForceCurves, CURVE_W, CURVE_H, CURVE_SAMPLES } from './ForceMap'
 import type { MapToken, CurveItem } from './ForceMap'
 
@@ -26,6 +28,7 @@ export const CORE_RADIUS_MAX_AXIS = 100
 export const CORE_RADIUS_STEP = 1
 
 const clamp = (v: number, lo: number, hi: number) => Math.max(lo, Math.min(hi, v))
+const snap = (v: number, step: number) => Math.round(v / step) * step
 
 interface ChargeControlProps {
   params: ForceParams
@@ -43,38 +46,70 @@ interface ChargeControlProps {
 //
 // y = charge magnitude, x = core radius. One solid token per bucket of the push
 // axis. Dragging sets both the (negative) charge and the core radius at once.
+// A ladder's rungs are joined by a chain; collapsed, they are one stacked
+// token at their centroid, and dragging it shifts every rung alike.
 export function ChargeMap({ params, resolved, present, onParamChange, hoveredBucket, onHoverBucket }: ChargeControlProps) {
   const taxonomy = useTaxonomy()
   const { push } = resolved
+  const [collapsed, toggle] = useCollapsed()
   // Only the buckets the visible set holds; the tuning keeps the rest.
   const shown = push.mapping.buckets.filter(b => present.has(b.id))
-  const tokens: MapToken[] = shown.map(b => ({
-    id: b.id,
-    x: pushForKey(push, b.id).coreRadius,
-    y: Math.abs(pushForKey(push, b.id).charge),
-    colorA: bucketColor(taxonomy, push.mapping, b.id),
-    outline: 'solid',
-    label: b.abbreviation,
-    tooltip: `${b.label} repulsion charge & core radius`,
-  }))
+  const ladders = laddersOn(taxonomy, push.mapping, shown.map(b => b.id))
+  const rows = rowsOf(shown.map(b => b.id), ladders, collapsed)
+  const at = (id: string) => ({ x: pushForKey(push, id).coreRadius, y: Math.abs(pushForKey(push, id).charge) })
+  const color = (id: string) => bucketColor(taxonomy, push.mapping, id)
+  const bucketToken = (id: string): MapToken => {
+    const b = shown.find(s => s.id === id)!
+    return {
+      id, ...at(id), colorA: color(id), outline: 'solid', label: b.abbreviation,
+      tooltip: `${b.label} repulsion charge & core radius`,
+    }
+  }
+  const tokens: MapToken[] = rows.flatMap((row): MapToken[] => {
+    if (row.kind === 'bucket') return [bucketToken(row.id)]
+    const { id, rungs } = row.ladder
+    if (!row.collapsed) return rungs.map(bucketToken)
+    const points = rungs.map(at)
+    return [{
+      id,
+      x: points.reduce((sum, p) => sum + p.x, 0) / points.length,
+      y: points.reduce((sum, p) => sum + p.y, 0) / points.length,
+      colorA: color(rungs[0]), outline: 'solid', stacked: true, label: id,
+      tooltip: `The ${id} ladder: dragging moves every rung alike`,
+    }]
+  })
+  const chains = rows.flatMap(row => (row.kind === 'ladder' && !row.collapsed ? [row.ladder.rungs] : []))
+  const collapsedLadder = (id: string) => ladders.find(l => l.id === id && collapsed.has(id))
 
   const handleDrag = (id: string, x: number, y: number) => {
-    const t = id
-    onParamChange({
+    const ladder = collapsedLadder(id)
+    if (ladder === undefined) {
       // One override per bucket, carrying both numbers the token encodes;
       // charge is stored negative (repulsion).
-      pair: withPushOverride(params.pair, t, { charge: -y, coreRadius: x }),
+      onParamChange({ pair: withPushOverride(params.pair, id, { charge: -y, coreRadius: x }) })
+      return
+    }
+    // A collapsed ladder: every rung moves by the token's snapped, clamped shift.
+    const token = tokens.find(t => t.id === id)!
+    const points = ladder.rungs.map(at)
+    const dx = alikeShift(snap(x - token.x, CORE_RADIUS_STEP), points.map(p => ({ value: p.x, lo: CORE_RADIUS_MIN_AXIS, hi: CORE_RADIUS_MAX_AXIS })))
+    const dy = alikeShift(snap(y - token.y, CHARGE_MAG_STEP), points.map(p => ({ value: p.y, lo: CHARGE_MAG_MIN, hi: CHARGE_MAG_MAX })))
+    onParamChange({
+      pair: ladder.rungs.reduce((pair, rung, i) =>
+        withPushOverride(pair, rung, { charge: -(points[i].y + dy), coreRadius: points[i].x + dx }), params.pair),
     })
   }
 
-  return (
+  return (<>
     <ForceMap2D
       tokens={tokens}
+      chains={chains}
       xAxis={{ min: CORE_RADIUS_MIN_AXIS, max: CORE_RADIUS_MAX_AXIS, step: CORE_RADIUS_STEP, label: 'core radius' }}
       yAxis={{ min: CHARGE_MAG_MIN, max: CHARGE_MAG_MAX, step: CHARGE_MAG_STEP, label: 'charge' }}
       onDrag={handleDrag}
       hoveredId={hoveredBucket}
-      onHover={onHoverBucket}
+      // A collapsed ladder stands for several buckets; hovering it links none.
+      onHover={id => onHoverBucket(id !== null && collapsedLadder(id) ? null : id)}
       ariaLabel="Charge map: core radius versus charge magnitude"
       xSlider={{
         value: params.coreRadiusMultiplier, min: 0.1, max: 3, step: 0.05,
@@ -89,7 +124,8 @@ export function ChargeMap({ params, resolved, present, onParamChange, hoveredBuc
         popId: 'pushMultiplier',
       }}
     />
-  )
+    <LadderToggles ladders={ladders} collapsed={collapsed} onToggle={toggle} />
+  </>)
 }
 
 // ── Charge-falloff visualization (read-only) ──────────────────────────────────

@@ -13,7 +13,11 @@ import type { Taxonomy } from '../../graph/taxonomy'
 
 export const NEUTRAL_BUCKET_COLOR = 'var(--gv-color-text-muted)'
 
+/** Whether `mapping` buckets the style axis by identity: each bucket a styled value. */
+export function bucketsStyles(taxonomy: Taxonomy, mapping: AxisMapping): boolean {
+  return mapping.axis === taxonomy.styleAxis() && isIdentityMapping(mapping)
+}
+
 export function bucketColor(taxonomy: Taxonomy, mapping: AxisMapping, bucketId: string): string {
-  const styled = mapping.axis === taxonomy.styleAxis() && isIdentityMapping(mapping)
-  return styled ? `var(${taxonomy.colorVar(bucketId)})` : NEUTRAL_BUCKET_COLOR
+  return bucketsStyles(taxonomy, mapping) ? `var(${taxonomy.colorVar(bucketId)})` : NEUTRAL_BUCKET_COLOR
 }

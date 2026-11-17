@@ -12,6 +12,9 @@ import type { ResolvedAxis, ResolvedPhysics } from '../graph/forces'
 import { bandRangeFor, isScalarAxis } from '../graph/forces'
 import { useTaxonomy } from './graph-view/useTaxonomy'
 import { bucketColor } from './controls/bucketColor'
+import { alikeShift, laddersOn, rowsOf } from './controls/ladders'
+import type { Bound } from './controls/ladders'
+import { LadderToggles, useCollapsed } from './controls/LadderToggles'
 import { Plot } from './controls/Plot'
 import { NothingVisible } from './controls/NothingVisible'
 import { Slider } from './controls/Slider'
@@ -148,7 +151,7 @@ export function AxisControls({ axis, params, resolved, axes, present, onParamCha
           present={present}
           strength={strength}
           onStrength={v => onParamChange(strengthPatch(axis, v))}
-          onBand={(bucket, next) => onParamChange(tuningPatch(axis, withOverride(mappedTuning(tuning), bucket, next)))}
+          onBands={bands => onParamChange(tuningPatch(axis, bands.reduce((t, [bucket, next]) => withOverride(t, bucket, next), mappedTuning(tuning))))}
           hovered={hovered}
           onHover={onHover}
           color={bucket => bucketColor(taxonomy, mappedTuning(tuning).mapping, bucket)}
@@ -255,7 +258,18 @@ function ScalarPlot({ axis, radial, label, tooltip, span, strength, onStrength, 
   )
 }
 
-function AxisPlot({ axis, radial, tuning, table, present, strength, onStrength, onBand, hovered, onHover, color }: {
+// One column per row: a bucket, a rung of an expanded ladder (its ladder
+// drawn as a faint backdrop behind its columns), or a collapsed ladder whose
+// rungs' stripes sit side by side under one stem spanning them all.
+interface Column {
+  id: string
+  rungs: readonly string[]
+  // The expanded ladder this column is a rung of.
+  ladder?: string
+  collapsed?: boolean
+}
+
+function AxisPlot({ axis, radial, tuning, table, present, strength, onStrength, onBands, hovered, onHover, color }: {
   axis: LayoutAxis
   radial: boolean
   tuning: AxisTuning<BandRange>
@@ -263,16 +277,25 @@ function AxisPlot({ axis, radial, tuning, table, present, strength, onStrength, 
   present: ReadonlySet<string>
   strength: number
   onStrength: (v: number) => void
-  onBand: (bucket: string, next: BandRange) => void
+  onBands: (bands: readonly (readonly [string, BandRange])[]) => void
   hovered: GravityHover | null
   onHover: (h: GravityHover | null) => void
   color: (bucket: string) => string
 }) {
+  const taxonomy = useTaxonomy()
   const svgRef = React.useRef<SVGSVGElement>(null)
-  const dragRef = React.useRef<{ bucket: string; edge: 'min' | 'max' } | null>(null)
+  const dragRef = React.useRef<{ column: Column; edge: 'min' | 'max' } | null>(null)
+  const [collapsed, toggle] = useCollapsed()
   // Only the buckets the visible set holds; the tuning keeps the rest.
-  const buckets = tuning.mapping.buckets.filter(b => present.has(b.id))
-  const colX = (i: number) => PL + ((i + 0.5) / Math.max(1, buckets.length)) * (PR - PL)
+  const shown = tuning.mapping.buckets.filter(b => present.has(b.id))
+  const bucketOf = new Map(shown.map(b => [b.id, b]))
+  const ladders = laddersOn(taxonomy, tuning.mapping, shown.map(b => b.id))
+  const columns: Column[] = rowsOf(shown.map(b => b.id), ladders, collapsed).flatMap((row): Column[] =>
+    row.kind === 'bucket' ? [{ id: row.id, rungs: [row.id] }]
+    : row.collapsed ? [{ id: row.ladder.id, rungs: row.ladder.rungs, collapsed: true }]
+    : row.ladder.rungs.map(r => ({ id: r, rungs: [r], ladder: row.ladder.id })))
+  const half = (PR - PL) / Math.max(1, columns.length) / 2
+  const colX = (i: number) => PL + ((i + 0.5) / Math.max(1, columns.length)) * (PR - PL)
   const label = axis.toUpperCase()
 
   const userY = (e: React.PointerEvent): number => {
@@ -285,19 +308,30 @@ function AxisPlot({ axis, radial, tuning, table, present, strength, onStrength, 
     if (!ctm) return 0
     return pt.matrixTransform(ctm.inverse()).y
   }
-  const handleDown = (e: React.PointerEvent, bucket: string, edge: 'min' | 'max') => {
+  const handleDown = (e: React.PointerEvent, column: Column, edge: 'min' | 'max') => {
     e.preventDefault()
     ;(e.currentTarget as Element).setPointerCapture(e.pointerId)
-    dragRef.current = { bucket, edge }
+    dragRef.current = { column, edge }
+  }
+  // A column's handles span its rungs: the lowest min and the highest max.
+  const spanOf = (column: Column): BandRange => {
+    const ranges = column.rungs.map(r => bandRangeFor(table, r))
+    return { min: Math.min(...ranges.map(r => r.min)), max: Math.max(...ranges.map(r => r.max)) }
   }
   const handleMove = (e: React.PointerEvent) => {
     const drag = dragRef.current
     if (!drag) return
-    const cur = bandRangeFor(table, drag.bucket)
+    const { column, edge } = drag
     const v = clamp(snap(valForY(axis, userY(e)), W_STEP), W_MIN, W_MAX)
-    onBand(drag.bucket, drag.edge === 'min'
-      ? { min: Math.min(v, cur.max - W_STEP), max: cur.max }
-      : { min: cur.min, max: Math.max(v, cur.min + W_STEP) })
+    // Every rung's edge shifts alike, as far as keeps each in range and no band inverted.
+    const ranges = column.rungs.map(r => bandRangeFor(table, r))
+    const bounds: Bound[] = ranges.map(r => edge === 'min'
+      ? { value: r.min, lo: W_MIN, hi: r.max - W_STEP }
+      : { value: r.max, lo: r.min + W_STEP, hi: W_MAX })
+    const d = alikeShift(v - spanOf(column)[edge], bounds)
+    onBands(column.rungs.map((r, i) => [r, edge === 'min'
+      ? { min: ranges[i].min + d, max: ranges[i].max }
+      : { min: ranges[i].min, max: ranges[i].max + d }] as const))
   }
   const handleUp = (e: React.PointerEvent) => {
     dragRef.current = null
@@ -305,8 +339,12 @@ function AxisPlot({ axis, radial, tuning, table, present, strength, onStrength, 
   }
   const isHovered = (bucket: string) => hovered !== null && hovered.axis === axis && hovered.bucket === bucket
   const anyHovered = hovered !== null && hovered.axis === axis
+  const backdrops = ladders.flatMap(l => {
+    const at = columns.flatMap((c, i) => (c.ladder === l.id ? [i] : []))
+    return at.length === 0 ? [] : [{ id: l.id, first: at[0], last: at[at.length - 1] }]
+  })
 
-  return (
+  return (<>
     <Plot
       yLabel={`${label} strength`}
       ySlider={
@@ -327,7 +365,7 @@ function AxisPlot({ axis, radial, tuning, table, present, strength, onStrength, 
         <div className="gv-ctl-plot-xlabel">{radial && axis === 'y' ? 'ring: the band centre, innermost first' : `${label} position`}</div>
       }
     >
-      {buckets.length === 0 ? <NothingVisible /> : <svg
+      {columns.length === 0 ? <NothingVisible /> : <svg
         ref={svgRef}
         className="gv-gravity-band-svg"
         viewBox={`0 0 ${AP_W} ${AP_H}`}
@@ -335,49 +373,58 @@ function AxisPlot({ axis, radial, tuning, table, present, strength, onStrength, 
         aria-label={`${label} axis: one column per bucket, its rest band as two handles`}
       >
         <rect x={PL} y={PT} width={PR - PL} height={PB - PT} className="gv-gravity-band-bg" />
+        {backdrops.map(b => (
+          <g key={b.id}>
+            <rect x={colX(b.first) - half} y={PT} width={colX(b.last) - colX(b.first) + 2 * half} height={PB - PT} className="gv-ctl-ladder-backdrop" />
+            <text x={(colX(b.first) + colX(b.last)) / 2} y={PT + 10} textAnchor="middle" className="gv-ctl-ladder-label">{b.id}</text>
+          </g>
+        ))}
         <g className="gv-gravity-band-stripes">
-          {buckets.map((b, i) => {
-            const r = bandRangeFor(table, b.id)
-            const yTop = yForWorld(axis, r.min)
-            const yBot = yForWorld(axis, r.max)
-            const half = (PR - PL) / buckets.length / 2
+          {columns.flatMap((c, i) => c.rungs.map((r, k) => {
+            const band = bandRangeFor(table, r)
+            const yTop = yForWorld(axis, band.min)
+            const yBot = yForWorld(axis, band.max)
+            const w = (half * 2) / c.rungs.length
             return (
               <rect
-                key={b.id}
-                x={colX(i) - half} y={yTop} width={half * 2} height={Math.max(0, yBot - yTop)}
-                fill={color(b.id)}
-                className={`gv-gravity-band-stripe${anyHovered && !isHovered(b.id) ? ' dim' : ''}${isHovered(b.id) ? ' active' : ''}`}
+                key={r}
+                x={colX(i) - half + k * w} y={yTop} width={w} height={Math.max(0, yBot - yTop)}
+                fill={color(r)}
+                className={`gv-gravity-band-stripe${anyHovered && !isHovered(r) ? ' dim' : ''}${isHovered(r) ? ' active' : ''}`}
               />
             )
-          })}
+          }))}
         </g>
-        {buckets.map((b, i) => {
+        {columns.map((c, i) => {
           const x = colX(i)
-          const r = bandRangeFor(table, b.id)
-          const yTop = yForWorld(axis, r.min)
-          const yBot = yForWorld(axis, r.max)
-          const c = color(b.id)
+          const span = spanOf(c)
+          const yTop = yForWorld(axis, span.min)
+          const yBot = yForWorld(axis, span.max)
+          const col = color(c.rungs[0])
+          const bucket = bucketOf.get(c.id)
           return (
             <g
-              key={b.id}
-              className={`gv-gravity-band-col${anyHovered && !isHovered(b.id) ? ' dim' : ''}${isHovered(b.id) ? ' active' : ''}`}
-              onPointerEnter={() => onHover({ axis, bucket: b.id })}
-              onPointerLeave={() => { if (!dragRef.current) onHover(null) }}
+              key={c.id}
+              className={`gv-gravity-band-col${anyHovered && !isHovered(c.id) ? ' dim' : ''}${isHovered(c.id) ? ' active' : ''}`}
+              // A collapsed ladder stands for several buckets; hovering it links none.
+              onPointerEnter={c.collapsed ? undefined : () => onHover({ axis, bucket: c.id })}
+              onPointerLeave={c.collapsed ? undefined : () => { if (!dragRef.current) onHover(null) }}
             >
-              <title>{b.label}</title>
-              <text x={x} y={PT - 6} textAnchor="middle" className="gv-gravity-band-label" style={{ fill: c }}>{b.abbreviation}</text>
+              <title>{c.collapsed ? `The ${c.id} ladder: each handle moves every rung alike` : bucket?.label}</title>
+              <text x={x} y={PT - 6} textAnchor="middle" className="gv-gravity-band-label" style={{ fill: col }}>{c.collapsed ? c.id : bucket?.abbreviation}</text>
               <line x1={x} y1={PT} x2={x} y2={PB} className="gv-gravity-band-track" />
-              <line x1={x} y1={yTop} x2={x} y2={yBot} stroke={c} className="gv-gravity-band-stem" />
-              <circle cx={x} cy={yTop} r={DOT_R} fill={c} className="gv-gravity-band-dot"
-                onPointerDown={e => handleDown(e, b.id, 'min')} onPointerMove={handleMove} onPointerUp={handleUp} />
-              <circle cx={x} cy={yBot} r={DOT_R} fill={c} className="gv-gravity-band-dot"
-                onPointerDown={e => handleDown(e, b.id, 'max')} onPointerMove={handleMove} onPointerUp={handleUp} />
+              <line x1={x} y1={yTop} x2={x} y2={yBot} stroke={col} className="gv-gravity-band-stem" />
+              <circle cx={x} cy={yTop} r={DOT_R} fill={col} className="gv-gravity-band-dot"
+                onPointerDown={e => handleDown(e, c, 'min')} onPointerMove={handleMove} onPointerUp={handleUp} />
+              <circle cx={x} cy={yBot} r={DOT_R} fill={col} className="gv-gravity-band-dot"
+                onPointerDown={e => handleDown(e, c, 'max')} onPointerMove={handleMove} onPointerUp={handleUp} />
             </g>
           )
         })}
       </svg>}
     </Plot>
-  )
+    <LadderToggles ladders={ladders} collapsed={collapsed} onToggle={toggle} />
+  </>)
 }
 
 // The band force-response curve for this axis — how the pull grows with

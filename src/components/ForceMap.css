@@ -38,6 +38,16 @@
 .gv-spring-plot-bg { fill: var(--gv-color-bg); opacity: 0.5; }
 .gv-spring-grid { stroke: var(--gv-color-border); stroke-width: 1; opacity: 0.6; }
 
+/* A chain: a ladder's rungs joined in declaration order, under the tokens. */
+.gv-spring-chain {
+  fill: none;
+  stroke: var(--gv-color-text-muted);
+  stroke-width: 1.5;
+  stroke-opacity: 0.35;
+  stroke-linejoin: round;
+  pointer-events: none;
+}
+
 /* Spring map tokens */
 .gv-spring-token { cursor: grab; }
 .gv-spring-token:active { cursor: grabbing; }

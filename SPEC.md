@@ -157,7 +157,11 @@ a 2D map and a curve:
   100). One solid token per bucket; dragging it sets both values. Tokens that
   coincide, as every bucket does on a freshly picked axis, fan out on a small
   ring; a drag still writes the token's own value. The `push` and
-  `coreRadiusMultiplier` sliders run along the axes they scale.
+  `coreRadiusMultiplier` sliders run along the axes they scale. On the style
+  axis, two or more shown rungs of a ladder (values sharing a `ladder` id) are
+  joined by a faint line in declaration order; its toggle under the map
+  collapses them to one ringed token at their centroid, which moves every shown
+  rung alike, as far as all stay in range, and links no hover.
 - **Push curve** — each bucket's falloff against distance, its core radius
   marked; the `exp` slider (0.5 to 1.0, default 0.7) beneath.
 - **Pull map** — x is rest length, y is stiffness. One token per spring
@@ -185,7 +189,11 @@ body shows.
   slider shared by both axes. On a scalar axis the plot is a gradient whose two
   ends are the handles, and dragging them past each other flips the axis; until
   the user drags, the span follows the taxonomy. 1 sits at the top of both
-  plots.
+  plots. On the style axis a ladder's shown rungs stand side by side on a faint
+  backdrop under its id; its toggle under the plot collapses them to one
+  column of their stripes, whose handles shift every min, or every max, alike,
+  as far as none leaves the plot or inverts its band, and which links no hover.
+  Each plot collapses on its own.
 - **Topological** — `F = strength × depthᵉˣᵖ × d`, a depth-to-pull curve, and
   its strength and `exp` sliders.
 

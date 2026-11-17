@@ -170,7 +170,7 @@ export interface TaxonomySpec {
    * value on the style axis. Absent, a grey disc with a question mark that
    * rests anywhere in the stack.
    */
-  fallbackStyle?: Omit<NodeStyle, 'id'>
+  fallbackStyle?: Omit<NodeStyle, 'id' | 'ladder'>
   /** The edge types, in control-panel order. Absent, none: every edge draws untyped in its relation's stroke, and `validateGraph` says so. */
   edgeTypes?: readonly EdgeType[]
   /**
@@ -221,7 +221,7 @@ export interface TaxonomySpec {
 }
 
 /** The style for a value the taxonomy does not declare, when the host declares none. */
-const DEFAULT_FALLBACK: Omit<NodeStyle, 'id'> = {
+const DEFAULT_FALLBACK: Omit<NodeStyle, 'id' | 'ladder'> = {
   label: 'Unknown',
   icon: '?',
   color: { light: { fill: '#CBD5E1', border: '#94A3B8' }, dark: { fill: '#64748B', border: '#94A3B8' } },
@@ -232,9 +232,10 @@ const DEFAULT_FALLBACK: Omit<NodeStyle, 'id'> = {
 /**
  * Build the container, refusing an incoherent spec: a value declared twice, an
  * edge type declared twice, running between values nobody declared or naming
- * no value at an end, a filter axis declared twice, a colour no reader can
- * parse, a band whose ends cross, a policy outside its vocabulary, a scalar
- * id already taken. Every problem is named at once, by its path in the spec.
+ * no value at an end, a ladder id empty or equal to a value's, a filter axis
+ * declared twice, a colour no reader can parse, a band whose ends cross, a
+ * policy outside its vocabulary, a scalar id already taken. Every problem is
+ * named at once, by its path in the spec.
  * To derive a variant, build one from a spec (`createTaxonomy({ ...spec, … })`);
  * spreading the built object copies closures that still read the original's
  * fields.
@@ -278,7 +279,12 @@ export function createTaxonomy(spec: TaxonomySpec): Taxonomy {
     band(`${where}.physics.band.x`, style.physics?.band?.x)
     band(`${where}.physics.band.y`, style.physics?.band?.y)
   }
-  for (const v of spec.styles) checkStyle(`styles.${v.id}`, v)
+  for (const v of spec.styles) {
+    checkStyle(`styles.${v.id}`, v)
+    // A collapsed ladder is a token named by its id, so the id is no value's.
+    if (v.ladder === '') problems.push(`styles.${v.id}.ladder is empty; name the ladder, or leave it out`)
+    else if (v.ladder !== undefined && valueSet.has(v.ladder)) problems.push(`styles.${v.id}.ladder is ${JSON.stringify(v.ladder)}, a style value's id; name the ladder apart from its values`)
+  }
   const fallbackSpec = spec.fallbackStyle ?? DEFAULT_FALLBACK
   checkStyle('fallbackStyle', fallbackSpec)
   const edgeIds = new Set<EdgeTypeId>()
