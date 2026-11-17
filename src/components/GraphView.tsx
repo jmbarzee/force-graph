@@ -26,8 +26,8 @@ import { axisOptions, layoutAxisOptions, pairTuning, sprungEdges } from '../grap
 import { copyGroups, copyKeyOf } from '../graph/model'
 import type { NodeScaleParams } from '../graph/node-scale'
 import { CONTAINMENT_STROKE, NEUTRAL_STROKE } from '../graph/shapes'
-import { defaultLayoutFor, layoutsEqual, makeLayout, openLayout } from '../graph/layout-internal'
-import type { LayoutState } from '../graph/layout'
+import { defaultTuningFor, tuningsEqual, makeTuning, openTuning } from '../graph/tuning-internal'
+import type { Tuning } from '../graph/tuning'
 import { TaxonomyContext, useTaxonomy } from './graph-view/useTaxonomy'
 import type { Taxonomy } from '../graph/taxonomy'
 import { worldToScreen } from '../graph/viewport'
@@ -245,18 +245,18 @@ export interface GraphViewProps {
   /** Per theme, the tokens `createTheme` overrides on the pane's root. */
   tokens?: ThemeTokens
   /**
-   * The layout — the force tuning and the node scale, as the user set them.
+   * The tuning — the forces and the node scale, as the user set them.
    * Controlled while defined: the view reads it, retunes it for the graph and
    * taxonomy it faces (a tuning on an axis the graph no longer carries
-   * returns to the style axis, reported through `onLayoutChange`), and
-   * otherwise never writes it. Absent, the view keeps the layout:
-   * `defaultLayout`, else the taxonomy's defaults.
+   * returns to the style axis, reported through `onTuningChange`), and
+   * otherwise never writes it. Absent, the view keeps the tuning:
+   * `defaultTuning`, else the taxonomy's defaults.
    */
-  layout?: LayoutState
-  /** Every change to the layout — the user's tuning in the control panel and the view's retune for a new graph or taxonomy. */
-  onLayoutChange?: (next: LayoutState) => void
-  /** Where the view's own layout starts when the host does not control it — `layoutFromJSON`'s answer, say. Read once. */
-  defaultLayout?: LayoutState
+  tuning?: Tuning
+  /** Every change to the tuning — the user's in the control panel and the view's retune for a new graph or taxonomy. */
+  onTuningChange?: (next: Tuning) => void
+  /** Where the view's own tuning starts when the host does not control it — `createTuning`'s or `tuningFromJSON`'s answer, say. Read once. */
+  defaultTuning?: Tuning
 
   /**
    * The selection the user made — a click, Enter, Escape, a search pick, a
@@ -274,6 +274,8 @@ export interface GraphViewProps {
   onHover?: (node: GraphNode | null) => void
   /** The theme the pane resolved to draw in — the choice, or the host's for `system`. */
   onThemeResolved?: (theme: Theme) => void
+  /** Every node's position, by id, each time the simulation comes to rest on its own — not when the user pauses it: a layout to keep and hand back as `defaultPositions`. */
+  onSettled?: (positions: ReadonlyMap<string, Position>) => void
 }
 
 const NO_GROUPS: readonly NodeGroup[] = []
@@ -309,8 +311,8 @@ export const GraphView = React.forwardRef<GraphViewHandle, GraphViewProps>(funct
   axes: hostAxes, onAxesChange, defaultAxes,
   search: searchProp, onSearchChange, defaultSearch,
   theme: themeProp, onThemeChange, defaultTheme, systemTheme, tokens,
-  layout: layoutProp, onLayoutChange, defaultLayout,
-  onSelectionChange, onNodeActivate, onHover, onThemeResolved, onDiagnostics,
+  tuning: tuningProp, onTuningChange, defaultTuning,
+  onSelectionChange, onNodeActivate, onHover, onThemeResolved, onDiagnostics, onSettled,
 }: GraphViewProps, ref) {
   // The taxonomy: the prop, or the context. Neither is a wiring bug a
   // default would hide, so it is said here, once, before any hook.
@@ -467,24 +469,24 @@ export const GraphView = React.forwardRef<GraphViewHandle, GraphViewProps>(funct
     if (!continued) requestFrame({ ids: graph.nodes.map(n => n.id), when: 'warm', hold: true })
   }
 
-  // The layout: the host's while `layout` is defined, the view's own
+  // The tuning: the host's while `tuning` is defined, the view's own
   // otherwise. Every write — the control panel's, a retune — goes through
-  // `updateLayout`, which composes two writes in one tick the way the filter's
+  // `tuningRef`, which composes two writes in one tick the way the filter's
   // ref does, tells the host, and applies the write when the view owns it.
-  const [rawLayout, setLayout] = useControllable<LayoutState>(layoutProp, onLayoutChange, () => defaultLayout ?? defaultLayoutFor(taxonomy), 'layout')
-  // Compared by content, as the filter is: a host that re-reads its layout
+  const [rawTuning, setTuning] = useControllable<Tuning>(tuningProp, onTuningChange, () => defaultTuning ?? defaultTuningFor(taxonomy), 'tuning')
+  // Compared by content, as the filter is: a host that re-reads its tuning
   // from JSON each render is not read as a change, and the retune does not
   // write back every render.
-  const layout = openLayout(useStable(rawLayout, layoutsEqual))
-  const layoutRef = useLatest(layout)
+  const tuning = openTuning(useStable(rawTuning, tuningsEqual))
+  const tuningRef = useLatest(tuning)
   const updateForces = React.useCallback((fn: (prev: ForceParams) => ForceParams) => {
-    const prev = layoutRef.current
+    const prev = tuningRef.current
     const forces = fn(prev.forces)
     if (forces === prev.forces) return
-    const next = makeLayout(forces, prev.nodeScale)
-    layoutRef.current = next
-    setLayout(next)
-  }, [layoutRef, setLayout])
+    const next = makeTuning(forces, prev.nodeScale)
+    tuningRef.current = next
+    setTuning(next)
+  }, [tuningRef, setTuning])
 
   // Simulation spine: the instance, version signal, running flag, the force
   // parameters as retuned for this graph and taxonomy, and every
@@ -502,7 +504,7 @@ export const GraphView = React.forwardRef<GraphViewHandle, GraphViewProps>(funct
     onNodeDragMove: handleNodeDragMove,
     onNodeDragEnd: handleNodeDragEnd,
     onToggleRunning: handleToggleRunning,
-  } = useSimulation(graph, taxonomy, defaultPositions, onSimRebuild, layout.forces, updateForces)
+  } = useSimulation(graph, taxonomy, defaultPositions, onSimRebuild, tuning.forces, updateForces)
 
   const dragNode = React.useCallback((id: string, wx: number, wy: number) => {
     releaseFrame()
@@ -541,16 +543,16 @@ export const GraphView = React.forwardRef<GraphViewHandle, GraphViewProps>(funct
     handleRelayout({ pair: pairTuning(mapping) })
   }, [forceParams.pair.mapping.axis, handleRelayout])
 
-  // Render-time node sizing — the layout's other half, tunable from the
+  // Render-time node sizing — the tuning's other half, tunable from the
   // Controls panel (Misc → Node scaling); a pure-render concern, so a change
   // reheats nothing.
-  const nodeScale = layout.nodeScale
+  const nodeScale = tuning.nodeScale
   const handleNodeScaleChange = React.useCallback((patch: Partial<NodeScaleParams>) => {
-    const prev = layoutRef.current
-    const next = makeLayout(prev.forces, { ...prev.nodeScale, ...patch })
-    layoutRef.current = next
-    setLayout(next)
-  }, [layoutRef, setLayout])
+    const prev = tuningRef.current
+    const next = makeTuning(prev.forces, { ...prev.nodeScale, ...patch })
+    tuningRef.current = next
+    setTuning(next)
+  }, [tuningRef, setTuning])
 
   // The locks a focus overrode — the view's own, or a host's under a new
   // key — go to the bar under a key of the view's, which it flashes once.
@@ -702,8 +704,12 @@ export const GraphView = React.forwardRef<GraphViewHandle, GraphViewProps>(funct
     return { visibleMatchIds: split.visible, hiddenMatchCount: split.hiddenCount, hiddenMatches: split.hiddenByAxis }
   }, [searchQuery, visibleIds, filter, axes, taxonomy, hostIndex])
 
+  // Every node's position, by id: what `getPositions` answers and `onSettled` hears.
+  const positions = () => new Map((simRef.current?.nodes ?? []).map(n => [n.id, { x: n.x, y: n.y }]))
+  const onSettledRef = useLatest(onSettled)
   const { fps } = useSimulationLoop({
     simRef, running, setRunning,
+    onSettled: () => onSettledRef.current?.(positions()),
     visibleIds, downstreamScores,
     filter, axes: filterAxes, groupsOf,
     hoveredNodeId, selectedNodeId,
@@ -846,7 +852,7 @@ export const GraphView = React.forwardRef<GraphViewHandle, GraphViewProps>(funct
     focusNode: focusNodeById,
     select: requestSelect,
     fit: handleFitToView,
-    getPositions: () => new Map((simRef.current?.nodes ?? []).map(n => [n.id, { x: n.x, y: n.y }])),
+    getPositions: positions,
     setPositions: (next: ReadonlyMap<string, Position>) => {
       const sim = simRef.current
       if (!sim) return

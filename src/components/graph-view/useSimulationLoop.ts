@@ -21,6 +21,8 @@ export interface SimulationLoopParams {
   simRef: React.MutableRefObject<Simulation | null>
   running: boolean
   setRunning: React.Dispatch<React.SetStateAction<boolean>>
+  /** The simulation came to rest on its own: not a pause, which stops the loop without it. */
+  onSettled: () => void
   visibleIds: Set<string>
   downstreamScores: Map<string, number>
   filter: FilterState
@@ -37,7 +39,7 @@ export interface SimulationLoopParams {
 }
 
 export function useSimulationLoop({
-  simRef, running, setRunning,
+  simRef, running, setRunning, onSettled,
   visibleIds, downstreamScores,
   filter, axes, groupsOf,
   hoveredNodeId, selectedNodeId,
@@ -81,6 +83,7 @@ export function useSimulationLoop({
       if (sim.isStable()) {
         releaseFrame()
         setRunning(false)
+        onSettled()
         return
       }
 

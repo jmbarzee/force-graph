@@ -3,10 +3,11 @@
 // bucket with its rest band as two handles (or, on a scalar axis, a gradient
 // with its two ends), the axis's strength, the force
 // curve beneath. Y carries the Radial switch — the way radial mode is entered:
-// Y's bands become rings about the origin and X is ignored. Topological
-// keeps its own switch: a depth→pull curve plus strength/exp sliders. Center
-// gravity is the unexplained baseline (active when both axes are at zero
-// strength and Topological is off), so it has no control here.
+// Y's bands become rings about the origin and X is ignored. Topological,
+// like X and Y, has no switch: its strength at 0 is off, beside a depth→pull
+// curve and the exp slider. Center gravity is the unexplained baseline
+// (active when both axes and Topological are at zero strength), so it has no
+// control here.
 
 import React from 'react'
 import type { PresentSets } from './GraphControlPanel'
@@ -46,8 +47,7 @@ export function GravityControls({ params, resolved, axes, onParamChange, onRelay
         <SubTab label="X Axis" active={sub === 'x'} onSelect={() => setSub('x')} />
         <SubTab label="Y Axis" active={sub === 'y'} onSelect={() => setSub('y')}
           leading={<ForceSwitch label="Radial layout: Y as distance from the centre" enabled={params.radial} onToggle={v => onRelayout({ radial: v })} />} />
-        <SubTab label="Topological" active={sub === 'topological'} onSelect={() => setSub('topological')}
-          leading={<ForceSwitch label="Topological gravity enabled" enabled={params.topologicalEnabled} onToggle={v => onRelayout({ topologicalEnabled: v })} />} />
+        <SubTab label="Topological" active={sub === 'topological'} onSelect={() => setSub('topological')} />
       </SubTabs>
 
       <SubTabBodies>
@@ -60,7 +60,7 @@ export function GravityControls({ params, resolved, axes, onParamChange, onRelay
             onParamChange={onParamChange} onRelayout={onRelayout} hovered={hovered} onHover={onHover} />
         </SubTabBody>
         <SubTabBody active={sub === 'topological'}>
-          <div className={`gv-gravity-section-tools gv-gravity-topo${params.topologicalEnabled ? '' : ' inactive'}`}>
+          <div className={`gv-gravity-section-tools gv-gravity-topo${params.gravityTopological > 0 ? '' : ' inactive'}`}>
             <Equation>{<>F = <FormulaValue id="topoStrength">strength</FormulaValue> × depth<sup><FormulaValue id="topoExp">exp</FormulaValue></sup> × d</>}</Equation>
             <TopologicalCurve exp={params.gravityTopologicalExp} />
             <div className="gv-gravity-slider-row">

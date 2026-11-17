@@ -373,7 +373,7 @@ export function bandAxesActing(params: GravityParams): boolean {
 }
 
 export function topologicalActing(params: GravityParams): boolean {
-  return params.topologicalEnabled && params.gravityTopological > 0
+  return params.gravityTopological > 0
 }
 
 /**

@@ -1,9 +1,10 @@
 // The host shell, leaning on the view's defaults. It controls the state its own
 // panel writes (the filter) or follows (the selection, which closing the panel
 // clears), hands the theme choice in from the URL, asks the view to reveal a
-// node by naming it (`focus`), and leaves the axes, the locks and the search to
-// the view. It supplies what only the host can know — findings, programme
-// groups, and what "Open details" does.
+// node by naming it (`focus`), keeps where the nodes came to rest across a
+// reload, and leaves the axes, the locks and the search to the view. It
+// supplies what only the host can know — findings, programme groups, and what
+// "Open details" does.
 
 import React from 'react'
 import {
@@ -15,6 +16,7 @@ import type {
 import { catalog } from './data'
 import type { Campus, Catalog } from './data'
 import { buildGraph, programmeGroups } from './graph'
+import { loadPositions, savePositions } from './positions'
 import { CAMPUS, CAMPUS_LABEL, ENTITY, taxonomy } from './taxonomy'
 import type { Entity } from './taxonomy'
 import './app.css'
@@ -49,6 +51,8 @@ export function App({ initialTheme = 'system' }: { initialTheme?: ThemeChoice })
   // A request, not a state: the view applies it when it changes, and each ask
   // is a fresh one, so asking again for the same node asks again.
   const [focus, requestFocus] = useFocusRequest()
+  // Where the nodes last came to rest: a reload opens there.
+  const [kept] = React.useState(() => loadPositions(localStorage))
 
 
   /** Ask the view to reveal `node`: it widens the filter just enough, centres and selects. */
@@ -76,6 +80,8 @@ export function App({ initialTheme = 'system' }: { initialTheme?: ThemeChoice })
             selectedId={selected?.id ?? null}
             onSelectionChange={setSelected}
             focus={focus}
+            defaultPositions={kept}
+            onSettled={positions => savePositions(localStorage, positions)}
           />
         </div>
         {details && (
