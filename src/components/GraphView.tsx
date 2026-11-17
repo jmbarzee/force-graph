@@ -15,8 +15,8 @@ import type { ForceParams, SimNode, Simulation } from '../graph/simulation'
 import { bandOverlay, resolvePhysics } from '../graph/forces'
 import { countsOn, mappingKey, valuesOn } from '../graph/axis'
 import type { AxisId, AxisLabels, AxisMapping } from '../graph/axis'
-import { coloringsEqual, fillOf } from '../graph/coloring'
-import type { Coloring } from '../graph/coloring'
+import { coloringsEqual, fillOf, glowOf } from '../graph/coloring'
+import type { Coloring, SetColoring } from '../graph/coloring'
 import { FillContext, useFill } from './graph-view/useFill'
 import { bucketsFill } from './controls/bucketColor'
 import type { PresentSets } from './graph-view/present'
@@ -46,7 +46,7 @@ import { CanvasErrorBoundary } from './CanvasErrorBoundary'
 import { GraphControlPanel } from './GraphControlPanel'
 import { hiddenByOf } from './controls/NothingVisible'
 import { Scrubber } from './Scrubber'
-import { activeGroupsOf, boostGroupsForNodes, cohesionOf, groupSlotsOf, groupsByNode, nodeGroupsOf, type ActiveGroup, type Groups, type NodeGroup } from '../graph/groups'
+import { activeGroupsOf, boostGroupsForNodes, cohesionOf, groupsByNode, nodeGroupsOf, type ActiveGroup, type Groups, type NodeGroup } from '../graph/groups'
 import { FilterBar } from './FilterBar'
 import type { SearchState } from './FilterBar'
 export type { SearchState } from './FilterBar'
@@ -83,9 +83,9 @@ export interface NodeAction {
 
 /** What `groupsControl` may ask of the view. */
 export interface GroupsControl {
-  /** Whether the filter shows this group (its `GROUPS` entry). */
+  /** Whether the filter shows this group (its `GROUPS` entry); always, while the glow follows another colouring. */
   shown(id: string): boolean
-  /** Show or hide this group, as the bar writes an axis: `onFilterChange` names `GROUPS` touched. Absent when the filter is read-only. */
+  /** Show or hide this group, as the bar writes an axis: `onFilterChange` names `GROUPS` touched. Absent when the filter is read-only, or the glow follows another colouring. */
   toggle?(id: string): void
   /** Emphasise one group (a legend row under the pointer), or none; the view glows it stronger. */
   emphasize(id: string | null): void
@@ -163,7 +163,7 @@ export interface GraphViewProps {
   counts?: ReadonlyMap<string, ReadonlyMap<string, number>> | 'faceted'
   /** The host's findings bars, rendered under the filter chips. */
   findings?: React.ReactNode
-  /** Groups to glow, over the whole graph: derived from the data, or listed. The view settles membership once per graph and groups, then restricts each to the visible set and colours it. */
+  /** Groups over the whole graph, derived from the data or listed: what the `GROUPS` filter and cohesion read, and the glow unless `coloring.glow` says otherwise. The view settles membership once per graph and groups, then restricts each to the visible set and colours it. */
   groups?: Groups
   /** A multiplier on the stiffness of every edge whose two ends share a visible group, so members drift together. Default 1, off. */
   groupCohesion?: number
@@ -173,9 +173,10 @@ export interface GraphViewProps {
    * Where the nodes' colours come from. `fill` colours each node's body by
    * its key — the canvas, the chips, the control rows and the hover box
    * alike; absent, the style axis's. Icon, size and physics stay on the style
-   * axis, and a new colouring repaints without relaying the layout.
+   * axis, and a new colouring repaints without relaying the layout. `glow`
+   * glows each key's nodes as one group; absent, it follows `groups`.
    */
-  coloring?: { fill?: Coloring }
+  coloring?: { fill?: Coloring; glow?: SetColoring }
   /** Edges to mark, by id, with a dashed band behind their stroke; a graduated edge is marked when the edge it stands for is. */
   markedEdges?: ReadonlySet<string>
   /** The host's action for a node, offered in the hover box: one for every node, or the host's answer per node (null for none). */
@@ -449,7 +450,6 @@ export const GraphView = React.forwardRef<GraphViewHandle, GraphViewProps>(funct
     return { diagnostics, graph: withContainmentEdges(dropInvalid(hostGraph, diagnostics)) }
   }, [hostGraph, taxonomy])
   const { groups: nodeGroups, diagnostics: groupDiagnostics } = React.useMemo(() => nodeGroupsOf(groups ?? NO_GROUPS, graph.nodes), [groups, graph])
-  const groupSlots = React.useMemo(() => groupSlotsOf(nodeGroups, graph.edges), [nodeGroups, graph])
   const groupsOf = React.useMemo(() => groupsByNode(nodeGroups), [nodeGroups])
   // What each filter axis can take, read off the graph: the engine declares no
   // value vocabulary, so the bar learns an axis's domain from the nodes.
@@ -460,10 +460,12 @@ export const GraphView = React.forwardRef<GraphViewHandle, GraphViewProps>(funct
   // The fill, resolved apart from the simulation: a new colouring repaints.
   const fillColoring = useStable(coloring?.fill, coloringsEqual)
   const fill = React.useMemo(() => fillOf(fillColoring, graph, taxonomy), [fillColoring, graph, taxonomy])
+  const glowColoring = useStable(coloring?.glow, coloringsEqual)
+  const glow = React.useMemo(() => glowOf(glowColoring, graph, taxonomy, groups ?? NO_GROUPS), [glowColoring, graph, taxonomy, groups])
   const diagnostics = React.useMemo(() => {
-    const added = [...groupDiagnostics, ...fill.diagnostics, ...tintDiagnostics(taxonomy, valuesByAxis, fill)]
+    const added = [...groupDiagnostics, ...fill.diagnostics, ...glow.diagnostics, ...tintDiagnostics(taxonomy, valuesByAxis, fill)]
     return added.length ? [...graphDiagnostics, ...added] : graphDiagnostics
-  }, [graphDiagnostics, groupDiagnostics, fill, taxonomy, valuesByAxis])
+  }, [graphDiagnostics, groupDiagnostics, fill, glow, taxonomy, valuesByAxis])
   const graphIndex = React.useMemo(() => nodesById(graph.nodes), [graph])
   const counts = React.useMemo(
     () => (typeof hostCounts === 'object' ? hostCounts : countsOn(graph.nodes, axes, hostCounts && { filter, taxonomy })),
@@ -744,16 +746,18 @@ export const GraphView = React.forwardRef<GraphViewHandle, GraphViewProps>(funct
 
   const hiddenBy = React.useMemo(() => hiddenByOf(graph.nodes, filter, groupsOf), [graph, filter, groupsOf])
 
-  // The groups as drawn: the ones the filter shows, restricted to the visible
-  // set and coloured by slot, the one its control emphasises glowing stronger.
-  // Drives the canvas glow and the host's control.
+  // The glow as drawn: each source the filter shows, restricted to the visible
+  // set, the one its control emphasises glowing stronger. Only a glow over the
+  // groups answers to the `GROUPS` filter. Drives the canvas glow and the
+  // host's control.
   const [emphasizedGroup, setEmphasizedGroup] = React.useState<string | null>(null)
-  const groupsHandle = React.useMemo<GroupsControl>(() => ({
+  const glowsGroups = !glowColoring || glowColoring.by === 'groups'
+  const groupsHandle = React.useMemo<GroupsControl>(() => glowsGroups ? {
     shown: id => selects(selectionFor(filter, GROUPS), id),
     toggle: filterWritable ? id => userWriteFilter(toggleValue(filterRef.current, GROUPS, id), [GROUPS]) : undefined,
     emphasize: setEmphasizedGroup,
-  }), [filter, filterWritable, userWriteFilter, filterRef])
-  const activeGroups = React.useMemo(() => activeGroupsOf(nodeGroups, groupSlots, visibleIds, groupsHandle.shown, theme, emphasizedGroup), [nodeGroups, groupSlots, visibleIds, groupsHandle, theme, emphasizedGroup])
+  } : { shown: () => true, emphasize: setEmphasizedGroup }, [glowsGroups, filter, filterWritable, userWriteFilter, filterRef])
+  const activeGroups = React.useMemo(() => activeGroupsOf(glow.sources, visibleIds, groupsHandle.shown, theme, emphasizedGroup), [glow, visibleIds, groupsHandle, theme, emphasizedGroup])
 
   // Canvas glow set: the active groups with the group under the hovered/selected
   // node strengthened, so one group surfaces from many faint ones as the pointer

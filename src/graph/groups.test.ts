@@ -1,7 +1,6 @@
 import { describe, expect, it } from 'vitest'
-import { activeGroupsOf, cohesionOf, groupsByNode, groupSlotsOf, nodeGroupsOf } from './groups'
-import { PALETTE } from './scheme'
-import type { DerivedGroups, NodeGroup } from './groups'
+import { activeGroupsOf, boostGroupsForNodes, cohesionOf, groupsByNode, groupSlotsOf, NODE_FOCUS_STRENGTH, nodeGroupsOf } from './groups'
+import type { DerivedGroups, GlowSource, NodeGroup } from './groups'
 import type { GraphEdge, GraphNode } from './model'
 
 const node = (id: string, sets: string[]): GraphNode => ({ id, name: id, values: {}, payload: { sets } })
@@ -37,11 +36,11 @@ describe('nodeGroupsOf', () => {
     expect(nodeGroupsOf(listed, nodes)).toEqual({ groups: listed, diagnostics: [] })
   })
 
-  it('drops a colour that is not hex, rgb() or hsl(), with one warning, for a palette slot', () => {
+  it('drops a colour that is not hex, rgb() or hsl(), with one warning', () => {
     for (const color of ['nope', '#11223344', 'var(--x)']) {
       const { groups, diagnostics } = nodeGroupsOf([group('x', 'a')].map(g => ({ ...g, color })), nodes)
       expect(diagnostics.map(d => d.code)).toEqual(['key-color-invalid'])
-      expect(activeGroupsOf(groups, groupSlotsOf(groups, []), new Set(['a']))[0]!.color).toBe(PALETTE[0].dark)
+      expect(groups[0]!.color).toBeUndefined()
     }
     expect(nodeGroupsOf({ ...derived, keys: [{ id: 'red', label: 'Red', color: 'nope' }] }, nodes).diagnostics.map(d => d.code)).toContain('key-color-invalid')
   })
@@ -53,29 +52,30 @@ describe('groupsByNode', () => {
   })
 })
 
-describe('activeGroupsOf over derived groups', () => {
-  it('recolours no key when a filter hides every member of another', () => {
-    const { groups } = nodeGroupsOf(derived, nodes)
-    const colours = (visible: string[]) => new Map(activeGroupsOf(groups, groupSlotsOf(groups, []), new Set(visible)).map(g => [g.id, g.color]))
-    const all = colours(['a', 'b', 'c', 'd'])
-    const redHidden = colours(['c', 'd'])
-    expect(redHidden.has('red')).toBe(false)
-    expect(redHidden.get('green')).toBe(all.get('green'))
-    expect(all.get('green')).toBe(PALETTE[2].dark)
+describe('activeGroupsOf', () => {
+  const hue = { light: '#010101', dark: '#fefefe' }
+  const source = (id: string, ...ids: string[]): GlowSource => ({ id, nodeIds: new Set(ids), color: hue })
+  const sources = [source('red', 'a', 'b'), source('blue', 'b'), source('green', 'c')]
+
+  it('restricts each source to the visible set and drops the empty', () => {
+    expect(activeGroupsOf(sources, new Set(['b', 'c'])).map(g => [g.id, [...g.nodeIds]])).toEqual([['red', ['b']], ['blue', ['b']], ['green', ['c']]])
+    expect(activeGroupsOf(sources, new Set(['c'])).map(g => g.id)).toEqual(['green'])
   })
 
-  it('draws a hue colour in its theme and a string in both', () => {
-    const hue = { light: '#010101', dark: '#fefefe' }
-    const groups = [{ ...group('x', 'a'), color: hue }, { ...group('y', 'a'), color: '#123456' }]
-    for (const theme of ['light', 'dark'] as const) {
-      expect(activeGroupsOf(groups, groupSlotsOf(groups, []), new Set(['a']), undefined, theme).map(g => g.color)).toEqual([hue[theme], '#123456'])
-    }
+  it('draws each source in its colour for the theme', () => {
+    for (const theme of ['light', 'dark'] as const) expect(activeGroupsOf(sources, new Set(['a']), undefined, theme)[0]!.color).toBe(hue[theme])
   })
 
-  it('draws no glow for a group not shown, and recolours none of the others', () => {
-    const { groups } = nodeGroupsOf(derived, nodes)
-    const drawn = activeGroupsOf(groups, groupSlotsOf(groups, []), new Set(['a', 'b', 'c']), id => id !== 'red')
-    expect(drawn.map(g => [g.id, g.color])).toEqual([['blue', '#123456'], ['green', PALETTE[2].dark]])
+  it('draws no glow for a source not shown', () => {
+    expect(activeGroupsOf(sources, new Set(['a', 'b', 'c']), id => id !== 'red').map(g => g.id)).toEqual(['blue', 'green'])
+  })
+
+  it('glows the emphasised source stronger, and boosts any holding a focused node', () => {
+    const drawn = activeGroupsOf(sources, new Set(['a', 'b', 'c']), undefined, 'dark', 'green')
+    expect(drawn.map(g => g.strength)).toEqual([1, 1, expect.any(Number)])
+    expect(drawn[2]!.strength).toBeGreaterThan(1)
+    expect(boostGroupsForNodes(drawn, ['a', null]).map(g => g.strength)).toEqual([NODE_FOCUS_STRENGTH, 1, drawn[2]!.strength])
+    expect(boostGroupsForNodes(drawn, [null])).toBe(drawn)
   })
 })
 

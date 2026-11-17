@@ -353,10 +353,14 @@ the console. Everything else is optional.
   icon, size and physics stay on the style axis, and a new colouring
   repaints without relaying the layout. A key no colouring declares
   (`key-undeclared`) and a chip `tint` naming no key (`tint-undeclared`)
-  are diagnostics, and draw neutral.
+  are diagnostics, and draw neutral. `coloring={{ glow }}` glows each key's
+  nodes as one group by a `SetColoring`: a `Coloring`, or `{ by: 'groups' }`,
+  the default, the view's `groups`. A key's `weight` swells its glow as a
+  group's does; `groups` still drive the `GROUPS` filter and cohesion, and
+  `toggle` writes `GROUPS` only while the glow follows them.
 
   ```tsx
-  <GraphView graph={graph} taxonomy={taxonomy} coloring={{ fill: { by: 'axis', axis: 'team' } }} />
+  <GraphView graph={graph} taxonomy={taxonomy} coloring={{ fill: { by: 'axis', axis: 'team' }, glow: { by: 'axis', axis: 'site' } }} />
   ```
 - **Inputs.** `counts` (chip badges; the graph's entity counts unless given,
   the copies of one `copyKey` once; `'faceted'` counts each axis under the

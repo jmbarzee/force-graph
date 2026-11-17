@@ -4,14 +4,14 @@
 // node by naming it (`focus`), keeps where the nodes came to rest across a
 // reload, and leaves the axes, the locks and the search to the view. It
 // supplies what only the host can know — findings, programme groups, a preset
-// of its own, and what "Open details" does.
+// of its own, and what "Open details" does — and glows by programme or campus.
 
 import React from 'react'
 import {
   GraphView, GroupLegend, TUNING_PRESETS, TaxonomyContext, copyGroups, copyKeyOf, initialFilter, nodesById, payloadNumber, payloadString, useFocusRequest, useScheme, withSelection,
 } from '@jmbarzee/force-graph'
 import type {
-  FilterState, GraphNode, ThemeChoice, TuningPreset,
+  FilterState, GraphNode, SetColoring, ThemeChoice, TuningPreset,
 } from '@jmbarzee/force-graph'
 import { CAMPUS_LABEL, catalog } from './data'
 import type { Campus, Catalog } from './data'
@@ -27,6 +27,9 @@ const nodeByCode = new Map(graph.nodes.map(n => [payloadString(n, 'code') ?? n.i
 const copies = copyGroups(graph)
 const groups = programmeGroups(catalog)
 const labels = { [CAMPUS]: CAMPUS_LABEL }
+/** What the glow can follow: the programmes, or the campus axis while the programmes stay declared. */
+const GLOW = { programmes: { by: 'groups' }, campus: { by: 'axis', axis: CAMPUS } } satisfies Record<string, SetColoring>
+type GlowBy = keyof typeof GLOW
 
 /** Data-quality warnings the registrar should see. */
 function findingsOf(data: Catalog): string[] {
@@ -61,11 +64,21 @@ export function App({ initialTheme = 'system', initialFocus }: { initialTheme?: 
   React.useEffect(() => { if (initialFocus) requestFocus(initialFocus) }, [initialFocus, requestFocus])
   // Where the nodes last came to rest: a reload opens there.
   const [kept] = React.useState(() => loadPositions(localStorage))
+  const [glowBy, setGlowBy] = React.useState<GlowBy>('programmes')
 
 
   /** Ask the view to reveal `node`: it widens the filter just enough, frames and selects. */
   const reveal = (node: GraphNode) => requestFocus(node.id)
   const onlyCampus = (campus: string) => setFilter(f => withSelection(f, CAMPUS, new Set([campus])))
+  const glowSwitch = (
+    <label>
+      Glow by{' '}
+      <select value={glowBy} onChange={e => setGlowBy(e.target.value as GlowBy)}>
+        <option value="programmes">Programmes</option>
+        <option value="campus">Campus</option>
+      </select>
+    </label>
+  )
 
   return (
     <TaxonomyContext.Provider value={taxonomy}>
@@ -77,9 +90,10 @@ export function App({ initialTheme = 'system', initialFocus }: { initialTheme?: 
             counts="faceted"
             findings={FINDINGS.length > 0 && <Findings messages={FINDINGS} />}
             groups={groups}
-            groupsControl={(active, control) => (
-              <GroupLegend title="Degree programmes" items={groups.keys} active={active} control={control} />
-            )}
+            coloring={{ glow: GLOW[glowBy] }}
+            groupsControl={(active, control) => glowBy === 'programmes'
+              ? <GroupLegend title="Degree programmes" items={groups.keys} active={active} control={control}>{glowSwitch}</GroupLegend>
+              : <div className="gv-group-legend">{glowSwitch}</div>}
             presets={PRESETS}
             nodeAction={{ label: 'Open details', onSelect: setDetails }}
             onNodeActivate={setDetails}
