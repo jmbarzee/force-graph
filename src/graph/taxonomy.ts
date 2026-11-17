@@ -378,7 +378,7 @@ export function createTaxonomy(spec: TaxonomySpec): Taxonomy {
   const styles: Record<AxisValue, ResolvedNodeStyle> = Object.create(null)
   spec.styles.forEach((v, i) => { styles[v.id] = resolveNodeStyleDefaults(v, i, n) })
   // The fallback rests anywhere in the stack: it is nobody's tier.
-  const fallback = resolveNodeStyleDefaults({ id: '', label: DEFAULT_FALLBACK.label, color: DEFAULT_FALLBACK.color, ...fallbackSpec }, 0, 1)
+  const fallback = resolveNodeStyleDefaults({ id: '', ...fallbackSpec, label: fallbackSpec.label ?? DEFAULT_FALLBACK.label, color: fallbackSpec.color ?? DEFAULT_FALLBACK.color }, 0, 1)
   if (n > 0 && fallbackSpec.physics?.band?.y === undefined) {
     fallback.physics.band.y = { min: styles[values[0]].physics.band.y.min, max: styles[values[n - 1]].physics.band.y.max }
   }

@@ -2,15 +2,14 @@
 
 A force-directed graph view with composable axes, as a React component.
 
-A host declares what its graph is made of — the **axes** its nodes carry values on,
-the **values** on each — through
-`createTaxonomy(spec)`. It builds a `Graph` of nodes and edges carrying
-their values on those axes, and mounts `GraphView`. The view lays the graph out (push and
-pull on any axis the nodes carry, two layout axes keyed on an axis or a
-computed scalar), filters it on any declared axis, highlights it, and lets the
-user tune the forces — without knowing what any node or edge means. The host's
-vocabulary never enters this package. What the user sees and does is
-[SPEC.md](SPEC.md).
+A host declares what its graph is made of — the **axes** its nodes carry
+values on, the **values** on each — through `createTaxonomy(spec)`. It builds
+a `Graph` of nodes and edges carrying their values on those axes, and mounts
+`GraphView`. The view lays the graph out (push and pull on any axis the nodes
+carry, two layout axes keyed on an axis or a computed scalar), filters it on
+any declared axis, highlights it, and lets the user tune the forces — without
+knowing what any node or edge means. The host's vocabulary never enters this
+package. What the user sees and does is [SPEC.md](SPEC.md).
 
 ## Install
 
