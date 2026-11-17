@@ -7,20 +7,22 @@ import React from 'react'
 import { DEFAULT_VIEWPORT, followResize } from '../../graph/viewport'
 import type { PaneSize, Viewport } from '../../graph/viewport'
 import type { SimNode } from '../../graph/simulation'
-import { frameView } from './frame'
+import { frameQueue, frameView } from './frame'
 import { useLatest } from './useControllable'
 import { useIsomorphicLayoutEffect } from './useIsomorphicLayoutEffect'
 import type { FrameRequest } from './frame'
 
 export interface ViewportController {
   viewport: Viewport
+  // The user's move, which releases a held frame.
   setViewport: React.Dispatch<React.SetStateAction<Viewport>>
   containerRef: React.RefObject<HTMLDivElement>
   overlayRef: React.RefObject<HTMLDivElement>
   overlayHeight: number
   requestFrame: (request: FrameRequest) => void
-  // Frame what `requestFrame` held, as the layout's alpha allows; the loop calls it each tick.
+  // Frame what `requestFrame` left waiting or holding, as the layout's alpha allows; the loop calls it each tick.
   tickFrame: (alpha: number) => void
+  releaseFrame: () => void
 }
 
 /** The camera, framing the nodes `drawn` holds. */
@@ -71,7 +73,6 @@ export function useViewport(drawn: React.RefObject<readonly SimNode[]>): Viewpor
     return () => ro.disconnect()
   }, [measure])
 
-  // Whether the pane measured something to frame in: a hidden one does not.
   const apply = React.useCallback((request: FrameRequest): boolean => {
     const size = measure()
     if (!size?.width || !size.height) return false
@@ -80,26 +81,11 @@ export function useViewport(drawn: React.RefObject<readonly SimNode[]>): Viewpor
     return true
   }, [measure, drawn, overlayHeightRef])
 
-  // A warm request waits for a measured pane; the others act once, framed or not.
-  const held = React.useRef<{ warm?: FrameRequest; next?: FrameRequest }>({})
-  const requestFrame = React.useCallback((request: FrameRequest) => {
-    if (request.when) { held.current[request.when] = request; return }
-    apply(request)
-    request.then?.()
-  }, [apply])
-  const tickFrame = React.useCallback((alpha: number) => {
-    const { warm, next } = held.current
-    if (warm) {
-      if (alpha >= 0.3 || !apply(warm)) return
-      held.current.warm = undefined
-      warm.then?.()
-    }
-    if (next) {
-      held.current.next = undefined
-      apply(next)
-      next.then?.()
-    }
-  }, [apply])
+  const queue = React.useMemo(() => frameQueue(apply), [apply])
+  const move = React.useCallback((action: React.SetStateAction<Viewport>) => {
+    queue.release()
+    setViewport(action)
+  }, [queue])
 
-  return { viewport, setViewport, containerRef, overlayRef, overlayHeight, requestFrame, tickFrame }
+  return { viewport, setViewport: move, containerRef, overlayRef, overlayHeight, requestFrame: queue.request, tickFrame: queue.tick, releaseFrame: queue.release }
 }

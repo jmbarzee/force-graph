@@ -1,7 +1,8 @@
 import { describe, expect, it } from 'vitest'
 import { worldToScreen } from '../../graph/viewport'
 import type { SimNode } from '../../graph/simulation'
-import { frameView } from './frame'
+import { frameQueue, frameView } from './frame'
+import type { FrameRequest } from './frame'
 
 const node = (id: string, x: number, y: number) => ({ id, x, y }) as SimNode
 const drawn = [node('a', -100, -50), node('b', 200, 80), node('c', 40, 300)]
@@ -29,5 +30,50 @@ describe('frameView', () => {
     expect(next.scale).toBe(1.2)
     expect(worldToScreen(next, 200, 80)).toEqual([400, 360])
     expect(frameView(vp, { ids: ['b'], minScale: 0 }, drawn, area).scale).toBe(vp.scale)
+  })
+})
+
+describe('frameQueue', () => {
+  const queued = () => {
+    const framed: FrameRequest[] = []
+    return { framed, queue: frameQueue(request => { framed.push(request); return true }) }
+  }
+  const opening = { ids: ['a'], when: 'warm', hold: true } as const
+
+  it('holds a frame from the first warm tick, running its then once', () => {
+    const { framed, queue } = queued()
+    let thens = 0
+    queue.request({ ...opening, then: () => thens++ })
+    queue.tick(0.5)
+    expect(framed).toEqual([])
+    queue.tick(0.29); queue.tick(0.2); queue.tick(0.1)
+    expect(framed).toHaveLength(3)
+    expect(thens).toBe(1)
+  })
+
+  it('releases a held frame, and one waiting to hold, at once', () => {
+    const { framed, queue } = queued()
+    queue.request(opening)
+    queue.release()
+    queue.tick(0.1)
+    queue.request(opening)
+    queue.tick(0.1)
+    queue.release()
+    queue.tick(0.1)
+    expect(framed).toHaveLength(1)
+  })
+
+  it('releases a held frame for a newer request, and for a next one acting after it', () => {
+    const { framed, queue } = queued()
+    const fit = { ids: ['b'] }
+    queue.request(opening)
+    queue.tick(0.1)
+    queue.request(fit)
+    queue.tick(0.1)
+    const focus = { ids: ['c'], when: 'next' } as const
+    queue.request(focus)
+    queue.request(opening)
+    queue.tick(0.1); queue.tick(0.1)
+    expect(framed).toEqual([opening, fit, opening, focus])
   })
 })

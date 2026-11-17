@@ -28,6 +28,7 @@ export interface SimulationLoopParams {
   selectedNodeId: string | null
   requestFrame: (request: FrameRequest) => void
   tickFrame: (alpha: number) => void
+  releaseFrame: () => void
   taxonomy: Taxonomy
 }
 
@@ -36,7 +37,7 @@ export function useSimulationLoop({
   visibleIds, downstreamScores,
   filter, axes,
   hoveredNodeId, selectedNodeId,
-  requestFrame, tickFrame, taxonomy,
+  requestFrame, tickFrame, releaseFrame, taxonomy,
 }: SimulationLoopParams): { fps: number } {
   // Frame-rate indicator. Updated ~2×/sec from the loop.
   const [fps, setFps] = React.useState(0)
@@ -73,6 +74,7 @@ export function useSimulationLoop({
       }
 
       if (sim.isStable()) {
+        releaseFrame()
         setRunning(false)
         return
       }
@@ -138,7 +140,7 @@ export function useSimulationLoop({
       }
       sim.reheat(alpha)
       if (resume) setRunning(true)
-      if (refit) requestFrame({ ids: sim.nodes.map(n => n.id), when: 'warm' })
+      if (refit) requestFrame({ ids: sim.nodes.map(n => n.id), when: 'warm', hold: true })
     }
     prevFilter.current = filter
   }, [filter]) // eslint-disable-line react-hooks/exhaustive-deps

@@ -411,7 +411,7 @@ export const GraphView = React.forwardRef<GraphViewHandle, GraphViewProps>(funct
   // Camera (viewport transform, container and overlay refs, every framing),
   // framing the visible nodes, set below once they are derived.
   const visibleNodesRef = React.useRef<SimNode[]>([])
-  const { viewport, setViewport, containerRef, overlayRef, overlayHeight, requestFrame, tickFrame } = useViewport(visibleNodesRef)
+  const { viewport, setViewport, containerRef, overlayRef, overlayHeight, requestFrame, tickFrame, releaseFrame } = useViewport(visibleNodesRef)
   // The simulation instance + its handlers are owned by useSimulation, and the
   // RAF loop + fps by useSimulationLoop, both called below once `graph` and the
   // visible subgraph are available.
@@ -458,7 +458,7 @@ export const GraphView = React.forwardRef<GraphViewHandle, GraphViewProps>(funct
   // build effect. A rebuild that carried the layout over keeps the user's pan
   // and zoom.
   const onSimRebuild = (continued: boolean) => {
-    if (!continued) requestFrame({ ids: graph.nodes.map(n => n.id), when: 'warm' })
+    if (!continued) requestFrame({ ids: graph.nodes.map(n => n.id), when: 'warm', hold: true })
   }
 
   // The layout: the host's while `layout` is defined, the view's own
@@ -497,6 +497,12 @@ export const GraphView = React.forwardRef<GraphViewHandle, GraphViewProps>(funct
     onNodeDragEnd: handleNodeDragEnd,
     onToggleRunning: handleToggleRunning,
   } = useSimulation(graph, taxonomy, defaultPositions, onSimRebuild, layout.forces, updateForces)
+
+  // A drag, like a pan or zoom, releases a held frame.
+  const dragNode = React.useCallback((id: string, wx: number, wy: number) => {
+    releaseFrame()
+    handleNodeDragStart(id, wx, wy)
+  }, [releaseFrame, handleNodeDragStart])
 
 
   // The dense per-bucket tables the kernels read, resolved once per
@@ -692,7 +698,7 @@ export const GraphView = React.forwardRef<GraphViewHandle, GraphViewProps>(funct
     visibleIds, downstreamScores,
     filter, axes: filterAxes,
     hoveredNodeId, selectedNodeId,
-    requestFrame, tickFrame, taxonomy,
+    requestFrame, tickFrame, releaseFrame, taxonomy,
   })
 
   // What the host hears: the hover, a double-click, the resolved theme and
@@ -988,7 +994,7 @@ export const GraphView = React.forwardRef<GraphViewHandle, GraphViewProps>(funct
             edges={visibleEdges}
             viewport={viewport}
             onViewportChange={setViewport}
-            onNodeDragStart={handleNodeDragStart}
+            onNodeDragStart={dragNode}
             onNodeDragMove={handleNodeDragMove}
             onNodeDragEnd={handleNodeDragEnd}
             onDoubleClickNode={handleDoubleClickNode}
