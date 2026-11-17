@@ -32,8 +32,8 @@ library holds and why.
 ## The forces
 
 - **`ForceParams` and the force kernels are not part of any surface.** The
-  layout a host holds (`LayoutState`) is opaque, and its plain-data form
-  (`LayoutJSON`) spells every field out, so the shipped declarations never
+  tuning a host holds (`Tuning`) is opaque, and its plain-data form
+  (`TuningJSON`) spells every field out, so the shipped declarations never
   reach the engine's types.
 - **Per-bucket tuning is one constructed value, and sparse**: the mapping with
   only the overrides the user set. Everything else resolves to the taxonomy's

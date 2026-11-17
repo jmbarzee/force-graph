@@ -179,8 +179,8 @@ brightens its curve and dims the rest, and the reverse.
 ### Gravity
 
 Sub-tabs **X Axis**, **Y Axis** (carrying the Radial switch) and
-**Topological** (carrying its on/off switch). A switch never changes which
-body shows.
+**Topological**. Each force is off at a strength of 0, with no switch of its
+own. The Radial switch never changes which body shows.
 
 - **X Axis / Y Axis** — `F = strength × dᵉˣᵖ`, an axis dropdown (a node axis
   within the ceiling, or a scalar), a plot with one column per bucket and its
@@ -197,8 +197,8 @@ body shows.
 - **Topological** — `F = strength × depthᵉˣᵖ × d`, a depth-to-pull curve, and
   its strength and `exp` sliders.
 
-A body whose force does nothing — zero strength, X in radial, Topological
-off — stays shown, dimmed. Center gravity has no control.
+A body whose force does nothing — zero strength, X in radial — stays shown,
+dimmed. Center gravity has no control.
 
 ### Misc
 

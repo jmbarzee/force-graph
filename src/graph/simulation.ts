@@ -407,7 +407,6 @@ export interface GravityParams {
   // Center gravity strength: radial pull toward the world origin — the baseline
   // cohesion/anchor force used when neither band axis nor Topological is active.
   gravityCenter: number
-  topologicalEnabled: boolean
 }
 
 // DYNAMICS — how the simulation cools and damps over time.
@@ -484,7 +483,6 @@ export function defaultParamsFor(taxonomy: Taxonomy): ForceParams {
     gravityTopological: 0,
     gravityTopologicalExp: 3,
     gravityCenter: 0.05,
-    topologicalEnabled: false,
 
     // Dynamics. alphaMin is well below the d3 default (0.001) so the
     // simulation continues into its slow-cooling tail — layouts read as

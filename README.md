@@ -72,7 +72,7 @@ The containment edges from each service to its team are derived from
 otherwise, and is classified as `'calls'` because that is the one declared type
 between two services; the filter axis is the style axis unless others are
 declared; the filter, the locks, the axes shown, the search, the theme, the
-selection and the layout are the view's own until the host asks for them.
+selection and the tuning are the view's own until the host asks for them.
 
 ## The taxonomy
 
@@ -232,12 +232,12 @@ A parent with no height gives the pane none, and the pane says so once on
 the console. Everything else is optional.
 
 - **State.** The filter, the locks, the axes shown, the search control
-  (`{ query, active }`), the theme choice, the selection and the layout each
+  (`{ query, active }`), the theme choice, the selection and the tuning each
   follow the React convention: pass the value and its callback to control it,
   neither to let the view keep it, the callback alone to be told; and each
   has a `default*` prop for where the view's own starts (`defaultFilter`,
   `defaultLocks`, `defaultAxes`, `defaultSearch`, `defaultTheme`,
-  `defaultSelectedId`, `defaultLayout`), read once. A controlled value is the
+  `defaultSelectedId`, `defaultTuning`), read once. A controlled value is the
   host's: the view never rewrites it, and warns once if the prop flips
   between defined and undefined. `initialFilter(taxonomy, graph)` is the
   filter the view starts from — an `initialSelection` that splits a chip is
@@ -277,18 +277,22 @@ the console. Everything else is optional.
   node. Null, or a newer request, withdraws a waiting one unreported.
   `useFocusRequest()` gives a host the request and a `requestFocus(id)` that
   makes each ask new.
-- **Layout.** `layout` is the force tuning and the node scale as the user
-  set them: which axis push and pull key on and the buckets they changed,
-  the two layout axes (an axis's bands, or a computed scalar's span), the
-  multipliers, gravities and dynamics. `onLayoutChange` hears every change —
+- **Tuning.** `tuning` is the forces and the node scale as the user set
+  them: which axis push and pull key on and the buckets they changed, the
+  two layout axes (an axis's bands, or a computed scalar's span), the
+  multipliers, gravities and dynamics. `onTuningChange` hears every change —
   the control panel's and the view's own retune for a new graph or taxonomy
   (a tuning on an axis the graph no longer carries returns to the style
-  axis). `layoutToJSON(layout)` carries it to a store and `layoutFromJSON(json,
-  taxonomy)` back; the JSON form (`LayoutJSON`) fills whatever it leaves out
-  from the taxonomy's defaults, so it is also how a host writes a start:
-  `defaultLayout={layoutFromJSON({ forces: { bandY: { scalar: 'credits' } } },
-  taxonomy)}` opens the view laid out on a scalar. The `LayoutState` itself
-  is opaque: keep it and hand it back.
+  axis). The `Tuning` itself is opaque: keep it and hand it back.
+  `createTuning(json, taxonomy)` is how a host writes one: the JSON form
+  (`TuningJSON`) fills whatever it leaves out from the taxonomy's defaults,
+  so `createTuning({}, taxonomy)` is the default tuning, and
+  `defaultTuning={createTuning({ forces: { bandY: { scalar: 'credits' } } },
+  taxonomy)}` opens the view laid out on a scalar. It throws on a mistake
+  and names its path (`forces.bandY.scalar: no scalar "credit"`).
+  `tuningToJSON(tuning)` carries a tuning to a store and
+  `tuningFromJSON(json, taxonomy)` back, answering undefined, never a throw,
+  for stored data that is not its shape.
 - **Inputs.** `counts` (chip badges; the graph's entity counts unless given,
   the copies of one `copyKey` once; `'faceted'` counts each axis under the
   other axes' selections),
@@ -326,11 +330,12 @@ the console. Everything else is optional.
 - **Outputs.** `onSelectionChange(node | null)`, `onNodeActivate(node)` on a
   double-click, `onHover(node | null)`, `onThemeResolved(theme)`,
   `onDiagnostics(diagnostics)` whenever the graph's defects are recomputed
-  (the first graph's included), `onLayoutChange(layout)`. Every node handed
-  out is the host's own object. The resolved theme is for the host's own
-  chrome beside the pane; a host that writes it as a `data-theme` on an
-  ancestor of the pane passes `systemTheme` too, so `'system'` follows the
-  host's answer and not the pane's own echo.
+  (the first graph's included), `onTuningChange(tuning)`,
+  `onSettled(positions)` each time the simulation comes to rest on its own
+  (not on a pause). Every node handed out is the host's own object. The
+  resolved theme is for the host's own chrome beside the pane; a host that
+  writes it as a `data-theme` on an ancestor of the pane passes `systemTheme`
+  too, so `'system'` follows the host's answer and not the pane's own echo.
 - **The handle.** Through a ref, `focusNode(id)` reveals, centres and selects
   a node in one call — it widens the filter on the axes shown and the groups
   it belongs to when the group filter hides it, flashes a lock
@@ -338,8 +343,9 @@ the console. Everything else is optional.
   whether the node ended visible (a value absent on a hiding axis cannot be
   revealed); `select(id | null)` sets or clears the selection; `fit()` frames
   the visible set; `getPositions()` and `setPositions()` carry a layout out
-  and back in; `updateFilter(fn)` rewrites the filter, the axes `fn` changes
-  counting as the user's.
+  and back in, as `onSettled` and `defaultPositions` do across a reload;
+  `updateFilter(fn)` rewrites the filter, the axes `fn` changes counting as
+  the user's.
 - **What to know.** The view's own filter re-seeds on a graph change for
   every axis the user has not touched — a controlled filter never does — and
   `onFilterChange` hears it. `onHover(null)` arrives 150 ms after the pointer
