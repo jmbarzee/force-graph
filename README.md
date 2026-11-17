@@ -193,10 +193,11 @@ engine compares them and never parses one.
   dangling endpoint, an unknown relation, a type the rule returns that the
   table lacks, a duplicate node or edge id, a parent not in the graph. The
   view runs it, lists the diagnostics under the bar, hands them to
-  `onDiagnostics` and draws what remains — adding one warning of its own,
+  `onDiagnostics` and draws what remains — adding two warnings of its own:
   `containment-untyped`, when a containment edge it derived from `parentId`
-  has no declared type; a host that wants to refuse a bad graph calls it
-  first.
+  has no declared type, and `group-key-undeclared`, once per key a derived
+  group's `of` answers that its `keys` do not declare. A host that wants to
+  refuse a bad graph calls it first.
 
 ## The view
 
@@ -265,8 +266,13 @@ the console. Everything else is optional.
   is opaque: keep it and hand it back.
 - **Inputs.** `counts` (chip badges; the graph's entity counts unless given,
   the copies of one `copyKey` once),
-  `findings` under the bar, `groups` to glow (each with a `color` or the
-  palette's), `groupsControl` for a legend inside the pane (anchor it under
+  `findings` under the bar, `groups` to glow (derived from the data as
+  `{ keys, of }` — the `LegendKey`s, `{ id, label, color? }`, and a function
+  answering each node's keys — or listed as `NodeGroup`s, each an id and the
+  node ids it covers; membership is settled once per graph and groups, and a
+  key or group with no `color` takes the palette's slot for its place in the
+  list, so a filter that hides one recolours no other), `groupsControl` for a
+  legend inside the pane (anchor it under
   `--gv-toolbar-height`, and handed the groups as drawn and `emphasize`;
   `GroupLegend` is one — items, the active groups, a toggle and the
   emphasis), `markedEdges` (edge ids drawn with a dashed band behind their

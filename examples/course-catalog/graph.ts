@@ -1,14 +1,18 @@
 // The translation step: a catalog in, a `Graph` out. One node per faculty,
 // department, course listing and lab; a cross-listed course becomes one node
-// per listing, sharing a `copyKey`.
+// per listing, sharing a `copyKey`. A course and its labs carry the programmes
+// that list any of their codes, which `programmeGroups` reads.
 
-import type { Graph, GraphEdge, GraphNode } from '@jmbarzee/force-graph'
+import type { DerivedGroups, Graph, GraphEdge, GraphNode } from '@jmbarzee/force-graph'
 import type { Catalog, Requirement } from './data'
 import { CAMPUS, ENTITY, REQUIREMENT } from './taxonomy'
 
 const subjectOf = (code: string) => code.split(' ')[0]
 /** "MATH 210" → 2; "CHEM 101L" → 1. */
 const levelOf = (code: string) => Number(code.split(' ')[1]?.[0] ?? 0)
+/** The ids of the programmes that list any of `codes`. */
+const programmesOf = (catalog: Catalog, codes: readonly string[]) =>
+  catalog.programmes.filter(p => p.courses.some(code => codes.includes(code))).map(p => p.id)
 
 export function buildGraph(catalog: Catalog): Graph {
   const nodes: GraphNode[] = []
@@ -53,6 +57,7 @@ export function buildGraph(catalog: Catalog): Graph {
     })
   }
   for (const c of catalog.courses) {
+    const programmes = programmesOf(catalog, c.listings)
     for (const code of c.listings) {
       const dept = ids.has(`dept:${subjectOf(code)}`) ? `dept:${subjectOf(code)}` : undefined
       byCode.set(code, `course:${code}`)
@@ -68,6 +73,7 @@ export function buildGraph(catalog: Catalog): Graph {
           term: c.term,
           level: levelOf(code),
           courseId: c.id,
+          programmes,
         },
         // A listing under a subject no department owns is set apart: the ring.
         ring: dept === undefined ? 'dashed' : undefined,
@@ -87,6 +93,7 @@ export function buildGraph(catalog: Catalog): Graph {
           credits: lab.credits,
           term: c.term,
           level: levelOf(lab.code),
+          programmes: [...new Set([...programmes, ...programmesOf(catalog, [lab.code])])],
         },
       })
     }
@@ -98,4 +105,12 @@ export function buildGraph(catalog: Catalog): Graph {
   }
 
   return { nodes, edges }
+}
+
+/** Every programme as a group, in the catalog's order; a node belongs to the enabled ones its `programmes` name. */
+export function programmeGroups(catalog: Catalog, enabled: ReadonlySet<string>): DerivedGroups {
+  return {
+    keys: catalog.programmes.map(p => ({ id: p.id, label: p.name })),
+    of: node => ((node.payload?.programmes ?? []) as string[]).filter(id => enabled.has(id)),
+  }
 }

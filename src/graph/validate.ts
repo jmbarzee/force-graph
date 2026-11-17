@@ -19,7 +19,8 @@ import type { Taxonomy } from './taxonomy'
  * graph. Warnings: an edge no type claims, a style value the taxonomy does
  * not declare, containment edges that contradict `parentId`, derived
  * containment edges no type claims (`containment-untyped`, from
- * `derivedContainmentDiagnostics`).
+ * `derivedContainmentDiagnostics`), a group key the groups do not declare
+ * (`group-key-undeclared`, from `nodeGroupsOf`).
  */
 export type GraphDiagnosticCode =
   | 'edge-id-duplicate'
@@ -33,6 +34,7 @@ export type GraphDiagnosticCode =
   | 'node-value-undeclared'
   | 'node-id-duplicate'
   | 'containment-untyped'
+  | 'group-key-undeclared'
 
 /** One defect in a host's graph, as data: its severity, its code, a message, and the node or edge it names. */
 export interface GraphDiagnostic {

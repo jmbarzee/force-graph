@@ -10,11 +10,11 @@ import {
   GraphView, GroupLegend, TaxonomyContext, copyGroups, initialFilter, nodesById, payloadNumber, payloadString, schemeVars, selectionFor, useFocusRequest, withSelection,
 } from '@jmbarzee/force-graph'
 import type {
-  AxisSelection, FilterState, Graph, GraphNode, NodeGroup, Theme, ThemeChoice,
+  AxisSelection, FilterState, GraphNode, Theme, ThemeChoice,
 } from '@jmbarzee/force-graph'
 import { catalog } from './data'
 import type { Campus, Catalog } from './data'
-import { buildGraph } from './graph'
+import { buildGraph, programmeGroups } from './graph'
 import { CAMPUS, CAMPUS_LABEL, ENTITY, taxonomy } from './taxonomy'
 import type { Entity } from './taxonomy'
 import './app.css'
@@ -58,23 +58,6 @@ function findingsOf(data: Catalog): string[] {
 }
 const FINDINGS = findingsOf(catalog)
 
-/** The legend's rows: every programme the catalog offers, drawn or not. */
-const PROGRAMMES = catalog.programmes.map(p => ({ id: p.id, label: p.name }))
-
-/** A programme glows over every copy of its courses and their labs. */
-function programmeGroups(g: Graph, enabled: ReadonlySet<string>): NodeGroup[] {
-  const copies = copyGroups(g)
-  return catalog.programmes.filter(p => enabled.has(p.id)).map(p => {
-    const ids = new Set<string>()
-    for (const code of p.courses) {
-      const node = nodeByCode.get(code)
-      if (node) for (const copy of copies.get(node.copyKey ?? node.id) ?? []) ids.add(copy)
-    }
-    for (const n of g.nodes) if (n.parentId && ids.has(n.parentId)) ids.add(n.id)
-    return { id: p.id, nodeIds: ids }
-  })
-}
-
 export function App({ initialTheme = 'system' }: { initialTheme?: ThemeChoice }) {
   // Controlled: the details panel's "Show only <campus>" writes the filter.
   const [filter, setFilter] = React.useState<FilterState>(() => initialFilter(taxonomy, graph))
@@ -91,7 +74,7 @@ export function App({ initialTheme = 'system' }: { initialTheme?: ThemeChoice })
   const [theme, setTheme] = React.useState<Theme>('light')
 
   const counts = React.useMemo(() => countsOf(catalog, selectionFor(filter, CAMPUS)), [filter])
-  const groups = React.useMemo(() => programmeGroups(graph, enabled), [enabled])
+  const groups = React.useMemo(() => programmeGroups(catalog, enabled), [enabled])
 
   /** Ask the view to reveal `node`: it widens the filter just enough, centres and selects. */
   const reveal = (node: GraphNode) => requestFocus(node.id)
@@ -109,7 +92,7 @@ export function App({ initialTheme = 'system' }: { initialTheme?: ThemeChoice })
             groupsControl={(active, control) => (
               <GroupLegend
                 title="Degree programmes"
-                items={PROGRAMMES}
+                items={groups.keys}
                 active={active}
                 enabled={enabled}
                 onToggle={id => setEnabled(prev => toggled(prev, id))}
