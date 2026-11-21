@@ -76,6 +76,8 @@ export function useSimulation(
   // Resolved and framed in render, once per change, so the panel and the
   // overlay draw in the same pass as the edit — and a computed scalar's
   // `compute` runs once for it, not once here and again in the simulation.
+  // A scalar's refused answer is the frame's diagnostic, never a throw: this
+  // runs above the pane's error boundary.
   const resolved = React.useMemo(() => resolvePhysics(forceParams, taxonomy), [forceParams, taxonomy])
   const frame = React.useMemo(() => layoutFrame(readableGraph(graph), resolved), [graph, resolved])
   const [simVersion, setSimVersion] = React.useState(0)

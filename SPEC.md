@@ -35,7 +35,10 @@ the energy (alpha) cools, and ticking pauses below a threshold.
   in a band — or on a computed scalar, read across a span from where 0 rests to
   where 1 rests (built in: reach, degree, depth; the catalog adds credits and
   level). A strength of zero turns an axis off; a node with no value on it
-  rests at its centre. A filter change moves no band.
+  rests at its centre. So does a node whose scalar answer is refused (not
+  finite, or outside [0, 1] once normalized), or every node when the scalar
+  throws; the pane's diagnostics name each, never a throw to the host. A
+  filter change moves no band.
 - **Radial**, a switch on Y: Y's buckets become rings about the origin, the
   lowest innermost; X is ignored; the topological pull draws to the centre
   instead of the top. Charge spreads a ring's nodes; nothing acts on angle.
