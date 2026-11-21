@@ -484,4 +484,43 @@ describe('selection', () => {
     expect(reported).toEqual([['n1']])
     expect(drawn.selected).toEqual(new Set(['n0', 'n2']))
   })
+
+  it('warns once of a selected id the graph lacks, and keeps the held one selected', async () => {
+    const onDiagnostics = vi.fn()
+    const root = newRoot(document.createElement('div'))
+    const render = (selectedIds: ReadonlySet<string>) => act(async () => {
+      root.render(React.createElement(GraphView, { graph: three, taxonomy, selectedIds, onDiagnostics }))
+    })
+    await render(new Set(['n0', 'nope']))
+    await render(new Set(['n0', 'nope']))
+    expect(onDiagnostics).toHaveBeenCalledTimes(1)
+    expect(onDiagnostics.mock.calls[0]![0]).toEqual([expect.objectContaining({ severity: 'warning', code: 'selected-node-missing', nodeId: 'nope' })])
+    expect(drawn.selected).toEqual(new Set(['n0']))
+    await render(new Set(['n1', 'nope']))
+    expect(onDiagnostics).toHaveBeenCalledTimes(1)
+  })
+
+  it('warns of a default selected id the graph lacks, and not again on a selection the user makes', async () => {
+    const onDiagnostics = vi.fn()
+    await mount({ defaultSelectedIds: new Set(['n0', 'nope']), onDiagnostics }, three)
+    await act(async () => drawn.select('n1', false))
+    expect(onDiagnostics).toHaveBeenCalledTimes(1)
+    expect(onDiagnostics.mock.calls[0]![0]).toEqual([expect.objectContaining({ severity: 'warning', code: 'selected-node-missing', nodeId: 'nope' })])
+  })
+
+  it('checks the default once, at mount: a later graph that lacks it does not warn', async () => {
+    let reported: readonly GraphDiagnostic[] = []
+    const view = await mount({ defaultSelectedIds: new Set(['n2']), onDiagnostics: d => { reported = d } }, three)
+    await act(async () => drawn.select('n1', false))
+    await view.render(graphOf(['a', 'x'], ['b', 'y']))
+    expect(reported.filter(d => d.code === 'selected-node-missing')).toEqual([])
+  })
+
+  it('warns of a controlled id a new graph no longer holds', async () => {
+    let reported: readonly GraphDiagnostic[] = []
+    const view = await mount({ selectedIds: new Set(['n0', 'n2']), onDiagnostics: d => { reported = d } }, three)
+    expect(reported).toEqual([])
+    await view.render(graphOf(['a', 'x'], ['b', 'y']))
+    expect(reported).toEqual([expect.objectContaining({ severity: 'warning', code: 'selected-node-missing', nodeId: 'n2' })])
+  })
 })
