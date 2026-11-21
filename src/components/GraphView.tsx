@@ -129,7 +129,8 @@ export interface GraphViewChrome {
  * What a host may ask of a mounted view. `focusNode` is the whole focus
  * recipe in one call: widen the filter just enough on the axes shown
  * (overriding a lock, which flashes), frame the node with its neighbors until
- * the layout settles, select it, and flash it.
+ * the layout settles, select it, and flash it. While the pane shows its error
+ * fallback, the ref is `null`.
  */
 export interface GraphViewHandle {
   /** Reveal, frame and select a node by id. False when the id is not in the graph or the filter cannot be widened to show it; a widening frames and selects once the filter shows the node. */
@@ -358,7 +359,15 @@ function selectedMissing(id: string): GraphDiagnostic {
  * drawn on a canvas. Only `graph` and a taxonomy are required; every piece
  * of state is controlled by the host or kept by the view.
  */
-export const GraphView = React.forwardRef<GraphViewHandle, GraphViewProps>(function GraphView({
+export const GraphView = React.forwardRef<GraphViewHandle, GraphViewProps>(function GraphView(props, ref) {
+  return (
+    <CanvasErrorBoundary failed={stringsOf(props.strings).paneFailed}>
+      <GraphViewBody {...props} ref={ref} />
+    </CanvasErrorBoundary>
+  )
+})
+
+const GraphViewBody = React.forwardRef<GraphViewHandle, GraphViewProps>(function GraphViewBody({
   graph: hostGraph,
   taxonomy: taxonomyProp,
   labels,
@@ -1152,7 +1161,6 @@ export const GraphView = React.forwardRef<GraphViewHandle, GraphViewProps>(funct
     <TaxonomyContext.Provider value={taxonomy}>
     <FillContext.Provider value={fill}>
     <StringsContext.Provider value={s}>
-    <CanvasErrorBoundary failed={s.paneFailed}>
     <div
       className={`gv-graph-view${className ? ` ${className}` : ''}`}
       ref={containerRef}
@@ -1366,7 +1374,6 @@ export const GraphView = React.forwardRef<GraphViewHandle, GraphViewProps>(funct
         </div>
       )}
     </div>
-    </CanvasErrorBoundary>
     </StringsContext.Provider>
     </FillContext.Provider>
     </TaxonomyContext.Provider>

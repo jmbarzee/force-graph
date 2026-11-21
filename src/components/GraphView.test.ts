@@ -404,6 +404,30 @@ it('leaves an empty graph to the host', async () => {
   expect(view.el.querySelector('.gv-graph-empty')).toBeNull()
 })
 
+it("shows its fallback for a hook's throw, leaves the host's siblings mounted, and nulls the ref", async () => {
+  // React reports the throw on the console and as a window error before the boundary takes it.
+  const error = vi.spyOn(console, 'error').mockImplementation(() => {})
+  const quiet = (e: ErrorEvent) => e.preventDefault()
+  window.addEventListener('error', quiet)
+  const refusing = createTaxonomy({
+    styleAxis: 'kind', values: [],
+    filterAxes: [{ id: 'team', emptyMeans: 'none', initialChosen: () => { throw new Error('seed refused') } }],
+  })
+  const ref = React.createRef<GraphViewHandle>()
+  const el = document.body.appendChild(document.createElement('div'))
+  await act(async () => {
+    newRoot(el).render(React.createElement('div', null,
+      React.createElement('p', { id: 'sibling' }),
+      React.createElement(GraphView, { ref, graph: first, taxonomy: refusing })))
+  })
+  expect(el.querySelector('[role="alert"]')?.textContent).toContain('seed refused')
+  expect(document.getElementById('sibling')).not.toBeNull()
+  expect(ref.current).toBeNull()
+  el.remove()
+  window.removeEventListener('error', quiet)
+  error.mockRestore()
+})
+
 describe('edge hover', () => {
   const [a, b] = first.nodes
   const prerequisite = { id: 'e', sourceId: 'n0', targetId: 'n1' }
