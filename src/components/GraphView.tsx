@@ -1281,7 +1281,7 @@ export const GraphView = React.forwardRef<GraphViewHandle, GraphViewProps>(funct
         <span className="gv-graph-count">{counted}</span>
       </div>}
 
-      {/* Bottom-center: simulation controls + live fps. */}
+      {/* Bottom-center: the theme button, and the simulation controls and live fps under `transport`. */}
       {(show.transport || show.themeToggle) && <div className="gv-graph-bottom-center">
         {show.transport && <button className="gv-graph-toolbar-btn" onClick={handleFitToView} title="Fit to view (F)">Fit</button>}
         {show.themeToggle && (

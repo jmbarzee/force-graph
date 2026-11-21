@@ -432,8 +432,8 @@ the console. Everything else is optional.
   `updateFilter(fn)` rewrites the filter, the axes `fn` changes counting as
   the user's.
 - **What to know.** The view's own filter re-seeds on a graph change for
-  every axis the user has not touched — a controlled filter never does — and
-  `onFilterChange` hears it. Removing an axis in the
+  every axis the user has not touched — a controlled filter never does.
+  Removing an axis in the
   bar resets its chosen values to "match everything" and fires `onFilterChange`
   before `onAxesChange`; an axis the taxonomy does not declare renders as a
   header with its remove control and filters nothing. Derived containment
@@ -470,11 +470,14 @@ When each output fires. Every node handed out is the host's own object.
 | `onEdgeHover(edge \| null)` | the pointer on an edge while on no node, a graduated edge handed as the host's edge it stands for; null 150 ms after | no |
 | `onNodeActivate(node)` | a double-click on a node | no |
 | `onSettled(positions)` | the simulation coming to rest on its own, not on a pause | once the opening layout rests: the first frame, when `defaultPositions` covers every node |
-| `focusNode(id)` | `onFilterChange` when it widens, then `onSelectionChange` once the node shows; its answer, not `onFocusResult`, says whether it can | — |
-| `select(id \| null)` | `onSelectionChange` when the selection changes | — |
-| `fit()`, `getPositions()` | nothing | — |
-| `setPositions(positions)` | `onSettled` once the layout rests again | — |
-| `updateFilter(fn)` | `onFilterChange` when `fn` changes the filter | — |
+
+| Handle method | Fires |
+|---|---|
+| `focusNode(id)` | `onFilterChange` when it widens, then `onSelectionChange` once the node shows; its answer, not `onFocusResult`, says whether it can |
+| `select(id \| null)` | `onSelectionChange` when the selection changes |
+| `fit()`, `getPositions()` | nothing |
+| `setPositions(positions)` | `onSettled` once the layout rests again |
+| `updateFilter(fn)` | `onFilterChange` when `fn` changes the filter |
 
 ## Two views sharing a bar
 

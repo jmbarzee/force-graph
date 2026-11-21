@@ -25,8 +25,9 @@ export interface Scalar {
    * answer it as one.
    *
    * It is handed the whole graph, not what the filter shows: the host's
-   * nodes, the edges no error diagnostic drops, and the containment edges
-   * derived from `parentId`. It reruns whenever the graph, the taxonomy or
+   * nodes and edges as error diagnostics leave them (a duplicated id's later
+   * node and a refused edge dropped, a refused `parentId` cleared), and the
+   * containment edges derived from `parentId`. It reruns whenever the graph, the taxonomy or
    * the forces' tuning changes. An answer not finite, or outside [0, 1] once
    * normalized, throws from the view's render, naming the scalar and the
    * node, past the pane's own error boundary to the host's.
