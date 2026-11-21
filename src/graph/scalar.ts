@@ -37,7 +37,8 @@ export interface Scalar {
   compute(graph: ReadableGraph): Map<string, number>
   /**
    * How the frame maps the answers onto [0, 1]: `max` (the default) divides
-   * by the largest, so 0 stays 0 and a negative answer is refused;
+   * by the largest, so 0 stays 0 and, when some answer is positive, a
+   * negative one is refused (with none positive, every node scores 0);
    * `range` puts the smallest at 0 and the largest at 1, whatever their
    * sign; `none` says the answers already lie in [0, 1], and the frame
    * refuses one outside it.

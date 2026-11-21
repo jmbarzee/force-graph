@@ -247,11 +247,16 @@ one.
   other than `buckets` or a count not finite and at least 0
   (`'edge-series-invalid'`, a warning: that edge draws as having none). The
   view runs it, lists the diagnostics under the bar, hands them to
-  `onDiagnostics` and draws what remains — adding two warnings of its own:
+  `onDiagnostics` and draws what remains — adding five warnings of its own:
   `'key-undeclared'`, once per key a derived group's `of` answers that its
-  `keys` do not declare, and
+  `keys` do not declare;
   `'key-color-invalid'`, once per group or key whose `color` is not hex,
-  `rgb()` or `hsl()`, which takes a palette colour instead. A host that wants
+  `rgb()` or `hsl()`, which takes a palette colour instead;
+  `'tint-undeclared'`, once per chip whose tint names no key of the fill,
+  which draws neutral; `'scalar-answer-refused'`, once per node a layout
+  scalar answers not finite or outside [0, 1] once normalized, which rests at
+  the axis's centre; and `'scalar-compute-threw'`, once per layout scalar
+  whose `compute` throws, which rests every node there. A host that wants
   to refuse a bad graph calls it first.
 
 ## The view
@@ -465,7 +470,7 @@ When each output fires. Every node handed out is the host's own object.
 | `onThemeResolved(theme)` | the resolved theme changing — for the host's own chrome; a host that writes it as an ancestor's `data-theme` passes `systemTheme` too, so `'system'` follows the host and not the pane's echo | yes |
 | `onTuningChange(next)` | the control panel, a preset, and the view's retune for a new graph or taxonomy | when the tuning it opens with does not fit the first graph |
 | `onPlayheadChange(next)` | the scrubber's seek, play and reset | no |
-| `onDiagnostics(diagnostics)` | the defects recomputed — a new graph, taxonomy, `groups` or colouring — an empty list included | yes |
+| `onDiagnostics(diagnostics)` | the defects recomputed — a new graph, taxonomy, `groups`, colouring or forces' tuning — an empty list included | yes |
 | `onHover(node \| null)` | the pointer reaching a node; null 150 ms after it leaves, so a tooltip can be reached | no |
 | `onEdgeHover(edge \| null)` | the pointer on an edge while on no node, a graduated edge handed as the host's edge it stands for; null 150 ms after | no |
 | `onNodeActivate(node)` | a double-click on a node | no |
