@@ -484,4 +484,27 @@ describe('selection', () => {
     expect(reported).toEqual([['n1']])
     expect(drawn.selected).toEqual(new Set(['n0', 'n2']))
   })
+
+  it('warns once of a selected id the graph lacks, and keeps the held one selected', async () => {
+    const onDiagnostics = vi.fn()
+    const root = newRoot(document.createElement('div'))
+    const render = (selectedIds: ReadonlySet<string>) => act(async () => {
+      root.render(React.createElement(GraphView, { graph: three, taxonomy, selectedIds, onDiagnostics }))
+    })
+    await render(new Set(['n0', 'nope']))
+    await render(new Set(['n0', 'nope']))
+    expect(onDiagnostics).toHaveBeenCalledTimes(1)
+    expect(onDiagnostics.mock.calls[0]![0]).toEqual([expect.objectContaining({ severity: 'warning', code: 'selected-node-missing', nodeId: 'nope' })])
+    expect(drawn.selected).toEqual(new Set(['n0']))
+    await render(new Set(['n1', 'nope']))
+    expect(onDiagnostics).toHaveBeenCalledTimes(1)
+  })
+
+  it('warns of a default selected id the graph lacks, and not again on a selection the user makes', async () => {
+    const onDiagnostics = vi.fn()
+    await mount({ defaultSelectedIds: new Set(['n0', 'nope']), onDiagnostics }, three)
+    await act(async () => drawn.select('n1', false))
+    expect(onDiagnostics).toHaveBeenCalledTimes(1)
+    expect(onDiagnostics.mock.calls[0]![0].map((d: GraphDiagnostic) => [d.code, d.nodeId])).toEqual([['selected-node-missing', 'nope']])
+  })
 })

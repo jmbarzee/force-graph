@@ -201,11 +201,12 @@ export interface GraphViewProps {
    * these and nothing else while it is defined, the empty set none. Compared
    * by value, so a set rebuilt each render is no change. A selection the user
    * makes arrives through `onSelectionChange`; the host answers by setting
-   * this, or does not. An id the graph does not hold is ignored, unreported,
-   * until a graph holds it. Absent, the view keeps the selection itself.
+   * this, or does not. An id the graph does not hold is ignored until a graph
+   * holds it, and reported as `selected-node-missing`. Absent, the view keeps
+   * the selection itself.
    */
   selectedIds?: ReadonlySet<string>
-  /** Where the view's own selection starts when the host does not control it. Read once. */
+  /** Where the view's own selection starts when the host does not control it. Read once; an id the graph does not hold is dropped and reported as `selected-node-missing`. */
   defaultSelectedIds?: ReadonlySet<string>
   /**
    * A request to reveal, frame and select a node — the declarative form of
@@ -341,6 +342,15 @@ const NO_SELECTION: ReadonlySet<string> = new Set()
 function heldBy(selection: ReadonlySet<string>, hostIndex: ReadonlyMap<string, GraphNode>): ReadonlySet<string> {
   const held = [...selection].filter(id => hostIndex.has(id))
   return held.length === selection.size ? selection : new Set(held)
+}
+
+/** The ids of `selection` the graph does not hold. */
+function unheldBy(selection: ReadonlySet<string>, hostIndex: ReadonlyMap<string, GraphNode>): ReadonlySet<string> {
+  return new Set([...selection].filter(id => !hostIndex.has(id)))
+}
+
+function selectedMissing(id: string): GraphDiagnostic {
+  return { severity: 'warning', code: 'selected-node-missing', nodeId: id, message: `selected node ${JSON.stringify(id)} is not in the graph; it is not selected` }
 }
 
 /**
@@ -580,10 +590,6 @@ export const GraphView = React.forwardRef<GraphViewHandle, GraphViewProps>(funct
     onNodeDragEnd: handleNodeDragEnd,
     onToggleRunning: handleToggleRunning,
   } = useSimulation(graph, taxonomy, defaultPositions, onSimRebuild, tuning.forces, updateForces)
-  const diagnostics = React.useMemo(() => {
-    const added = [...groupDiagnostics, ...fill.diagnostics, ...glow.diagnostics, ...(ring?.diagnostics ?? []), ...tintDiagnostics(taxonomy, valuesByAxis, fill), ...frame.diagnostics]
-    return added.length ? [...graphDiagnostics, ...added] : graphDiagnostics
-  }, [graphDiagnostics, groupDiagnostics, fill, glow, ring, taxonomy, valuesByAxis, frame])
 
   const dragNode = React.useCallback((id: string, wx: number, wy: number) => {
     releaseFrame()
@@ -728,6 +734,15 @@ export const GraphView = React.forwardRef<GraphViewHandle, GraphViewProps>(funct
   const [ownSelected, setOwnSelected] = React.useState(defaultSelectedIds)
   const rawSelected = useStable(controlledSelection ? selectedIds : ownSelected, setsEqual)
   const selected = React.useMemo(() => heldBy(rawSelected, hostIndex), [rawSelected, hostIndex])
+  // The host's ids the graph lacks are warned of: the controlled set's, or the
+  // default's the view's own selection started from. Compared by value, so a
+  // selection change that leaves them as they were reports nothing.
+  const [defaultSelected] = React.useState(defaultSelectedIds)
+  const unheld = useStable(unheldBy(controlledSelection ? rawSelected : defaultSelected, hostIndex), setsEqual)
+  const diagnostics = React.useMemo(() => {
+    const added = [...groupDiagnostics, ...fill.diagnostics, ...glow.diagnostics, ...(ring?.diagnostics ?? []), ...tintDiagnostics(taxonomy, valuesByAxis, fill), ...frame.diagnostics, ...[...unheld].map(selectedMissing)]
+    return added.length ? [...graphDiagnostics, ...added] : graphDiagnostics
+  }, [graphDiagnostics, groupDiagnostics, fill, glow, ring, taxonomy, valuesByAxis, frame, unheld])
   const selectedRef = useLatest(selected)
   const onSelectionChangeRef = useLatest(onSelectionChange)
   // Read through refs so the callback never goes stale: the physics loop
