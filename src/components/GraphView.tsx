@@ -484,10 +484,6 @@ export const GraphView = React.forwardRef<GraphViewHandle, GraphViewProps>(funct
   const glow = React.useMemo(() => glowOf(glowColoring, graph, taxonomy, groups ?? NO_GROUPS, labels), [glowColoring, graph, taxonomy, groups, labels])
   const ringColoring = useStable(coloring?.ring, coloringsEqual)
   const ring = React.useMemo(() => (ringColoring ? resolveColoring(ringColoring, graph, taxonomy, NO_GROUPS, labels) : null), [ringColoring, graph, taxonomy, labels])
-  const diagnostics = React.useMemo(() => {
-    const added = [...groupDiagnostics, ...fill.diagnostics, ...glow.diagnostics, ...(ring?.diagnostics ?? []), ...tintDiagnostics(taxonomy, valuesByAxis, fill)]
-    return added.length ? [...graphDiagnostics, ...added] : graphDiagnostics
-  }, [graphDiagnostics, groupDiagnostics, fill, glow, ring, taxonomy, valuesByAxis])
   const graphIndex = React.useMemo(() => nodesById(graph.nodes), [graph])
   // Every edge by id: the host's own, and the containment edges derived from `parentId`.
   const edgeIndex = React.useMemo(() => new Map(graph.edges.map(e => [e.id, e])), [graph])
@@ -584,6 +580,10 @@ export const GraphView = React.forwardRef<GraphViewHandle, GraphViewProps>(funct
     onNodeDragEnd: handleNodeDragEnd,
     onToggleRunning: handleToggleRunning,
   } = useSimulation(graph, taxonomy, defaultPositions, onSimRebuild, tuning.forces, updateForces)
+  const diagnostics = React.useMemo(() => {
+    const added = [...groupDiagnostics, ...fill.diagnostics, ...glow.diagnostics, ...(ring?.diagnostics ?? []), ...tintDiagnostics(taxonomy, valuesByAxis, fill), ...frame.diagnostics]
+    return added.length ? [...graphDiagnostics, ...added] : graphDiagnostics
+  }, [graphDiagnostics, groupDiagnostics, fill, glow, ring, taxonomy, valuesByAxis, frame])
 
   const dragNode = React.useCallback((id: string, wx: number, wy: number) => {
     releaseFrame()

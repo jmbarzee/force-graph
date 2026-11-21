@@ -27,6 +27,7 @@ import type { EdgeTypeId, ResolvedEdgeType, SpringPhysics } from './shapes'
 import { MIDDLING_SPRING } from './shapes'
 import type { Relation } from './axis'
 import type { Rng } from './rng'
+import type { GraphDiagnostic } from './validate'
 
 /** The minimum a force needs of a node in order to look up its physics. */
 export type PhysicsSubject = { values: Readonly<Record<AxisId, AxisValue>> }
@@ -303,6 +304,8 @@ export interface LayoutFrame {
   readonly centerY: number
   /** Ring radius per Y bucket (mapped Y only; a scalar Y rings per node). */
   readonly rings: ReadonlyMap<string, number>
+  /** Each scalar answer the frame refused, and each scalar that threw. */
+  readonly diagnostics: readonly GraphDiagnostic[]
   /** A node's rest interval on an axis — a re-centred band, a scalar's point, or the centre itself for a node with no value there. */
   rest(axis: 'x' | 'y', node: LayoutSubject): { lo: number; hi: number }
   /** A node's ring radius in radial mode: its bucket's ring, its scalar's, or the centre (0) for a node with no value on Y. */
@@ -312,18 +315,31 @@ export interface LayoutFrame {
 const AT_CENTRE = { lo: 0, hi: 0 }
 
 // A scalar's answer, checked once per frame: every value finite and in [0, 1].
-// Loud, because a value outside the contract would become a rest point or a
-// ring radius and nothing downstream could tell it from a real one.
-function checkedScores(scalar: Scalar, graph: ReadableGraph): Map<string, number> {
-  const raw = scalar.compute(graph)
-  for (const [id, s] of raw) {
-    if (!Number.isFinite(s)) throw new Error(`scalar ${JSON.stringify(scalar.id)} answered ${String(s)} for node ${JSON.stringify(id)}; a scalar answers a finite number`)
+// A refused answer is dropped, and said: the node rests at the axis's centre,
+// as one the scalar left out does, and a diagnostic names it — a value outside
+// the contract would become a rest point or a ring radius that nothing
+// downstream could tell from a real one, and a throw would leave the pane.
+function checkedScores(scalar: Scalar, graph: ReadableGraph, out: GraphDiagnostic[]): Map<string, number> {
+  let raw: Map<string, number>
+  try {
+    raw = scalar.compute(graph)
+  } catch (e) {
+    out.push({ severity: 'warning', code: 'scalar-compute-threw', message: `scalar ${JSON.stringify(scalar.id)} threw: ${e instanceof Error ? e.message : String(e)}; every node rests at the axis's centre` })
+    return new Map()
   }
-  const scores = scalar.normalize === 'none' ? raw : scalar.normalize === 'range' ? rangeNormalized(raw) : normalized(raw)
+  const refuse = (id: string, s: number, contract: string) => {
+    out.push({ severity: 'warning', code: 'scalar-answer-refused', nodeId: id, message: `scalar ${JSON.stringify(scalar.id)} answered ${String(s)} for node ${JSON.stringify(id)}; a scalar answers ${contract}; the node rests at the axis's centre` })
+  }
+  const finite = new Map<string, number>()
+  for (const [id, s] of raw) {
+    if (Number.isFinite(s)) finite.set(id, s)
+    else refuse(id, s, 'a finite number')
+  }
+  const scores = scalar.normalize === 'none' ? finite : scalar.normalize === 'range' ? rangeNormalized(finite) : normalized(finite)
   for (const [id, s] of scores) {
-    if (!(Number.isFinite(s) && s >= 0 && s <= 1)) {
-      throw new Error(`scalar ${JSON.stringify(scalar.id)} answered ${String(s)} for node ${JSON.stringify(id)}; a scalar answers in [0, 1]`)
-    }
+    if (s >= 0 && s <= 1) continue
+    scores.delete(id)
+    refuse(id, raw.get(id)!, 'in [0, 1]')
   }
   return scores
 }
@@ -331,7 +347,8 @@ function checkedScores(scalar: Scalar, graph: ReadableGraph): Map<string, number
 export function layoutFrame(graph: ReadableGraph, resolved: ResolvedPhysics): LayoutFrame {
   const all = [...graph.nodes]
   const centerFor = (a: ResolvedBandAxis) => (isScalarAxis(a) ? 0 : medianBandCenter(all, a))
-  const scoresFor = (a: ResolvedBandAxis) => (isScalarAxis(a) ? checkedScores(a.scalar, graph) : undefined)
+  const diagnostics: GraphDiagnostic[] = []
+  const scoresFor = (a: ResolvedBandAxis) => (isScalarAxis(a) ? checkedScores(a.scalar, graph, diagnostics) : undefined)
   const centerX = centerFor(resolved.bandX)
   const centerY = centerFor(resolved.bandY)
   const scoresX = scoresFor(resolved.bandX)
@@ -349,7 +366,7 @@ export function layoutFrame(graph: ReadableGraph, resolved: ResolvedPhysics): La
     return band === undefined ? AT_CENTRE : { lo: band.min - center, hi: band.max - center }
   }
   return {
-    centerX, centerY, rings,
+    centerX, centerY, rings, diagnostics,
     rest: (axis, node) => axis === 'x' ? restOn(resolved.bandX, centerX, scoresX, node) : restOn(resolved.bandY, centerY, scoresY, node),
     ringOf: node => {
       if (isScalarAxis(resolved.bandY)) {

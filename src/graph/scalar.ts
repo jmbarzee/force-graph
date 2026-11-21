@@ -29,13 +29,16 @@ export interface Scalar {
    * node and a refused edge dropped, a refused `parentId` cleared), and the
    * containment edges derived from `parentId`. It reruns whenever the graph, the taxonomy or
    * the forces' tuning changes. An answer not finite, or outside [0, 1] once
-   * normalized, throws from the view's render, naming the scalar and the
-   * node, past the pane's own error boundary to the host's.
+   * normalized, is refused: the node rests at the axis's centre, and a
+   * `scalar-answer-refused` diagnostic names the scalar, the node and the
+   * answer. A throw from here rests every node there, as
+   * `scalar-compute-threw`.
    */
   compute(graph: ReadableGraph): Map<string, number>
   /**
    * How the frame maps the answers onto [0, 1]: `max` (the default) divides
-   * by the largest, so 0 stays 0 and a negative answer is refused, loudly;
+   * by the largest, so 0 stays 0 and, when some answer is positive, a
+   * negative one is refused (with none positive, every node scores 0);
    * `range` puts the smallest at 0 and the largest at 1, whatever their
    * sign; `none` says the answers already lie in [0, 1], and the frame
    * refuses one outside it.

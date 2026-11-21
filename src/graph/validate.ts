@@ -24,11 +24,13 @@ import { engineOf } from './taxonomy'
  * series that does not read against the window, a style value the taxonomy
  * does not declare, containment edges that contradict `parentId`,
  * containment edges derived from `parentId` that no type claims
- * (`containment-untyped`). The view adds three of its own, through
+ * (`containment-untyped`). The view adds five of its own, through
  * `onDiagnostics`: a key a colouring or the groups do not declare
  * (`key-undeclared`), a key or group colour outside the scheme's forms
- * (`key-color-invalid`), and a chip tint naming no key of the fill
- * (`tint-undeclared`).
+ * (`key-color-invalid`), a chip tint naming no key of the fill
+ * (`tint-undeclared`), a layout scalar's answer not finite or outside
+ * [0, 1] (`scalar-answer-refused`), and a layout scalar that threw
+ * (`scalar-compute-threw`).
  */
 export type GraphDiagnosticCode =
   | 'edge-id-duplicate'
@@ -49,6 +51,8 @@ export type GraphDiagnosticCode =
   | 'key-undeclared'
   | 'key-color-invalid'
   | 'tint-undeclared'
+  | 'scalar-answer-refused'
+  | 'scalar-compute-threw'
 
 /** One defect in a host's graph, as data. */
 export interface GraphDiagnostic {
