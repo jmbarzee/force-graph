@@ -1345,14 +1345,10 @@ export const GraphView = React.forwardRef<GraphViewHandle, GraphViewProps>(funct
             <button className="gv-graph-shortcuts-close" onClick={() => setShortcutsOpen(false)}>&times;</button>
           </div>
           <div className="gv-graph-shortcuts-list">
-            {[
-              s.shortcutTab, s.shortcutEnter, s.shortcutEscape, s.shortcutArrows, s.shortcutZoom, s.shortcutFit,
-              ...(show.search ? [s.shortcutSearch] : []),
-              s.shortcutRun, s.shortcutUpstream, s.shortcutToggle, s.shortcutLasso, s.shortcutHelp,
-            ].map(([keys, action]) => (
-              <div key={keys} className="gv-graph-shortcut-row">
-                <kbd className="gv-graph-shortcut-key">{keys}</kbd>
-                <span className="gv-graph-shortcut-desc">{action}</span>
+            {SHORTCUTS.filter(row => show.search || row !== 'shortcutSearch').map(row => (
+              <div key={row} className="gv-graph-shortcut-row">
+                <kbd className="gv-graph-shortcut-key">{s[row][0]}</kbd>
+                <span className="gv-graph-shortcut-desc">{s[row][1]}</span>
               </div>
             ))}
           </div>
@@ -1365,6 +1361,12 @@ export const GraphView = React.forwardRef<GraphViewHandle, GraphViewProps>(funct
     </TaxonomyContext.Provider>
   )
 })
+
+/** The shortcuts panel's rows, in order. */
+const SHORTCUTS = [
+  'shortcutTab', 'shortcutEnter', 'shortcutEscape', 'shortcutArrows', 'shortcutZoom', 'shortcutFit',
+  'shortcutSearch', 'shortcutRun', 'shortcutUpstream', 'shortcutToggle', 'shortcutLasso', 'shortcutHelp',
+] as const
 
 /** The pane's own findings about the host's graph: each with its code; errors name edges the view does not draw. */
 function GraphDiagnostics({ diagnostics }: { diagnostics: readonly GraphDiagnostic[] }) {

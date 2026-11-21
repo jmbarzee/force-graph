@@ -75,7 +75,7 @@ export function GravityControls({ params, resolved, axes, onParamChange, onRelay
               />
             </div>
             <div className="gv-gravity-slider-row">
-              <label className="gv-graph-control-slider-label">{s.topoExp}</label>
+              <label className="gv-graph-control-slider-label">{s.exp}</label>
               <Slider
                 min={1} max={6} step={0.1}
                 value={params.gravityTopologicalExp}

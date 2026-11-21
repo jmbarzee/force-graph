@@ -379,7 +379,7 @@ export function ForceCurves({
       </>}
 
       <div className="gv-spring-curves-exp" title={exp.title}>
-        <span className="gv-spring-exp-label">{s.curveExp}</span>
+        <span className="gv-spring-exp-label">{s.exp}</span>
         <Slider
           min={exp.min} max={exp.max} step={exp.step}
           value={exp.value}

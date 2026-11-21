@@ -76,7 +76,7 @@ export function PushPullControls({
       {/* The axis both forces key on — above the sub-tabs so it stays visible
           whichever force is being edited. */}
       <div className="gv-axis-row">
-        <label className="gv-axis-label" htmlFor="pushpull-axis">{s.pushPullAxis}</label>
+        <label className="gv-axis-label" htmlFor="pushpull-axis">{s.axis}</label>
         <select
           id="pushpull-axis"
           className="gv-axis-select"

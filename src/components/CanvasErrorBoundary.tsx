@@ -36,7 +36,7 @@ export class CanvasErrorBoundary extends React.Component<
   componentDidCatch(error: Error, info: React.ErrorInfo): void {
     // Surface the failure to the console for debugging; the fallback UI keeps
     // the rest of the app usable.
-    console.error(this.props.failed, error, info.componentStack)
+    console.error(error, info.componentStack)
   }
 
   render(): React.ReactNode {

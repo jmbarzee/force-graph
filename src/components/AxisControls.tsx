@@ -117,7 +117,7 @@ export function AxisControls({ axis, params, resolved, axes, present, onParamCha
         : <>F = <FormulaValue id={`bandStrength${label}`}>strength</FormulaValue> × d<sup><FormulaValue id="bandExp">exp</FormulaValue></sup></>}</Equation>
 
       <div className="gv-axis-row">
-        <label className="gv-axis-label" htmlFor={`gravity-axis-${axis}`}>{s.layoutAxis}</label>
+        <label className="gv-axis-label" htmlFor={`gravity-axis-${axis}`}>{s.axis}</label>
         <select
           id={`gravity-axis-${axis}`}
           className="gv-axis-select"

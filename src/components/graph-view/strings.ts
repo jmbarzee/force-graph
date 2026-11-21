@@ -153,8 +153,10 @@ export interface GraphViewStrings {
   curveDistance: string
   /** A force-curve plot's y axis. */
   curveForce: string
-  /** A force-curve plot's exponent slider. */
-  curveExp: string
+  /** An exponent slider's label: a force-curve plot's, and the Topological sub-tab's. */
+  exp: string
+  /** An axis menu's label: the Push/Pull tab's, and each layout axis's. */
+  axis: string
   /** A ladder's toggle title. */
   ladderToggle: (ladder: string) => string
   /** A collapsed ladder's token title, on a map. */
@@ -166,8 +168,6 @@ export interface GraphViewStrings {
   /** A force tab's line when the chips hide every node. */
   nothingVisibleChips: string
 
-  /** The Push/Pull tab's axis menu's label. */
-  pushPullAxis: string
   /** The Push/Pull tab's axis menu's title. */
   pushPullAxisTitle: string
   /** A disabled entry in the Push/Pull tab's axis menu. */
@@ -227,16 +227,12 @@ export interface GraphViewStrings {
   gravityRadial: string
   /** The Topological sub-tab's strength slider. */
   topoStrength: string
-  /** The Topological sub-tab's exponent slider. */
-  topoExp: string
   /** The Topological curve's `aria-label`. */
   topoCurve: string
   /** The Topological curve's x axis. */
   topoDepth: string
   /** The Topological curve's y axis. */
   topoPull: string
-  /** A layout axis's menu's label. */
-  layoutAxis: string
   /** A layout axis's menu's title. */
   layoutAxisTitle: (axis: string) => string
   /** A computed scalar's entry in a layout axis's menu. */
@@ -397,14 +393,14 @@ export const DEFAULT_STRINGS: GraphViewStrings = {
   presetCustom: 'custom',
   curveDistance: 'distance',
   curveForce: 'force',
-  curveExp: 'exp',
+  exp: 'exp',
+  axis: 'axis',
   ladderToggle: ladder => `Tune the ${ladder} ladder's rungs as one`,
   ladderToken: ladder => `The ${ladder} ladder: dragging moves every rung alike`,
   ladderColumn: ladder => `The ${ladder} ladder: each handle moves every rung alike`,
   nothingVisibleLegend: 'Nothing visible — turn a group on in the legend.',
   nothingVisibleChips: 'Nothing visible on this axis — turn a chip on.',
 
-  pushPullAxis: 'axis',
   pushPullAxisTitle: "The axis push and pull key on. Tokens are the visible set's: a push token per bucket some visible node falls in, a pull token per spring category some sprung edge falls in; the counts measure the whole graph",
   pushPullTooMany: (axis, tokens, max) => `${axis} — ${tokens} tokens (max ${max})`,
   pairForce: 'Pair force',
@@ -435,11 +431,9 @@ export const DEFAULT_STRINGS: GraphViewStrings = {
   gravityTopological: 'Topological',
   gravityRadial: 'Radial layout: Y as distance from the centre',
   topoStrength: 'strength',
-  topoExp: 'exp',
   topoCurve: 'Depth-to-pull contrast curve',
   topoDepth: 'depth',
   topoPull: 'pull',
-  layoutAxis: 'axis',
   layoutAxisTitle: axis => `What the ${axis} axis keys on: one column per bucket of a mapping, or a computed scalar as a gradient`,
   layoutComputed: scalar => `${scalar} — computed`,
   layoutTooMany: (mapping, columns, max) => `${mapping} — ${columns} columns (max ${max})`,
