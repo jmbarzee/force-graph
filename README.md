@@ -259,8 +259,7 @@ one.
   whose `compute` throws, which rests every node there; and
   `'selected-node-missing'`, once per id of `selectedIds` the graph does not
   hold, or of `defaultSelectedIds` the first graph does not, which is not
-  selected. A host that wants
-  to refuse a bad graph calls it first.
+  selected. A host that wants to refuse a bad graph calls it first.
 
 ## The view
 

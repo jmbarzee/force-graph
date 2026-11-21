@@ -505,6 +505,22 @@ describe('selection', () => {
     await mount({ defaultSelectedIds: new Set(['n0', 'nope']), onDiagnostics }, three)
     await act(async () => drawn.select('n1', false))
     expect(onDiagnostics).toHaveBeenCalledTimes(1)
-    expect(onDiagnostics.mock.calls[0]![0].map((d: GraphDiagnostic) => [d.code, d.nodeId])).toEqual([['selected-node-missing', 'nope']])
+    expect(onDiagnostics.mock.calls[0]![0]).toEqual([expect.objectContaining({ severity: 'warning', code: 'selected-node-missing', nodeId: 'nope' })])
+  })
+
+  it('checks the default once, at mount: a later graph that lacks it does not warn', async () => {
+    let reported: readonly GraphDiagnostic[] = []
+    const view = await mount({ defaultSelectedIds: new Set(['n2']), onDiagnostics: d => { reported = d } }, three)
+    await act(async () => drawn.select('n1', false))
+    await view.render(graphOf(['a', 'x'], ['b', 'y']))
+    expect(reported.filter(d => d.code === 'selected-node-missing')).toEqual([])
+  })
+
+  it('warns of a controlled id a new graph no longer holds', async () => {
+    let reported: readonly GraphDiagnostic[] = []
+    const view = await mount({ selectedIds: new Set(['n0', 'n2']), onDiagnostics: d => { reported = d } }, three)
+    expect(reported).toEqual([])
+    await view.render(graphOf(['a', 'x'], ['b', 'y']))
+    expect(reported).toEqual([expect.objectContaining({ severity: 'warning', code: 'selected-node-missing', nodeId: 'n2' })])
   })
 })

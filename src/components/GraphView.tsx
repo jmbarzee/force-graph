@@ -344,7 +344,6 @@ function heldBy(selection: ReadonlySet<string>, hostIndex: ReadonlyMap<string, G
   return held.length === selection.size ? selection : new Set(held)
 }
 
-/** The ids of `selection` the graph does not hold. */
 function unheldBy(selection: ReadonlySet<string>, hostIndex: ReadonlyMap<string, GraphNode>): ReadonlySet<string> {
   return new Set([...selection].filter(id => !hostIndex.has(id)))
 }
@@ -734,11 +733,8 @@ export const GraphView = React.forwardRef<GraphViewHandle, GraphViewProps>(funct
   const [ownSelected, setOwnSelected] = React.useState(defaultSelectedIds)
   const rawSelected = useStable(controlledSelection ? selectedIds : ownSelected, setsEqual)
   const selected = React.useMemo(() => heldBy(rawSelected, hostIndex), [rawSelected, hostIndex])
-  // The host's ids the graph lacks are warned of: the controlled set's, or the
-  // default's the view's own selection started from. Compared by value, so a
-  // selection change that leaves them as they were reports nothing.
-  const [defaultSelected] = React.useState(defaultSelectedIds)
-  const unheld = useStable(unheldBy(controlledSelection ? rawSelected : defaultSelected, hostIndex), setsEqual)
+  const [defaultUnheld] = React.useState(() => unheldBy(defaultSelectedIds, hostIndex))
+  const unheld = useStable(controlledSelection ? unheldBy(rawSelected, hostIndex) : defaultUnheld, setsEqual)
   const diagnostics = React.useMemo(() => {
     const added = [...groupDiagnostics, ...fill.diagnostics, ...glow.diagnostics, ...(ring?.diagnostics ?? []), ...tintDiagnostics(taxonomy, valuesByAxis, fill), ...frame.diagnostics, ...[...unheld].map(selectedMissing)]
     return added.length ? [...graphDiagnostics, ...added] : graphDiagnostics
