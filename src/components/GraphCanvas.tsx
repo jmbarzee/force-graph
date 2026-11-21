@@ -62,7 +62,6 @@ const MARK_ALPHA = 0.55
 
 // White, not the surface token: a glyph sits on its node's fill, not on the surface.
 const GLYPH_COLOR = 'white'
-const ICON_FONT_FAMILY = '-apple-system, BlinkMacSystemFont, "Segoe UI", Roboto, sans-serif'
 const LABEL_FONT_PX = 11
 // Slight translucency on node labels so they don't read as the only bright
 // text on the dark canvas and edges remain visible through them.
@@ -77,11 +76,11 @@ function labelText(name: string): string {
   return name.length > LABEL_MAX_CHARS ? name.slice(0, LABEL_TRUNC_CHARS) + '\u2026' : name
 }
 
-// Build the node-label font string at a given pixel size. Semibold (600) so
-// labels read against the canvas background and over edges without needing a
+// The font labels and badges draw in, at a given pixel size. Semibold (600)
+// so they read against the canvas background and over edges without needing a
 // halo/outline.
-function labelFont(px: number): string {
-  return `600 ${px.toFixed(1)}px ${ICON_FONT_FAMILY}`
+function textFont(px: number, family: string): string {
+  return `600 ${px.toFixed(1)}px ${family}`
 }
 
 // Badges: a host's short texts drawn as a row of chips above the node, as
@@ -92,9 +91,6 @@ const BADGE_PAD_X = 4          // horizontal text padding inside a chip
 const BADGE_PAD_Y = 2          // vertical text padding inside a chip
 const BADGE_GAP = 3            // gap between adjacent chips
 const BADGE_NODE_GAP = 4       // gap between the node's top edge and the chip row
-function badgeFont(px: number): string {
-  return `600 ${px.toFixed(1)}px ${ICON_FONT_FAMILY}`
-}
 // Rounded-rect path helper (arcTo keeps it compatible without relying on
 // CanvasRenderingContext2D.roundRect being present).
 function roundRectPath(
@@ -1022,7 +1018,7 @@ export function GraphCanvas({
         // icon bleeds into the fill anyway and just adds noise.
         if (vp.scale >= LABEL_ELIDE_SCALE && icon) {
           ctx.save()
-          ctx.font = `${def.size.iconSize * mul}px ${ICON_FONT_FAMILY}`
+          ctx.font = `${def.size.iconSize * mul}px ${p.fontSans}`
           ctx.fillStyle = GLYPH_COLOR
           ctx.globalAlpha = nodeAlpha * 0.92
           ctx.fillText(icon, sx, sy + 0.5)
@@ -1065,7 +1061,7 @@ export function GraphCanvas({
           const padX = BADGE_PAD_X * mul
           const gap = BADGE_GAP * mul
           ctx.save()
-          ctx.font = badgeFont(badgePx)
+          ctx.font = textFont(badgePx, p.fontSans)
           ctx.textAlign = 'center'
           ctx.textBaseline = 'middle'
           // Measure each chip, then centre the whole row horizontally on the node.
@@ -1102,7 +1098,7 @@ export function GraphCanvas({
           // zoomed out, since they're deliberately surfaced; others scale freely.
           const labelPx = LABEL_FONT_PX * (isActiveNode ? Math.max(mul, 1) : mul)
           const labelY = sy + r + 4 + labelPx * 0.7
-          ctx.font = labelFont(labelPx)
+          ctx.font = textFont(labelPx, p.fontSans)
           const text = labelText(node.name)
           const tw = ctx.measureText(text).width
           const box = { x: sx - tw / 2 - 2, y: labelY - labelPx / 2 - 1, w: tw + 4, h: labelPx + 2 }

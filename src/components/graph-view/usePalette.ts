@@ -9,16 +9,21 @@ import { useIsomorphicLayoutEffect } from './useIsomorphicLayoutEffect'
 const ROLES = [
   'colorGraphLabel', 'colorText', 'colorTextMuted',
   'focusRingColor', 'selectionRingColor', 'badgeFill', 'badgeText',
-  'tensionStretch', 'tensionCompress', 'tensionRest',
+  'tensionStretch', 'tensionCompress', 'tensionRest', 'fontSans',
 ] as const
 
 /** Each canvas token's resolved value, by role. */
 export type Palette = Readonly<Record<(typeof ROLES)[number], string>>
 
-/** The palette `el` inherits: the pane's tokens, a host's overrides included, not the document's. */
+/**
+ * The palette `el` inherits: the pane's tokens, a host's overrides included,
+ * not the document's. `--gv-font-sans` left `inherit`, as it is by default,
+ * resolves empty, so the canvas takes the font `el` inherits.
+ */
 function resolvePalette(el: Element): Palette {
   const style = getComputedStyle(el)
-  return Object.fromEntries(ROLES.map(role => [role, style.getPropertyValue(`--gv-${cssSuffix(role)}`).trim()])) as Palette
+  const palette = Object.fromEntries(ROLES.map(role => [role, style.getPropertyValue(`--gv-${cssSuffix(role)}`).trim()])) as Palette
+  return { ...palette, fontSans: palette.fontSans || style.fontFamily }
 }
 
 /**
