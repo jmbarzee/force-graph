@@ -70,7 +70,7 @@ export function cssSuffix(value: AxisValue): string {
  */
 export function schemeVars(taxonomy: Taxonomy, theme: Theme): React.CSSProperties {
   const vars: Record<string, string> = {}
-  for (const key of taxonomy.styleValues) {
+  for (const key of taxonomy.styleValues()) {
     const c = taxonomy.styleOf(key).color[theme]
     vars[taxonomy.colorVar(key)] = c.fill
     vars[`${taxonomy.colorVar(key)}-border`] = c.border

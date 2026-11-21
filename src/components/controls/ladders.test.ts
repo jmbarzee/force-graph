@@ -3,14 +3,14 @@ import { alikeShift, laddersOn, rowsOf } from './ladders'
 import { createTaxonomy } from '../../graph/taxonomy'
 import { styleIdentityMapping } from '../../graph/simulation'
 import { createAxisMapping } from '../../graph/axis'
-import type { NodeStyle } from '../../graph/shapes'
+import type { ValueSpec } from '../../graph/shapes'
 
-const style = (id: string, ladder?: string): NodeStyle => ({
+const style = (id: string, ladder?: string): ValueSpec => ({
   id, label: id, ladder,
   color: { light: { fill: '#000000', border: '#000000' }, dark: { fill: '#ffffff', border: '#ffffff' } },
 })
 // `top` and `bottom` are one ladder with `middle` between them.
-const taxonomy = createTaxonomy({ styleAxis: 'kind', styles: [style('top', 'tier'), style('middle'), style('bottom', 'tier')] })
+const taxonomy = createTaxonomy({ styleAxis: 'kind', values: [style('top', 'tier'), style('middle'), style('bottom', 'tier')] })
 const mapping = styleIdentityMapping(taxonomy)
 const all = ['top', 'middle', 'bottom']
 

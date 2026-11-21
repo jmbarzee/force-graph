@@ -3,7 +3,7 @@ import { dropInvalid, validateGraph } from './validate'
 import { createTaxonomy } from './taxonomy'
 import type { Graph, GraphNode } from './model'
 
-const taxonomy = createTaxonomy({ styleAxis: 'kind', styles: [] })
+const taxonomy = createTaxonomy({ styleAxis: 'kind', values: [] })
 const node = (id: string, parentId?: string): GraphNode => ({ id, name: id, values: {}, parentId })
 // `t` hangs off the two-cycle `b`/`c`; `s` is its own parent.
 const graph: Graph = { nodes: [node('t', 'c'), node('c', 'b'), node('s', 's'), node('b', 'c')], edges: [] }

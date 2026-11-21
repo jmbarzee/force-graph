@@ -45,7 +45,7 @@ const runFrames = (n: number) => act(async () => {
   for (let i = 0; i < n; i++) frames.splice(0).forEach(cb => cb(0))
 })
 
-const taxonomy = createTaxonomy({ styleAxis: 'kind', styles: [] })
+const taxonomy = createTaxonomy({ styleAxis: 'kind', values: [] })
 const graph = { nodes: [{ id: 'a', name: 'a', values: { kind: 'k' }, badges: ['1..n'] }], edges: [] }
 const tokens = createTheme({ light: { badgeFill: '#111111' }, dark: { badgeFill: '#222222' } })
 

@@ -11,22 +11,22 @@ import { createTaxonomy } from '../../graph/taxonomy'
 import { resolvePhysics } from '../../graph/forces'
 import { axisOptions, defaultParamsFor, layoutAxisOptions, sprungEdges } from '../../graph/simulation'
 import type { SimNode } from '../../graph/simulation'
-import { GROUPS, initialFilter, withSelection } from '../../filter/types'
-import type { NodeStyle } from '../../graph/shapes'
+import { GROUPS, initialFilter, withChosen } from '../../filter/types'
+import type { ValueSpec } from '../../graph/shapes'
 import type { Graph, GraphNode } from '../../graph/model'
 
 const LINE = 'Nothing visible on this axis — turn a chip on.'
 const LEGEND = 'Nothing visible — turn a group on in the legend.'
 
-const style = (id: string): NodeStyle => ({
+const style = (id: string): ValueSpec => ({
   id, label: id, icon: id, abbreviation: id,
   color: { light: { fill: '#000000', border: '#000000' }, dark: { fill: '#ffffff', border: '#ffffff' } },
   size: { r: 10, iconSize: 10 },
 })
 const taxonomy = createTaxonomy({
   styleAxis: 'kind',
-  styles: [style('parent'), style('child')],
-  edgeTypes: [{ id: 'within', sourceValue: 'child', targetValue: 'parent', relation: 'containment' }],
+  values: [style('parent'), style('child')],
+  edgeTypes: [{ id: 'within', sources: 'child', targets: 'parent', relation: 'containment' }],
 })
 const node = (id: string, kind: string, parentId?: string): GraphNode => ({ id, name: id, values: { kind }, parentId })
 const graph: Graph = {
@@ -41,9 +41,9 @@ const resolved = resolvePhysics(params, taxonomy)
 const axes = axisOptions(taxonomy, graph)
 const noop = () => {}
 
-/** Both force tabs, rendered over what `styles` and the shown `groups` leave visible; both nodes are in group `g`. */
-function forceTabs(styles: string[], groups: string[] = ['g']): string {
-  const filter = withSelection(withSelection(initialFilter(taxonomy, graph), 'kind', new Set(styles)), GROUPS, new Set(groups))
+/** Both force tabs, rendered over what `kinds` and the shown `groups` leave visible; both nodes are in group `g`. */
+function forceTabs(kinds: string[], groups: string[] = ['g']): string {
+  const filter = withChosen(withChosen(initialFilter(taxonomy, graph), 'kind', new Set(kinds)), GROUPS, new Set(groups))
   const { visibleNodes, visibleIds } = computeVisibleGraph({ nodes, edges: graph.edges, getNode }, filter, taxonomy, undefined, groupsOf)
   const present = presentSetsOf(visibleNodes, sprungEdges(graph.edges, visibleIds), resolved, getNode)
   return renderToStaticMarkup(React.createElement(TaxonomyContext.Provider, { value: taxonomy },

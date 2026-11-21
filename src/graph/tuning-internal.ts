@@ -12,7 +12,7 @@ import type { NodeScaleParams } from './node-scale'
 import { DEFAULT_NODE_SCALE } from './node-scale'
 import { isScalarTuning } from './scalar'
 import type { SpringPhysics } from './shapes'
-import type { BandRange, ForceParams, LayoutTuning, PairTuning, PushPhysics } from './simulation'
+import type { BandRange, ForceParams, BandAxisTuning, PairTuning, PushPhysics } from './simulation'
 import { defaultParamsFor, namerFor, styleIdentityMapping } from './simulation'
 import type { Taxonomy } from './taxonomy'
 import { engineOf } from './taxonomy'
@@ -49,7 +49,7 @@ const SCALE_FIELDS = ['baseMul', 'minZoomMul', 'maxZoomMul'] as const
 
 /** The forces as plain data: every number and switch, each layout axis by its axis or scalar, each override by its bucket. */
 export function forcesToJSON(forces: ForceParams): NonNullable<TuningJSON['forces']> {
-  const band = (t: LayoutTuning): BandAxisJSON =>
+  const band = (t: BandAxisTuning): BandAxisJSON =>
     isScalarTuning(t)
       ? { scalar: t.scalar, ...(t.span ? { span: { ...t.span } } : {}) }
       : { axis: t.mapping.axis, ...(t.overrides.size > 0 ? { overrides: Object.fromEntries(t.overrides) } : {}) }
@@ -172,7 +172,7 @@ class Reader {
     return { mapping, push, spring }
   }
 
-  band(value: unknown, path: string): LayoutTuning {
+  band(value: unknown, path: string): BandAxisTuning {
     const json = this.record(value, path)
     if (this.strict && json.scalar !== undefined && typeof json.scalar !== 'string') this.fail(at(path, 'scalar'), 'not a scalar id')
     if (typeof json.scalar === 'string') {

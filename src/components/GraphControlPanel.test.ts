@@ -9,7 +9,7 @@ import type { ForceParams } from '../graph/simulation'
 import { DEFAULT_NODE_SCALE } from '../graph/node-scale'
 import type { NodeScaleParams } from '../graph/node-scale'
 
-const params = defaultParamsFor(createTaxonomy({ styleAxis: 'kind', styles: [] }))
+const params = defaultParamsFor(createTaxonomy({ styleAxis: 'kind', values: [] }))
 const noop = () => {}
 
 function misc(p: Partial<ForceParams> = {}, s: Partial<NodeScaleParams> = {}): string {
@@ -77,7 +77,7 @@ describe('the Misc tab', () => {
 })
 
 describe('the preset row', () => {
-  const taxonomy = createTaxonomy({ styleAxis: 'kind', styles: [] })
+  const taxonomy = createTaxonomy({ styleAxis: 'kind', values: [] })
   const choices = presetChoices([...TUNING_PRESETS, { label: 'By credit', tuning: { forces: { bandY: { scalar: 'credit' } } } }], taxonomy, { nodes: [], edges: [] })
   const row = (selected: number) => renderToStaticMarkup(React.createElement(PresetRow, { menu: { choices, selected }, onPreset: noop }))
   const options = (html: string) => [...html.matchAll(/<option([^>]*)>([^<]*)<\/option>/g)].map(([, attrs, text]) => ({ text, disabled: attrs.includes('disabled'), selected: attrs.includes('selected') }))

@@ -1,15 +1,15 @@
 // The chip-toggle reducers behind the shared filter bar.
 //
 // Pure, and deliberately outside the component. Each reducer rebuilds only the
-// selection for the axis it edits, of the kind it was — on an exclusion a
+// choice for the axis it edits, of the kind it was — on an exclusion a
 // value turned off joins `except` and one turned on leaves it; every other
-// axis is passed through by reference, which `withSelection` guarantees, so a
+// axis is passed through by reference, which `withChosen` guarantees, so a
 // no-op edit changes no identity and the view's memos have nothing to
 // recompute.
 
 import type { AxisId } from '../graph/axis'
 import type { FilterState } from './types'
-import { selectionFor, selects, withSelection, withValues } from './types'
+import { chosenOn, selects, withChosen, withValues } from './types'
 
 /** Toggle one value on one axis. */
 export function toggleValue(
@@ -17,8 +17,8 @@ export function toggleValue(
   axis: AxisId,
   value: string,
 ): FilterState {
-  const current = selectionFor(filter, axis)
-  return withSelection(filter, axis, withValues(current, [value], !selects(current, value)))
+  const current = chosenOn(filter, axis)
+  return withChosen(filter, axis, withValues(current, [value], !selects(current, value)))
 }
 
 /**
@@ -33,6 +33,6 @@ export function toggleGroup(
   axis: AxisId,
   values: readonly string[],
 ): FilterState {
-  const current = selectionFor(filter, axis)
-  return withSelection(filter, axis, withValues(current, values, !values.some(v => selects(current, v))))
+  const current = chosenOn(filter, axis)
+  return withChosen(filter, axis, withValues(current, values, !values.some(v => selects(current, v))))
 }

@@ -166,7 +166,7 @@ describe('frameQueue', () => {
 describe('a held frame over a settling layout', () => {
   const taxonomy = createTaxonomy({
     styleAxis: 'kind',
-    styles: [{ id: 'item', label: 'item', color: { light: { fill: '#000000', border: '#000000' }, dark: { fill: '#ffffff', border: '#ffffff' } } }],
+    values: [{ id: 'item', label: 'item', color: { light: { fill: '#000000', border: '#000000' }, dark: { fill: '#ffffff', border: '#ffffff' } } }],
   })
   const graph: Graph = {
     nodes: Array.from({ length: 300 }, (_, i) => ({ id: `n${i}`, name: `n${i}`, values: { kind: 'item' } })),

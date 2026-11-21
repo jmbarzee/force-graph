@@ -68,7 +68,7 @@ export function resolveColoring(coloring: SetColoring, graph: Graph, taxonomy: T
     else if (axis === taxonomy.styleAxis()) {
       const present = new Set(valuesOn(graph.nodes, axis))
       const labelFor = styleLabelFor(taxonomy, labels)
-      for (const v of taxonomy.styleValues) {
+      for (const v of taxonomy.styleValues()) {
         if (!present.has(v)) continue
         const { color } = taxonomy.styleOf(v)
         keys.set(v, { label: labelFor(v), hue: { light: color.light.fill, dark: color.dark.fill } })
@@ -131,7 +131,7 @@ export function fillOf(coloring: Coloring | undefined, graph: Graph, taxonomy: T
   const styleAxis = taxonomy.styleAxis()
   if (!coloring || (coloring.by === 'axis' && coloring.axis === styleAxis && !coloring.keys)) {
     const labelFor = styleLabelFor(taxonomy, labels)
-    const keys = new Map(taxonomy.styleValues.map(v => [v, { label: labelFor(v), color: taxonomy.styleOf(v).color, cssVar: taxonomy.colorVar(v) }]))
+    const keys = new Map(taxonomy.styleValues().map(v => [v, { label: labelFor(v), color: taxonomy.styleOf(v).color, cssVar: taxonomy.colorVar(v) }]))
     const of = new Map<string, string>()
     for (const node of graph.nodes) {
       const v = node.values[styleAxis]

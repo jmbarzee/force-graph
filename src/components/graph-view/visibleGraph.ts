@@ -150,7 +150,7 @@ function computeGraphNodeSummary(
       if (value === undefined) continue
       counts.set(value, (counts.get(value) ?? 0) + 1)
     }
-    return taxonomy.styleValues
+    return taxonomy.styleValues()
       .filter(k => counts.has(k))
       .map(k => `${counts.get(k)} ${engine.abbreviationFor(k)}`)
       .join(' · ')
@@ -182,7 +182,7 @@ export function passesFilter(
   node: LayoutSubject,
   filter: FilterState,
   taxonomy: Taxonomy,
-  axes: readonly ResolvedAxisDescriptor[] = taxonomy.filterAxes,
+  axes: readonly ResolvedAxisDescriptor[] = taxonomy.filterAxes(),
   groupsOf: ReadonlyMap<string, readonly string[]> = IN_NO_GROUP,
 ): boolean {
   return passesDescriptors(filter, axes, axis => node.values[axis]) && passesGroups(filter, groupsOf.get(node.id) ?? NO_GROUP_IDS)
@@ -196,7 +196,7 @@ export function passesFilter(
  */
 function classifyEdges(sim: VisibleGraphSource, taxonomy: Taxonomy): Map<string, EdgeTypeId | undefined> {
   const engine = engineOf(taxonomy)
-  const declared = new Map(taxonomy.edgeTypes.map(e => [e.id, e]))
+  const declared = new Map(taxonomy.edgeTypes().map(e => [e.id, e]))
   const out = new Map<string, EdgeTypeId | undefined>()
   for (const edge of sim.edges) {
     const src = sim.getNode(edge.sourceId)
@@ -227,7 +227,7 @@ export function computeVisibleGraph(
   sim: VisibleGraphSource,
   filter: FilterState,
   taxonomy: Taxonomy,
-  axes: readonly ResolvedAxisDescriptor[] = taxonomy.filterAxes,
+  axes: readonly ResolvedAxisDescriptor[] = taxonomy.filterAxes(),
   groupsOf?: ReadonlyMap<string, readonly string[]>,
 ): VisibleGraph {
   const ids = new Set<string>()
@@ -241,7 +241,7 @@ export function computeVisibleGraph(
   }
 
   const originalTypes = classifyEdges(sim, taxonomy)
-  const undirectedTypes = new Set<EdgeTypeId | undefined>(taxonomy.edgeTypes.filter(t => t.direction === 'undirected').map(t => t.id))
+  const undirectedTypes = new Set<EdgeTypeId | undefined>(taxonomy.edgeTypes().filter(t => t.direction === 'undirected').map(t => t.id))
   // A pair by its ends in order, or in either order for an undirected edge.
   const pairKey = (edge: GraphEdge, s: string, t: string): string =>
     undirectedTypes.has(originalTypes.get(edge.id)) ? [s, t].sort().join('↔') : `${s}→${t}`

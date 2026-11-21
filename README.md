@@ -34,16 +34,16 @@ import '@jmbarzee/force-graph/styles.css'
 
 const taxonomy = createTaxonomy({
   styleAxis: 'kind',
-  styles: [
+  values: [
     { id: 'team', label: 'Team', icon: '⌂', summaryKind: 'children',
       color: { light: { fill: '#475569', border: '#1E293B' }, dark: { fill: '#94A3B8', border: '#475569' } }, size: { r: 18 } },
     { id: 'service', label: 'Service', icon: '◆',
       color: { light: { fill: '#0F766E', border: '#134E4A' }, dark: { fill: '#2DD4BF', border: '#0F766E' } } },
   ],
   edgeTypes: [
-    { id: 'owns', sourceValue: 'service', targetValue: 'team', relation: 'containment' },
-    { id: 'calls', sourceValue: 'service', targetValue: 'service', relation: 'dependency',
-      style: { color: { light: '#0F766E', dark: '#5EEAD4' }, width: 1.5 } },
+    { id: 'owns', sources: 'service', targets: 'team', relation: 'containment' },
+    { id: 'calls', sources: 'service', targets: 'service', relation: 'dependency',
+      stroke: { color: { light: '#0F766E', dark: '#5EEAD4' }, width: 1.5 } },
   ],
 })
 
@@ -82,9 +82,9 @@ derive a variant, build one from the spec (`createTaxonomy({ ...spec, … })`),
 never by spreading the built object.
 
 - **The style axis and its values.** `styleAxis` names the axis every
-  node is styled on; `styles` lists its values' styles, top of the hierarchy
+  node is styled on; `values` declares each of its values, top of the hierarchy
   first.
-  A `NodeStyle` needs only its `id`; everything else has a default, and a
+  A `ValueSpec` needs only its `id`; everything else has a default, and a
   value that restates one says nothing:
 
   | field | default |
@@ -101,10 +101,10 @@ never by spreading the built object.
   | `summaryKind` | `'degree'` (`→3 ←2` in the hover box); `'children'` counts what the node contains; `'none'` shows neither |
   | `ladder` | none: the value is a rung of no ladder |
 
-  `fallbackStyle` draws a value nobody declared; `styleLabel` names the axis
+  `fallbackValue` draws a value nobody declared; `styleLabel` names the axis
   in the controls.
-- **Edge types.** Each `EdgeType` has an `id`, the `sourceValue` and
-  `targetValue` it runs between — a style value, several (the type runs
+- **Edge types.** Each `EdgeType` has an `id`, the `sources` and
+  `targets` it runs between — a style value, several (the type runs
   between every source value and every target value), or left out for any
   declared value — its `relation` (`'containment'` or `'dependency'`), and
   optionally a `match`, values the edge itself must carry on the host's edge
@@ -112,11 +112,11 @@ never by spreading the built object.
   `direction` defaults to `'directed'`, and `'undirected'` marks a
   symmetric relation: no arrowhead, a highlight from either end, and its
   own `↔n` in the hover box (a containment type is refused one);
-  `label` defaults to the id, `style` (colour per theme, alpha, dash, width)
+  `label` defaults to the id, `stroke` (colour per theme, alpha, dash, width)
   field by field to the relation's stroke (`NEUTRAL_STROKE`, a quiet solid
   grey; `CONTAINMENT_STROKE`, the same grey faint and dashed, for a
   containment type), `physics` (a spring's strength and rest length) to a
-  middling spring, `tooltip` to the label. Resolved, in `Taxonomy.edgeTypes`,
+  middling spring, `tooltip` to the label. Resolved, in `Taxonomy.edgeTypes()`,
   a type carries `sources` and `targets`, every value each end claims (every
   declared value for an end left out), and `swatch`, the two halves of its
   spring-control token: each end's first value, `null` for an end left out,
@@ -124,11 +124,11 @@ never by spreading the built object.
   [Classifying an edge](#classifying-an-edge).
 - **Filter axes.** `filterAxes` defaults to the style axis as an
   allow-list. Each `AxisDescriptor` is an `id`, a `label` (default the id)
-  and what an empty selection means: `'none'` (an allow-list: nothing selected
-  shows nothing) or `'all'` (a narrowing axis: nothing selected shows
+  and what choosing nothing means: `'none'` (an allow-list: nothing chosen
+  shows nothing) or `'all'` (a narrowing axis: nothing chosen shows
   everything). The policies follow — a node with no value on the axis
   (`absentMeans`), how a focus widens it (`widens`: `'always'`, or `'whenActive'`
-  — only while a selection is active), whether a change keeps the camera
+  — only while a value is chosen), whether a change keeps the camera
   (`keepCamera`: a narrowing axis does, an allow-list refits) — and may be
   overridden. `chipsFor(values)` groups values into chips (default one per
   value; on the style axis they wear the value's icon; a chip none
@@ -136,12 +136,12 @@ never by spreading the built object.
   key of the view's fill, and absent, a one-value chip on the axis the fill
   follows wears its value's key), `order` lists the
   values `chipsFor` receives first, in its order, the rest after them in
-  first-encounter order (default: the `styles` order on the style axis;
+  first-encounter order (default: the `values` order on the style axis;
   elsewhere, first encounter alone), `labelFor`,
   `abbreviationFor`, `iconFor` and `tooltipFor` name and adorn values
-  (defaults: the style's names and icon on the style axis, the value itself
+  (defaults: the declared names and icon on the style axis, the value itself
   and no icon elsewhere, the abbreviation from the label, no tooltip),
-  `initialSelection(values)` is the first open's selection (default every
+  `initialChosen(values)` is what the first open chooses (default every
   value on an allow-list, none on a narrowing axis), `presentation` is
   `'chip'` or `'tag'`.
 - **Pair mappings.** `pairMappings` folds an axis's values into fewer
@@ -150,7 +150,7 @@ never by spreading the built object.
   maps and its `buckets`, each a `MappingBucket`: an `id`, a `label`, a one-
   or two-character `abbreviation` and the `values` it groups. A value in two
   buckets, an empty bucket, and an id declared twice are refused.
-- **Scalars and hooks.** `scalars` adds computed axes (`id`, `label` and
+- **Scalars and hooks.** `scalars` adds computed scalars (`id`, `label` and
   `tooltip` — defaults the id and the label — and `compute(graph)` answering a
   number per node; `normalize` maps
   the answers onto [0, 1]: `'max'` divides by the largest and refuses a
@@ -180,7 +180,7 @@ step narrows the types the one before it left:
 | `match` | those declaring a `match`, else those declaring none |
 | orientation | those declared in the edge's direction, else the reverse |
 | declaration order | the first declared |
-| `classifyEdge(edge, sourceValue, targetValue, declared)` | its answer: an id replaces `declared`, `null` leaves the edge untyped, undefined keeps `declared` |
+| `classifyEdge(edge, src, tgt, declared)` | its answer: an id replaces `declared`, `null` leaves the edge untyped, undefined keeps `declared` |
 
 Two types on one pair naming as many ends, in the same orientation, with the
 same `match`, are refused at construction unless the host gives
@@ -273,17 +273,17 @@ the console. Everything else is optional.
   read once. A controlled value is the host's: the view never rewrites it,
   and warns once if the prop flips between defined and undefined.
   `initialFilter(taxonomy, graph)` is the filter the view starts from — an
-  `initialSelection` that splits a chip is snapped to the whole chip, with a
+  `initialChosen` that splits a chip is snapped to the whole chip, with a
   warning. `reseedFilter(filter, taxonomy, graph, touched)` is what the view
   does to its own filter when the graph
   changes — every axis the user has not touched takes the new graph's
-  opening selection — for a host that controls the filter to call from its
+  opening choice — for a host that controls the filter to call from its
   own data effect; `onFilterChange(next, touched, focus?)` names the axes the
   user changed in each write, so the host can keep that set, and a focus's
   widening names the request it answers. A host that writes
   only one axis need not control the filter: the handle's `updateFilter`
   writes it, and the view keeps re-seeding the rest.
-- **Save and restore.** An axis's selection is a set, "only these", or
+- **Save and restore.** An axis's chosen values are a set, "only these", or
   `{ except }`, "all but these". An allow-list opens as an exclusion and the
   bar keeps an axis's kind, so a value the data gains after a chip was turned
   off shows; a set the host writes stays exactly its values. `filterToJSON`
@@ -354,7 +354,7 @@ the console. Everything else is optional.
   `Coloring`: `{ by: 'axis', axis, keys? }`, a node's value on an axis, or
   `{ by: 'node', keys, of }`, the key a host function answers; keys are
   `LegendKey`s, and an axis without them takes its values, each in a palette
-  slot. Absent, or the style axis without keys, the fill is the styles' own.
+  slot. Absent, or the style axis without keys, the fill is each value's own.
   The chips, the control rows that bucket the fill's axis, the band overlay
   and the hover box (the node's key beside its swatch) follow the canvas;
   icon, size and physics stay on the style axis, and a new colouring
@@ -374,7 +374,7 @@ the console. Everything else is optional.
   ```
 - **Inputs.** `counts` (chip badges; the graph's entity counts unless given,
   the copies of one `copyKey` once; `'faceted'` counts each axis under the
-  other axes' selections),
+  other axes' chosen values),
   `findings` under the bar, `groups` to glow (derived from the data as
   `{ keys, of }` — the `LegendKey`s, `{ id, label, color?, weight? }`, and a
   function answering each node's keys — or listed as `NodeGroup`s, each an id
@@ -392,7 +392,7 @@ the console. Everything else is optional.
   `ColorChannels` — each channel's keys as drawn, `fill` always, `glow` and
   `ring` while they colour, each a `ChannelKey`, `{ id, label, color,
   visible }`, its colour in the pane's theme and `visible` while a visible
-  node wears it — and a `GroupsControl` over the glow's keys: `shown(id)`,
+  node wears it — and a `GroupsHandle` over the glow's keys: `shown(id)`,
   `toggle(id)` while the filter is writable, which writes the entry the keys
   are values of as the bar writes an axis (`GROUPS` for the groups, the axis
   for a filter axis the view shows, none for any other), and `emphasize(id | null)`;
@@ -448,7 +448,7 @@ the console. Everything else is optional.
   `onFilterChange` hears it. `onHover(null)` and `onEdgeHover(null)` arrive
   150 ms after the pointer leaves, so a tooltip can be reached; a graduated
   edge is handed as the host's edge it stands for. Removing an axis in the
-  bar resets its selection to "match everything" and fires `onFilterChange`
+  bar resets its chosen values to "match everything" and fires `onFilterChange`
   before `onAxesChange`; an axis the taxonomy does not declare renders as a
   header with its remove control and filters nothing. Derived containment
   edges are `in:<id>` (numbered on a collision), not the host's objects, and
@@ -474,13 +474,13 @@ a focus names:
 
 ```tsx
 import React from 'react'
-import { FilterBar, GraphView, passesSelection, useLinkedViews } from '@jmbarzee/force-graph'
+import { FilterBar, GraphView, passesChosen, useLinkedViews } from '@jmbarzee/force-graph'
 import type { Graph, Taxonomy } from '@jmbarzee/force-graph'
 
 export function TwoViews({ taxonomy, graph }: { taxonomy: Taxonomy; graph: Graph }) {
   const linked = useLinkedViews({ taxonomy, views: ['list', 'graph'], graph: { list: graph, graph } })
   const list = linked.of('list')
-  const shown = graph.nodes.filter(node => passesSelection({ filter: list.filter, taxonomy, axes: list.axes, node }))
+  const shown = graph.nodes.filter(node => passesChosen({ filter: list.filter, taxonomy, axes: list.axes, node }))
   // `linked.focus` switches to the view, widens its filter to show the node
   // and, for the graph view, asks it to frame and select the node.
   return linked.active === 'graph'
@@ -512,12 +512,12 @@ its `graph` changes, on the axes the user has not touched); `linked.state`,
 `linked.active` and `linked.search` are everything,
 for a host that persists them. The bar carries its own theme and scheme
 (`theme`, default `'system'`; `systemTheme` says what that means), so it needs
-no wrapper; give it the `graph` (or the `values` per axis — `valuesOn(records,
+no wrapper; give it the `graph` (or the `available` values per axis — `valuesOn(records,
 axis)` reads them off any subjects carrying `values`) and, if the host reads
 its own data, the `counts` (or `'faceted'`, with the `graph`). Given every
 record the view holds as `records` and `matches(record, query)`, the bar
 badges each chip with the search matches it hides and the search with their
-"+N"; a host whose visible set is not `passesSelection`'s passes its
+"+N"; a host whose visible set is not `passesChosen`'s passes its
 `hiddenMatchesOf` result as `hiddenMatches` instead. A shown bar binds `/` to
 its search while focus is not in an editable field; a host that binds its own
 passes `searchInputRef`. The lock toggles appear only when `locks` is
@@ -528,7 +528,7 @@ The bar tracks the values that just turned on for its chip flash
 it.
 
 What the pane computes for its own bar is exported for the second view:
-`passesSelection({ filter, taxonomy, axes, node })` decides visibility on the
+`passesChosen({ filter, taxonomy, axes, node })` decides visibility on the
 axes the view shows (`valueOn(node, axis)` for a record that carries its
 values under other names), `countsOn(nodes, axes, { filter, taxonomy })`
 the badges (without the third argument, unfaceted),
@@ -536,7 +536,7 @@ the badges (without the third argument, unfaceted),
 search's hidden-match badges. `reconcileFilter({ destination, source, locks,
 transition, taxonomy, axes, graph })` is the switch the hook makes; `axes`
 are ids, and with the `graph` a focus widens to the whole chip holding its
-target's value. `selectionFor`, `withSelection`, `withLock`, `toggleGroup` and
+target's value. `chosenOn`, `withChosen`, `withLock`, `toggleGroup` and
 `filterStatesEqual` are the filter operations the bar itself uses;
 `toggleValue` flips one value for a host's own control. A focus into the graph
 is `focusNode(id)` or the `focus` prop.
@@ -627,7 +627,7 @@ nothing, a key's colour winning over a style value it shares a name with. A
 host's own chrome beside the pane reads both through `useScheme`, or
 `schemeStylesheet(taxonomy, darkSelector?, view?)` mounted once (its dark
 block under `[data-theme="dark"]`, or the host's own selector); without
-`view`, the styles' alone. Default
+`view`, the values' alone. Default
 rest bands are laid in `BAND_FRAME` (world units: the hierarchy axis from
 −300 to 400, x from 0 to 380); a band a host declares is read in the same
 units.

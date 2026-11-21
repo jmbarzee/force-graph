@@ -9,7 +9,7 @@
 
 import React from 'react'
 import {
-  ColorLegend, GraphView, TUNING_PRESETS, TaxonomyContext, copyGroups, copyKeyOf, initialFilter, nodesById, payloadNumber, payloadString, useFocusRequest, useScheme, withSelection,
+  ColorLegend, GraphView, TUNING_PRESETS, TaxonomyContext, copyGroups, copyKeyOf, initialFilter, nodesById, payloadNumber, payloadString, useFocusRequest, useScheme, withChosen,
 } from '@jmbarzee/force-graph'
 import type {
   Coloring, FilterState, GraphNode, SetColoring, ThemeChoice, TuningPreset,
@@ -75,7 +75,7 @@ export function App({ initialTheme = 'system', initialFocus }: { initialTheme?: 
 
   /** Ask the view to reveal `node`: it widens the filter just enough, frames and selects. */
   const reveal = (node: GraphNode) => requestFocus(node.id)
-  const onlyCampus = (campus: string) => setFilter(f => withSelection(f, CAMPUS, new Set([campus])))
+  const onlyCampus = (campus: string) => setFilter(f => withChosen(f, CAMPUS, new Set([campus])))
   const glowSwitch = (
     <label>
       Glow by{' '}

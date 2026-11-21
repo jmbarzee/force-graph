@@ -27,7 +27,7 @@ describe('firstLine', () => {
 })
 
 describe('tintOf', () => {
-  const taxonomy = createTaxonomy({ styleAxis: 'kind', styles: [{ id: 'svc', label: 'Service' }], filterAxes: [{ id: 'team', emptyMeans: 'all' }, { id: 'site', emptyMeans: 'all' }] })
+  const taxonomy = createTaxonomy({ styleAxis: 'kind', values: [{ id: 'svc', label: 'Service' }], filterAxes: [{ id: 'team', emptyMeans: 'all' }, { id: 'site', emptyMeans: 'all' }] })
   const fill = fillOf({ by: 'axis', axis: 'team' }, { nodes: [{ id: 'a', name: 'a', values: { team: 'red', site: 'x' } }], edges: [] }, taxonomy)
   const chip = (values: string[], tint?: string) => ({ id: values.join(), label: values.join(), values, tint })
 
@@ -55,12 +55,12 @@ describe('axesOpenedBy', () => {
     expect(axesOpenedBy(before, after, ['team'])).toEqual(['region'])
   })
 
-  it('opens nothing when the selections are unchanged', () => {
+  it('opens nothing when the choices are unchanged', () => {
     expect(axesOpenedBy(before, new Map(before), [])).toEqual([])
   })
 
   // An allow-list axis, whose seed excludes nothing.
-  const taxonomy = createTaxonomy({ styleAxis: 'kind', styles: [], filterAxes: [{ id: 'team', emptyMeans: 'none' }] })
+  const taxonomy = createTaxonomy({ styleAxis: 'kind', values: [], filterAxes: [{ id: 'team', emptyMeans: 'none' }] })
   const none = new Map([['team', []]])
   const thirty = new Map([['team', Array.from({ length: 30 }, (_, i) => `team ${i}`)]])
 
@@ -83,7 +83,7 @@ describe('FilterBar', () => {
   })
   afterEach(() => { document.body.innerHTML = '' })
 
-  const taxonomy = createTaxonomy({ styleAxis: 'kind', styles: [], filterAxes: [{ id: 'team', emptyMeans: 'none' }] })
+  const taxonomy = createTaxonomy({ styleAxis: 'kind', values: [], filterAxes: [{ id: 'team', emptyMeans: 'none' }] })
   const values = new Map([['team', ['a', 'b']]])
   const onlyA: FilterState = new Map([['team', new Set(['a'])]])
   type Row = { id: string; name: string; values: { team: string } }
@@ -94,7 +94,7 @@ describe('FilterBar', () => {
     const host = document.body.appendChild(document.createElement('div'))
     const root = createRoot(host)
     const render = (next: Props) => act(async () => {
-      root.render(React.createElement(FilterBar<Row>, { taxonomy, filter: onlyA, onFilterChange: () => {}, ...next, values }))
+      root.render(React.createElement(FilterBar<Row>, { taxonomy, filter: onlyA, onFilterChange: () => {}, ...next, available: values }))
     })
     await render(props)
     return { host, render }
@@ -106,7 +106,7 @@ describe('FilterBar', () => {
     const host = document.createElement('div')
     await act(async () => {
       createRoot(host).render(React.createElement(FillContext.Provider, { value: langs },
-        React.createElement(FilterBar, { taxonomy, axes: ['team'], values: new Map([['team', ['C', 'C++']]]), filter: new Map(), onFilterChange: () => {} })))
+        React.createElement(FilterBar, { taxonomy, axes: ['team'], available: new Map([['team', ['C', 'C++']]]), filter: new Map(), onFilterChange: () => {} })))
     })
     const tints = [...host.querySelectorAll<HTMLElement>('.gv-chip')].map(c => c.style.getPropertyValue('--gv-chip-tint'))
     expect(tints).toEqual(['var(--gv-node-c)', 'var(--gv-node-c-2)'])
@@ -138,8 +138,8 @@ describe('FilterBar', () => {
     expect(changes.map(f => [...(f.get('team') as Set<string>)])).toEqual([['a', 'b']])
   })
 
-  it('badges chips with faceted counts: each axis under the other\'s selection', async () => {
-    const faceted = createTaxonomy({ styleAxis: 'kind', styles: [], filterAxes: [{ id: 'team', emptyMeans: 'none' }, { id: 'site', emptyMeans: 'all' }] })
+  it('badges chips with faceted counts: each axis under the other\'s choice', async () => {
+    const faceted = createTaxonomy({ styleAxis: 'kind', values: [], filterAxes: [{ id: 'team', emptyMeans: 'none' }, { id: 'site', emptyMeans: 'all' }] })
     const graph = { nodes: [['a', 'x'], ['a', 'y'], ['b', 'y']].map(([team, site], i) => ({ id: `${i}`, name: team, values: { team, site } })), edges: [] }
     const host = document.body.appendChild(document.createElement('div'))
     const filter: FilterState = new Map([['team', new Set(['a'])], ['site', new Set(['y'])]])

@@ -1,9 +1,9 @@
-// The filter model a host's views share: a selection per axis, over whatever
+// The filter model a host's views share: a choice per axis, over whatever
 // axes the host declares, and the operations on it.
 //
 // Every operation here is copy-on-write: the axis being edited gets a new
-// selection, every other axis keeps its exact instance, and a no-op edit
-// returns the same state. The view compares selections by content, so a host
+// choice, every other axis keeps its exact instance, and a no-op edit
+// returns the same state. The view compares choices by content, so a host
 // that rebuilds a filter from a URL or a store is not read as a change —
 // identity is the cheap path, not the contract.
 //
@@ -22,75 +22,75 @@ import { isPlainRecord } from '../json'
  * is an exclusion, "all but these": every value the graph presents but its
  * own, so a value the data gains later shows.
  */
-export type AxisSelection = ReadonlySet<string> | { except: ReadonlySet<string> }
+export type AxisChosen = ReadonlySet<string> | { except: ReadonlySet<string> }
 
 /**
- * A selection per axis. A `Map`, not a `Record`: an axis the host did not
+ * A choice per axis. A `Map`, not a `Record`: an axis the host did not
  * declare has no key, so a misspelt axis is a miss the type sees rather than
- * an `undefined` every downstream `.has` reads as "nothing selected".
+ * an `undefined` every downstream `.has` reads as "nothing chosen".
  */
-export type FilterState = ReadonlyMap<AxisId, AxisSelection>
+export type FilterState = ReadonlyMap<AxisId, AxisChosen>
 
 /**
- * Which axes are locked. A locked axis keeps its selection when a `manual`
+ * Which axes are locked. A locked axis keeps its choice when a `manual`
  * switch adopts the source view's; a focus widens it anyway and reports it.
  */
 export type AxisLocks = ReadonlyMap<AxisId, boolean>
 
 
 /**
- * The entry for which groups are shown: an `AxisSelection` over group ids,
+ * The entry for which groups are shown: an `AxisChosen` over group ids,
  * saved and controlled with the axes but not one of them — a node belongs to
  * many groups, and no taxonomy may declare an axis by this id.
  */
 export const GROUPS: AxisId = '@groups'
 
-const EMPTY: AxisSelection = new Set<string>()
-const EVERY_GROUP: AxisSelection = { except: new Set<string>() }
+const EMPTY: AxisChosen = new Set<string>()
+const EVERY_GROUP: AxisChosen = { except: new Set<string>() }
 
 /**
- * The selection on one axis, or, absent, an empty one — `GROUPS`'s shows
+ * The choice on one axis, or, absent, an empty one — `GROUPS`'s shows
  * every group, so a filter written before a group arrived shows it.
  *
- * Always returns the *same* absent selection, so an absent axis does not change
+ * Always returns the *same* absent choice, so an absent axis does not change
  * identity between reads — a fresh `new Set()` per call would defeat exactly the
  * memoisation this module exists to protect.
  */
-export function selectionFor(state: FilterState, axis: AxisId): AxisSelection {
+export function chosenOn(state: FilterState, axis: AxisId): AxisChosen {
   return state.get(axis) ?? (axis === GROUPS ? EVERY_GROUP : EMPTY)
 }
 
 /** Whether the group filter shows a node in `groupIds`: one in no group, or one in any group it shows. */
 export function passesGroups(filter: FilterState, groupIds: readonly string[]): boolean {
   if (groupIds.length === 0) return true
-  const selection = selectionFor(filter, GROUPS)
-  return groupIds.some(id => selects(selection, id))
+  const chosen = chosenOn(filter, GROUPS)
+  return groupIds.some(id => selects(chosen, id))
 }
 
-/** Every axis the state carries a selection for. */
+/** Every axis the state carries a choice for. */
 export function axesOf(state: FilterState): AxisId[] {
   return [...state.keys()].sort()
 }
 
-/** The values a selection names: an inclusion's, or the ones an exclusion leaves out. */
-export function namedBy(selection: AxisSelection): ReadonlySet<string> {
-  return 'except' in selection ? selection.except : selection
+/** The values a choice names: an inclusion's, or the ones an exclusion leaves out. */
+export function namedBy(chosen: AxisChosen): ReadonlySet<string> {
+  return 'except' in chosen ? chosen.except : chosen
 }
 
-/** Whether a selection shows `value`: an inclusion holds it, an exclusion does not. An empty inclusion is `emptyMeans`'s to read first. */
-export function selects(selection: AxisSelection, value: string): boolean {
-  return 'except' in selection ? !selection.except.has(value) : selection.has(value)
+/** Whether a choice shows `value`: an inclusion holds it, an exclusion does not. An empty inclusion is `emptyMeans`'s to read first. */
+export function selects(chosen: AxisChosen, value: string): boolean {
+  return 'except' in chosen ? !chosen.except.has(value) : chosen.has(value)
 }
 
-/** Whether a selection is an empty inclusion — the one `emptyMeans` reads. */
-export function isEmptySelection(selection: AxisSelection): boolean {
-  return !('except' in selection) && selection.size === 0
+/** Whether a choice is an empty inclusion — the one `emptyMeans` reads. */
+export function isEmptyChosen(chosen: AxisChosen): boolean {
+  return !('except' in chosen) && chosen.size === 0
 }
 
-/** `selection` with `values` turned on or off, of the same kind. */
-export function withValues(selection: AxisSelection, values: Iterable<string>, on: boolean): AxisSelection {
-  const exclusion = 'except' in selection
-  const named = new Set(namedBy(selection))
+/** `chosen` with `values` turned on or off, of the same kind. */
+export function withValues(chosen: AxisChosen, values: Iterable<string>, on: boolean): AxisChosen {
+  const exclusion = 'except' in chosen
+  const named = new Set(namedBy(chosen))
   for (const v of values) {
     if (on !== exclusion) named.add(v)
     else named.delete(v)
@@ -98,29 +98,34 @@ export function withValues(selection: AxisSelection, values: Iterable<string>, o
   return exclusion ? { except: named } : named
 }
 
-/** Whether two selections are of one kind and name the same values. */
-export function selectionsEqual(a: AxisSelection, b: AxisSelection): boolean {
+/** Whether two sets hold the same strings. */
+export function setsEqual(a: ReadonlySet<string>, b: ReadonlySet<string>): boolean {
   if (a === b) return true
-  if (('except' in a) !== ('except' in b)) return false
-  const [x, y] = [namedBy(a), namedBy(b)]
-  if (x.size !== y.size) return false
-  for (const v of x) if (!y.has(v)) return false
+  if (a.size !== b.size) return false
+  for (const v of a) if (!b.has(v)) return false
   return true
 }
 
+/** Whether two choices are of one kind and name the same values. */
+export function chosenEqual(a: AxisChosen, b: AxisChosen): boolean {
+  if (a === b) return true
+  if (('except' in a) !== ('except' in b)) return false
+  return setsEqual(namedBy(a), namedBy(b))
+}
+
 /**
- * Replace one axis's selection, copy-on-write.
+ * Replace one axis's choice, copy-on-write.
  *
- * Returns `state` **itself** when the new selection is content-equal to the old
+ * Returns `state` **itself** when the new choice is content-equal to the old
  * one, so a no-op edit changes no identity anywhere. Otherwise only the edited
  * axis takes `next`; every other axis is carried over by reference.
  */
-export function withSelection(
+export function withChosen(
   state: FilterState,
   axis: AxisId,
-  next: AxisSelection,
+  next: AxisChosen,
 ): FilterState {
-  if (selectionsEqual(selectionFor(state, axis), next)) return state
+  if (chosenEqual(chosenOn(state, axis), next)) return state
   const out = new Map(state)
   out.set(axis, next)
   return out
@@ -131,7 +136,7 @@ export function filterStatesEqual(a: FilterState, b: FilterState): boolean {
   if (a === b) return true
   const axes = new Set([...a.keys(), ...b.keys()])
   for (const axis of axes) {
-    if (!selectionsEqual(selectionFor(a, axis), selectionFor(b, axis))) return false
+    if (!chosenEqual(chosenOn(a, axis), chosenOn(b, axis))) return false
   }
   return true
 }
@@ -173,7 +178,7 @@ export type FocusTarget = {
   groups?: readonly string[]
 }
 
-/** How a view is being switched to: by the user (`manual`: adopt the source's selections) or to show a node (`focus`: widen for its values). */
+/** How a view is being switched to: by the user (`manual`: adopt the source's choices) or to show a node (`focus`: widen for its values). */
 export type ViewTransition =
   | { kind: 'manual' }
   | { kind: 'focus'; target: FocusTarget }
@@ -189,22 +194,22 @@ export type ReconcileResult = {
 
 /**
  * The filter a view starts from: on every filter axis, what its descriptor's
- * `initialSelection` chooses from the values the graph presents there —
+ * `initialChosen` chooses from the values the graph presents there —
  * every value on an allow-list, none on a narrowing axis, or the host's own
  * choice. An allow-list's is an exclusion of the values not chosen, so a
  * value the graph gains later shows.
  */
 export function initialFilter(taxonomy: Pick<Taxonomy, 'filterAxes'>, graph: Pick<Graph, 'nodes'>): FilterState {
-  return new Map(taxonomy.filterAxes.map(d => [d.id, seedSelection(taxonomy, d, valuesOn(graph.nodes, d.id))]))
+  return new Map(taxonomy.filterAxes().map(d => [d.id, seedChosen(taxonomy, d, valuesOn(graph.nodes, d.id))]))
 }
 
-/** One axis's opening selection on the values the graph presents there: `initialFilter`'s, axis by axis. */
-export function seedSelection(taxonomy: Pick<Taxonomy, 'filterAxes'>, d: ResolvedAxisDescriptor, values: readonly string[]): AxisSelection {
-  const chosen = new Set(d.initialSelection(values))
-  // The bar toggles a chip's values as a unit, so a selection that splits
+/** One axis's opening choice on the values the graph presents there: `initialFilter`'s, axis by axis. */
+export function seedChosen(taxonomy: Pick<Taxonomy, 'filterAxes'>, d: ResolvedAxisDescriptor, values: readonly string[]): AxisChosen {
+  const chosen = new Set(d.initialChosen(values))
+  // The bar toggles a chip's values as a unit, so a choice that splits
   // one would show the chip as on with half its nodes hidden, and the
   // first click would turn the whole chip off. Snap to the whole chip —
-  // selecting is the safe direction — and say so once per chip.
+  // choosing more is the safe direction — and say so once per chip.
   const present = new Set(values)
   for (const chip of d.chipsFor(values)) {
     const mine = chip.values.filter(v => present.has(v))
@@ -220,10 +225,10 @@ export function seedSelection(taxonomy: Pick<Taxonomy, 'filterAxes'>, d: Resolve
 
 /**
  * A filter re-seeded for a graph that changed: every filter axis the user has
- * not touched takes its opening selection on `graph` (`initialFilter`'s), so
+ * not touched takes its opening choice on `graph` (`initialFilter`'s), so
  * a host that mounts empty while its data loads is not left blank and a value
  * first seen later is not born hidden; an axis in `touched` keeps its
- * selection. Which axes the user touched is state, not an inference — the
+ * choice. Which axes the user touched is state, not an inference — the
  * bar names the axis of every change it makes (`onFilterChange`'s second
  * argument), the view and `useLinkedViews` keep the set, and a host that
  * controls its filter keeps its own and passes it here from its data effect.
@@ -232,18 +237,18 @@ export function seedSelection(taxonomy: Pick<Taxonomy, 'filterAxes'>, d: Resolve
 export function reseedFilter(filter: FilterState, taxonomy: Pick<Taxonomy, 'filterAxes'>, graph: Pick<Graph, 'nodes'>, touched: ReadonlySet<AxisId> = new Set()): FilterState {
   const seed = initialFilter(taxonomy, graph)
   let next = filter
-  for (const d of taxonomy.filterAxes) {
+  for (const d of taxonomy.filterAxes()) {
     if (touched.has(d.id)) continue
-    next = withSelection(next, d.id, selectionFor(seed, d.id))
+    next = withChosen(next, d.id, chosenOn(seed, d.id))
   }
   return next
 }
 
-/** The axes whose selection differs between two filters — what a write touched. */
+/** The axes whose choice differs between two filters — what a write touched. */
 export function changedAxes(a: FilterState, b: FilterState): AxisId[] {
   const out: AxisId[] = []
   for (const axis of new Set([...a.keys(), ...b.keys()])) {
-    if (!selectionsEqual(selectionFor(a, axis), selectionFor(b, axis))) out.push(axis)
+    if (!chosenEqual(chosenOn(a, axis), chosenOn(b, axis))) out.push(axis)
   }
   return out
 }
@@ -257,7 +262,7 @@ function warnSplitChip(taxonomy: object, axis: AxisId, chip: string, added: read
   const key = `${axis}\u0000${chip}`
   if (warned.has(key)) return
   warned.add(key)
-  console.warn(`[filter] the initial selection on axis ${JSON.stringify(axis)} splits the chip ${JSON.stringify(chip)}; the whole chip is selected (${added.map(v => JSON.stringify(v)).join(', ')} added). Choose a selection the chips can show.`)
+  console.warn(`[filter] the initial choice on axis ${JSON.stringify(axis)} splits the chip ${JSON.stringify(chip)}; the whole chip is chosen (${added.map(v => JSON.stringify(v)).join(', ')} added). Choose values the chips can show.`)
 }
 
 // The records below are built from entries, not by assignment: an axis id is
@@ -266,7 +271,7 @@ function warnSplitChip(taxonomy: object, axis: AxisId, chip: string, added: read
 
 /** A filter as plain data — an inclusion as its values in an array, an exclusion as `{ except: [...] }` — for a URL, a store or a saved layout. */
 export function filterToJSON(filter: FilterState): Record<AxisId, string[] | { except: string[] }> {
-  return Object.fromEntries([...filter].map(([axis, selection]) => [axis, 'except' in selection ? { except: [...selection.except] } : [...selection]]))
+  return Object.fromEntries([...filter].map(([axis, chosen]) => [axis, 'except' in chosen ? { except: [...chosen.except] } : [...chosen]]))
 }
 
 /**
@@ -276,7 +281,7 @@ export function filterToJSON(filter: FilterState): Record<AxisId, string[] | { e
  */
 export function filterFromJSON(value: unknown): FilterState | undefined {
   if (!isPlainRecord(value)) return undefined
-  const out = new Map<AxisId, AxisSelection>()
+  const out = new Map<AxisId, AxisChosen>()
   for (const [axis, stored] of Object.entries(value)) {
     const exclusion = isPlainRecord(stored)
     const values = exclusion ? stored.except : stored
@@ -311,9 +316,9 @@ export function matchesFocus(node: { values: Readonly<Record<string, string>> },
   return true
 }
 
-/** What `passesSelection` reads. */
-export interface PassesSelectionInput<N> {
-  /** The selections the record is judged against. */
+/** What `passesChosen` reads. */
+export interface PassesChosenInput<N> {
+  /** The choices the record is judged against. */
   filter: FilterState
   /** Resolves each axis's policy. */
   taxonomy: Pick<Taxonomy, 'axisFor'>
@@ -331,12 +336,12 @@ function carriesValues(record: unknown): record is { values?: AxisValues } {
 }
 
 /**
- * Does a record pass the selection on the axes a view shows? The policy —
- * what an empty selection means, what an absent value means — is read from
+ * Does a record pass the choice on the axes a view shows? The policy —
+ * what an empty choice means, what an absent value means — is read from
  * each axis's descriptor, once, here, so a host's second view and the pane
  * agree on what the filter means.
  */
-export function passesSelection<N>({ filter, taxonomy, axes, node, valueOn }: PassesSelectionInput<N>): boolean {
+export function passesChosen<N>({ filter, taxonomy, axes, node, valueOn }: PassesChosenInput<N>): boolean {
   const read = valueOn ?? ((n: N, axis: AxisId) => (carriesValues(n) ? n.values?.[axis] : undefined))
   for (const id of axes) {
     const d = taxonomy.axisFor(id)
@@ -345,15 +350,15 @@ export function passesSelection<N>({ filter, taxonomy, axes, node, valueOn }: Pa
   return true
 }
 
-/** `passesSelection` over descriptors already resolved — the view's hot path, which resolves them once per render. */
+/** `passesChosen` over descriptors already resolved — the view's hot path, which resolves them once per render. */
 export function passesDescriptors(
   filter: FilterState,
   axes: readonly ResolvedAxisDescriptor[],
   valueOn: (axis: string) => string | undefined,
 ): boolean {
   for (const axis of axes) {
-    const selection = selectionFor(filter, axis.id)
-    if (isEmptySelection(selection)) {
+    const chosen = chosenOn(filter, axis.id)
+    if (isEmptyChosen(chosen)) {
       if (axis.emptyMeans === 'none') return false
       continue
     }
@@ -362,7 +367,7 @@ export function passesDescriptors(
       if (axis.absentMeans === 'hidden') return false
       continue
     }
-    if (!selects(selection, value)) return false
+    if (!selects(chosen, value)) return false
   }
   return true
 }
@@ -381,7 +386,7 @@ export interface HiddenMatches {
 export interface HiddenMatchesInput<N extends { id: string; values?: AxisValues }> {
   /** Every node the search ran over, visible or not. */
   nodes: Iterable<N>
-  /** The selections that hide nodes. */
+  /** The choices that hide nodes. */
   filter: FilterState
   /** Resolves each axis's policy. */
   taxonomy: Pick<Taxonomy, 'axisFor'>

@@ -41,7 +41,7 @@ const tick = (n = Infinity) => act(async () => {
 
 // A style gives the nodes a charge, which spreads them: with none they
 // collapse within a pixel, and their frame barely moves when they do.
-const taxonomy = createTaxonomy({ styleAxis: 'kind', styles: [{ id: 'node' }], filterAxes: [] })
+const taxonomy = createTaxonomy({ styleAxis: 'kind', values: [{ id: 'node' }], filterAxes: [] })
 const graphOf = (...ids: string[]): Graph => ({
   nodes: ids.map(id => ({ id, name: id, values: { kind: 'node' } })),
   edges: ids.slice(1).map(id => ({ id: `${ids[0]}-${id}`, sourceId: ids[0]!, targetId: id })),

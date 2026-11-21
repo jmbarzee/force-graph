@@ -12,14 +12,14 @@ import { resolvePhysics } from '../../graph/forces'
 import { axisOptions, defaultParamsFor, layoutAxisOptions, sprungEdges } from '../../graph/simulation'
 import type { SimNode } from '../../graph/simulation'
 import { initialFilter } from '../../filter/types'
-import type { NodeStyle } from '../../graph/shapes'
+import type { ValueSpec } from '../../graph/shapes'
 import type { Graph } from '../../graph/model'
 
 beforeEach(() => {
   ;(globalThis as { IS_REACT_ACT_ENVIRONMENT?: boolean }).IS_REACT_ACT_ENVIRONMENT = true
 })
 
-const style = (id: string, ladder?: string): NodeStyle => ({
+const style = (id: string, ladder?: string): ValueSpec => ({
   id, label: id, abbreviation: id, ladder,
   color: { light: { fill: '#000000', border: '#000000' }, dark: { fill: '#ffffff', border: '#ffffff' } },
 })
@@ -27,7 +27,7 @@ const graph: Graph = { nodes: ['a', 'b', 'c'].map(kind => ({ id: kind, name: kin
 
 /** Both force tabs over every node, mounted, with `a` and `c` a ladder when `ladder` is given. */
 async function forceTabs(ladder?: string): Promise<HTMLElement> {
-  const taxonomy = createTaxonomy({ styleAxis: 'kind', styles: [style('a', ladder), style('b'), style('c', ladder)] })
+  const taxonomy = createTaxonomy({ styleAxis: 'kind', values: [style('a', ladder), style('b'), style('c', ladder)] })
   const nodes = graph.nodes as SimNode[]
   const getNode = (id: string) => nodes.find(n => n.id === id)
   const params = defaultParamsFor(taxonomy)

@@ -78,8 +78,8 @@ const RELATIONS = new Set(['containment', 'dependency'])
  */
 export function validateGraph(graph: Graph, taxonomy: Taxonomy): GraphDiagnostic[] {
   const out: GraphDiagnostic[] = []
-  const declaredTypes = new Map(taxonomy.edgeTypes.map(e => [e.id, e]))
-  const declaredValues = new Set(taxonomy.styleValues)
+  const declaredTypes = new Map(taxonomy.edgeTypes().map(e => [e.id, e]))
+  const declaredValues = new Set(taxonomy.styleValues())
   const engine = engineOf(taxonomy)
   const byId = nodesById(graph.nodes)
   const window = windowOf(graph)
@@ -265,7 +265,7 @@ function derivedContainmentDiagnostics(drawn: Graph, host: Graph, taxonomy: Taxo
     } catch {
       typeId = undefined
     }
-    const declared = typeId === undefined ? undefined : taxonomy.edgeTypes.find(t => t.id === typeId)
+    const declared = typeId === undefined ? undefined : taxonomy.edgeTypes().find(t => t.id === typeId)
     if (declared === undefined || declared.relation !== 'containment') untyped.push(edge.id)
   }
   if (untyped.length === 0) return []
@@ -282,7 +282,7 @@ function derivedContainmentDiagnostics(drawn: Graph, host: Graph, taxonomy: Taxo
 /** Every chip, over each declared axis's values, whose tint names no key of the fill: once per chip. */
 export function tintDiagnostics(taxonomy: Taxonomy, values: ReadonlyMap<string, readonly AxisValue[]>, fill: Fill): GraphDiagnostic[] {
   const out: GraphDiagnostic[] = []
-  for (const axis of taxonomy.filterAxes) {
+  for (const axis of taxonomy.filterAxes()) {
     for (const chip of axis.chipsFor(values.get(axis.id) ?? [])) {
       if (chip.tint === undefined || fill.keys.has(chip.tint)) continue
       out.push({ severity: 'warning', code: 'tint-undeclared', message: `chip ${JSON.stringify(chip.id)} on ${JSON.stringify(axis.id)} wears ${JSON.stringify(chip.tint)}, which the fill's keys do not declare; it draws neutral` })

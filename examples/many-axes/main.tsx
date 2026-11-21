@@ -8,7 +8,7 @@ const VALUES = 30
 
 const taxonomy = createTaxonomy({
   styleAxis: 'kind',
-  styles: [{
+  values: [{
     id: 'item',
     label: 'Item',
     icon: '•',

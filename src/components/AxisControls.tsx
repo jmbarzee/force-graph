@@ -5,7 +5,7 @@
 // they are the same kind of thing, so they get the same surface.
 
 import React from 'react'
-import type { ForceParams, LayoutAxisOption, AxisTuning, BandRange, LayoutTuning } from '../graph/simulation'
+import type { ForceParams, LayoutAxisOption, AxisTuning, BandRange, BandAxisTuning } from '../graph/simulation'
 import { TOKEN_CEILING, layoutAxisKey, mappedTuning, withOverride } from '../graph/simulation'
 import type { ScalarSpan } from '../graph/scalar'
 import type { ResolvedAxis, ResolvedPhysics } from '../graph/forces'
@@ -50,7 +50,7 @@ const tuningKey = (axis: LayoutAxis): 'bandX' | 'bandY' => (axis === 'x' ? 'band
 const strengthKey = (axis: LayoutAxis): 'gravityX' | 'gravityY' => (axis === 'x' ? 'gravityX' : 'gravityY')
 // Patches spelled out per axis, so the compiler checks the value against the
 // field — a computed key under a cast would let a tuning land in a strength.
-const tuningPatch = (axis: LayoutAxis, tuning: LayoutTuning): Partial<ForceParams> =>
+const tuningPatch = (axis: LayoutAxis, tuning: BandAxisTuning): Partial<ForceParams> =>
   axis === 'x' ? { bandX: tuning } : { bandY: tuning }
 const strengthPatch = (axis: LayoutAxis, value: number): Partial<ForceParams> =>
   axis === 'x' ? { gravityX: value } : { gravityY: value }
@@ -89,7 +89,7 @@ export function AxisControls({ axis, params, resolved, axes, present, onParamCha
   const taxonomy = useTaxonomy()
   const fill = useFill(taxonomy)
   const key = tuningKey(axis)
-  const tuning: LayoutTuning = params[key]
+  const tuning: BandAxisTuning = params[key]
   const table = axis === 'x' ? resolved.bandX : resolved.bandY
   const strength = params[strengthKey(axis)]
   const label = axis.toUpperCase()

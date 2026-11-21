@@ -31,7 +31,7 @@ it('hydrates a server-rendered pane under a dark host without a mismatch, then t
 it('reports a client-only pane under a dark OS as dark, once', async () => {
   window.matchMedia = (query: string) => ({ matches: query.includes('dark') }) as MediaQueryList
   const onThemeResolved = vi.fn()
-  const taxonomy = createTaxonomy({ styleAxis: 'kind', styles: [] })
+  const taxonomy = createTaxonomy({ styleAxis: 'kind', values: [] })
   window.ResizeObserver = class { observe() {} unobserve() {} disconnect() {} }
   await act(async () => {
     createRoot(document.createElement('div')).render(
@@ -45,7 +45,7 @@ it('marks a pane under a dark host with data-gv-theme, and writes no data-theme'
   const host = document.createElement('div')
   host.setAttribute('data-theme', 'dark')
   document.body.append(host)
-  const taxonomy = createTaxonomy({ styleAxis: 'kind', styles: [] })
+  const taxonomy = createTaxonomy({ styleAxis: 'kind', values: [] })
   window.ResizeObserver = class { observe() {} unobserve() {} disconnect() {} }
   await act(async () => {
     createRoot(host).render(React.createElement(GraphView, { graph: { nodes: [], edges: [] }, taxonomy }))

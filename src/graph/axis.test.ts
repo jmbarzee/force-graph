@@ -1,28 +1,28 @@
 import { describe, expect, it } from 'vitest'
 import { countsOn, identityMapping, labelled, valuesOn } from './axis'
 import { createTaxonomy } from './taxonomy'
-import type { NodeStyle } from './shapes'
-import type { AxisSelection, FilterState } from '../filter/types'
+import type { ValueSpec } from './shapes'
+import type { AxisChosen, FilterState } from '../filter/types'
 
-const style = (id: string): NodeStyle => ({
+const spec = (id: string): ValueSpec => ({
   id, label: id,
   color: { light: { fill: '#000000', border: '#000000' }, dark: { fill: '#ffffff', border: '#ffffff' } },
 })
 const node = (id: string, values: Record<string, string>, copyKey?: string) => ({ id, values, copyKey })
 
 describe('chipsFor', () => {
-  it('orders the style axis\'s chips as styles declares them, however the nodes are ordered', () => {
-    const taxonomy = createTaxonomy({ styleAxis: 'kind', styles: [style('service'), style('queue'), style('store')] })
+  it('orders the style axis\'s chips as values declares them, however the nodes are ordered', () => {
+    const taxonomy = createTaxonomy({ styleAxis: 'kind', values: [spec('service'), spec('queue'), spec('store')] })
     const nodes = [node('1', { kind: 'store' }), node('2', { kind: 'service' }), node('3', { kind: 'queue' })]
     for (const shuffled of [nodes, [...nodes].reverse(), [nodes[1], nodes[0], nodes[2]]]) {
-      expect(taxonomy.filterAxes[0].chipsFor(valuesOn(shuffled, 'kind')).map(c => c.id)).toEqual(['service', 'queue', 'store'])
+      expect(taxonomy.filterAxes()[0].chipsFor(valuesOn(shuffled, 'kind')).map(c => c.id)).toEqual(['service', 'queue', 'store'])
     }
   })
 
   it('puts the values `order` lists first, in its order, and the rest after them as encountered', () => {
     const seen: string[][] = []
     const taxonomy = createTaxonomy({
-      styleAxis: 'kind', styles: [],
+      styleAxis: 'kind', values: [],
       filterAxes: [
         { id: 'site', emptyMeans: 'all', order: ['z', 'missing', 'x'] },
         { id: 'team', emptyMeans: 'all', order: ['b'], chipsFor: values => { seen.push([...values]); return [] } },
@@ -36,7 +36,7 @@ describe('chipsFor', () => {
 
 describe('labels', () => {
   const taxonomy = createTaxonomy({
-    styleAxis: 'kind', styles: [style('service')],
+    styleAxis: 'kind', values: [spec('service')],
     filterAxes: [
       { id: 'login', emptyMeans: 'all', labelFor: v => `@${v}` },
       { id: 'repo', emptyMeans: 'all', abbreviationFor: v => v.toUpperCase() },
@@ -70,7 +70,7 @@ describe('labels', () => {
 
 describe('countsOn', () => {
   const taxonomy = createTaxonomy({
-    styleAxis: 'kind', styles: [],
+    styleAxis: 'kind', values: [],
     filterAxes: [{ id: 'kind', emptyMeans: 'none' }, { id: 'site', emptyMeans: 'all' }],
   })
   const nodes = [
@@ -89,8 +89,8 @@ describe('countsOn', () => {
     })
   })
 
-  it('counts each axis under the other axes\' selections, of either kind, and not under its own', () => {
-    const filter: FilterState = new Map<string, AxisSelection>([['kind', { except: new Set(['lab']) }], ['site', new Set(['south'])]])
+  it('counts each axis under the other axes\' choices, of either kind, and not under its own', () => {
+    const filter: FilterState = new Map<string, AxisChosen>([['kind', { except: new Set(['lab']) }], ['site', new Set(['south'])]])
     expect(tally(countsOn(nodes, ['kind', 'site'], { filter, taxonomy }))).toEqual({
       // Under site = south: the north course is out; the dept has no site and stays.
       kind: { course: 1, lab: 1, dept: 1 },

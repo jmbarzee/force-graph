@@ -9,7 +9,7 @@ import type { AxisLocks, FilterState, ReconcileResult, ViewTransition } from './
 
 /** One view's share of the linked state. */
 export interface LinkedViewState {
-  /** The view's selections. */
+  /** The view's choices. */
   filter: FilterState
   /** The axes the view holds against adoption. */
   locks: AxisLocks
@@ -24,7 +24,7 @@ export const NO_OVERRIDES: LinkedViewState['overriddenLocks'] = { axes: new Set(
 
 /**
  * Switch to `to` from `from`: on a manual switch `to` adopts `from`'s
- * selections on the axes it shows, except where locked; on a focus `to`
+ * choices on the axes it shows, except where locked; on a focus `to`
  * widens just enough to show the target — to the whole chip holding its
  * value when `graph` is given — overriding locks (recorded). The same state
  * object comes back when nothing changed.

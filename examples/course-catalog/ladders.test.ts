@@ -9,7 +9,7 @@ import { presentSetsOf } from '../../src/components/graph-view/present'
 import { resolvePhysics } from '../../src/graph/forces'
 import { axisOptions, defaultParamsFor, layoutAxisOptions, sprungEdges } from '../../src/graph/simulation'
 import type { SimNode } from '../../src/graph/simulation'
-import { initialFilter, withSelection } from '../../src/filter/types'
+import { initialFilter, withChosen } from '../../src/filter/types'
 import { catalog } from './data'
 import { buildGraph } from './graph'
 import { ENTITY, taxonomy } from './taxonomy'
@@ -25,7 +25,7 @@ const noop = () => {}
 /** Both force tabs over what the opening filter shows, with `entities` shown on the style axis when given. */
 function forceTabs(entities?: string[]): (s: string) => number {
   const opening = initialFilter(taxonomy, graph)
-  const filter = entities ? withSelection(opening, ENTITY, new Set(entities)) : opening
+  const filter = entities ? withChosen(opening, ENTITY, new Set(entities)) : opening
   const { visibleNodes, visibleIds } = computeVisibleGraph({ nodes, edges: graph.edges, getNode }, filter, taxonomy)
   const present = presentSetsOf(visibleNodes, sprungEdges(graph.edges, visibleIds), resolved, getNode)
   const html = renderToStaticMarkup(React.createElement(TaxonomyContext.Provider, { value: taxonomy },

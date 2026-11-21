@@ -5,7 +5,7 @@ import { createTaxonomy } from '../../graph/taxonomy'
 import { identityMapping } from '../../graph/axis'
 import type { AxisMapping } from '../../graph/axis'
 
-const taxonomy = createTaxonomy({ styleAxis: 'kind', styles: [{ id: 'svc', label: 'Service' }], filterAxes: [{ id: 'team', emptyMeans: 'all' }, { id: 'kind', emptyMeans: 'all' }] })
+const taxonomy = createTaxonomy({ styleAxis: 'kind', values: [{ id: 'svc', label: 'Service' }], filterAxes: [{ id: 'team', emptyMeans: 'all' }, { id: 'kind', emptyMeans: 'all' }] })
 const graph = { nodes: [{ id: 'a', name: 'a', values: { kind: 'svc', team: 'red' } }], edges: [] }
 const fill = fillOf({ by: 'axis', axis: 'team' }, graph, taxonomy)
 const identity = (axis: string): AxisMapping => identityMapping(taxonomy.axisFor(axis)!, ['red', 'svc'])

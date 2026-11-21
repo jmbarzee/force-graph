@@ -15,8 +15,8 @@ import type { AxisId, AxisValue } from './axis'
 import { isIdentityMapping } from './axis'
 import type { GraphEdge } from './model'
 import { relationOf } from './model'
-import type { ChargeParams, LinkParams, GravityParams, SimNode, PairTuning, PushPhysics, BandRange, LayoutTuning } from './simulation'
-import type { ResolvedScalarAxis, ScalarAxis, ScalarSpan } from './scalar'
+import type { ChargeParams, LinkParams, GravityParams, SimNode, PairTuning, PushPhysics, BandRange, BandAxisTuning } from './simulation'
+import type { ResolvedScalar, Scalar, ScalarSpan } from './scalar'
 import { normalized, rangeNormalized } from './scalar'
 import { isScalarTuning } from './scalar'
 import type { ReadableGraph } from './model'
@@ -87,17 +87,17 @@ export interface ResolvedAxis<T> {
 
 /** A layout axis backed by a scalar: the scalar itself, and where its 0 and 1 rest. */
 export interface ResolvedScalarLayout {
-  readonly scalar: ResolvedScalarAxis
+  readonly scalar: ResolvedScalar
   readonly span: ScalarSpan
 }
 
 /** A layout axis as the kernels see it: per-bucket bands, or a scalar over a span. */
-export type ResolvedLayoutAxis = ResolvedAxis<BandRange> | ResolvedScalarLayout
+export type ResolvedBandAxis = ResolvedAxis<BandRange> | ResolvedScalarLayout
 
-export const isScalarAxis = (a: ResolvedLayoutAxis): a is ResolvedScalarLayout => 'scalar' in a
+export const isScalarAxis = (a: ResolvedBandAxis): a is ResolvedScalarLayout => 'scalar' in a
 
 /** The mapped half of a layout axis; loud where a caller expects buckets and meets a scalar. */
-export function mappedAxis(a: ResolvedLayoutAxis): ResolvedAxis<BandRange> {
+export function mappedAxis(a: ResolvedBandAxis): ResolvedAxis<BandRange> {
   if (isScalarAxis(a)) throw new Error(`expected a mapped axis, got scalar ${JSON.stringify(a.scalar.id)}`)
   return a
 }
@@ -108,8 +108,8 @@ export type LayoutSubject = PhysicsSubject & { id: string }
 export interface ResolvedPhysics {
   push: ResolvedAxis<PushPhysics>
   /** The two layout axes — the same shape, resolved the same way; either may be a scalar. */
-  bandX: ResolvedLayoutAxis
-  bandY: ResolvedLayoutAxis
+  bandX: ResolvedBandAxis
+  bandY: ResolvedBandAxis
   spring: ResolvedSprings
 }
 
@@ -152,7 +152,7 @@ function declaredBand(taxonomy: Taxonomy, values: readonly AxisValue[], axis: 'x
  * downward) and at the right.
  */
 export function defaultSpan(taxonomy: Taxonomy, axis: 'x' | 'y'): ScalarSpan {
-  const extent = declaredBand(taxonomy, taxonomy.styleValues, axis)
+  const extent = declaredBand(taxonomy, taxonomy.styleValues(), axis)
   const half = (extent.max - extent.min) / 2
   return axis === 'y' ? { zero: half, one: -half } : { zero: -half, one: half }
 }
@@ -178,11 +178,11 @@ export function resolvePhysics(params: ChargeParams & GravityParams & LinkParams
   const style = taxonomy.styleAxis()
   const pushFor = (m: AxisMapping) => m.axis === style
     ? (values: readonly AxisValue[]) => declaredPush(taxonomy, values)
-    : () => declaredPush(taxonomy, taxonomy.styleValues)
+    : () => declaredPush(taxonomy, taxonomy.styleValues())
   const bandOn = (m: AxisMapping, axis: 'x' | 'y') => m.axis === style
     ? (values: readonly AxisValue[]) => declaredBand(taxonomy, values, axis)
-    : () => declaredBand(taxonomy, taxonomy.styleValues, axis)
-  const layout = (t: LayoutTuning, axis: 'x' | 'y'): ResolvedLayoutAxis => {
+    : () => declaredBand(taxonomy, taxonomy.styleValues(), axis)
+  const layout = (t: BandAxisTuning, axis: 'x' | 'y'): ResolvedBandAxis => {
     if (!isScalarTuning(t)) return resolveAxis(t.mapping, t.overrides, bandOn(t.mapping, axis))
     const scalar = engineOf(taxonomy).scalars.find(sc => sc.id === t.scalar)
     // Loud: a tuning naming a scalar the taxonomy does not know is a host bug.
@@ -314,7 +314,7 @@ const AT_CENTRE = { lo: 0, hi: 0 }
 // A scalar's answer, checked once per frame: every value finite and in [0, 1].
 // Loud, because a value outside the contract would become a rest point or a
 // ring radius and nothing downstream could tell it from a real one.
-function checkedScores(scalar: ScalarAxis, graph: ReadableGraph): Map<string, number> {
+function checkedScores(scalar: Scalar, graph: ReadableGraph): Map<string, number> {
   const raw = scalar.compute(graph)
   for (const [id, s] of raw) {
     if (!Number.isFinite(s)) throw new Error(`scalar ${JSON.stringify(scalar.id)} answered ${String(s)} for node ${JSON.stringify(id)}; a scalar answers a finite number`)
@@ -330,14 +330,14 @@ function checkedScores(scalar: ScalarAxis, graph: ReadableGraph): Map<string, nu
 
 export function layoutFrame(graph: ReadableGraph, resolved: ResolvedPhysics): LayoutFrame {
   const all = [...graph.nodes]
-  const centerFor = (a: ResolvedLayoutAxis) => (isScalarAxis(a) ? 0 : medianBandCenter(all, a))
-  const scoresFor = (a: ResolvedLayoutAxis) => (isScalarAxis(a) ? checkedScores(a.scalar, graph) : undefined)
+  const centerFor = (a: ResolvedBandAxis) => (isScalarAxis(a) ? 0 : medianBandCenter(all, a))
+  const scoresFor = (a: ResolvedBandAxis) => (isScalarAxis(a) ? checkedScores(a.scalar, graph) : undefined)
   const centerX = centerFor(resolved.bandX)
   const centerY = centerFor(resolved.bandY)
   const scoresX = scoresFor(resolved.bandX)
   const scoresY = scoresFor(resolved.bandY)
   const rings = isScalarAxis(resolved.bandY) ? new Map<string, number>() : ringRadii(all, resolved.bandY)
-  const restOn = (a: ResolvedLayoutAxis, center: number, scores: Map<string, number> | undefined, node: LayoutSubject) => {
+  const restOn = (a: ResolvedBandAxis, center: number, scores: Map<string, number> | undefined, node: LayoutSubject) => {
     if (isScalarAxis(a)) {
       const s = scores?.get(node.id)
       if (s === undefined) return AT_CENTRE
@@ -438,7 +438,7 @@ export function bandOverlay(
     }
     return { acting, x: [], y: [], rings: [...byRadius].map(([radius, buckets]) => ({ radius, buckets })), colors }
   }
-  const stripesOn = (a: ResolvedLayoutAxis, center: number): BandStripe[] =>
+  const stripesOn = (a: ResolvedBandAxis, center: number): BandStripe[] =>
     isScalarAxis(a)
       ? [{ lo: Math.min(a.span.zero, a.span.one), hi: Math.max(a.span.zero, a.span.one), buckets: [], gradient: a.span }]
       : withColors(a, bandStripes(all, a, center))
@@ -549,7 +549,7 @@ export interface ResolvedSprings {
 export function resolveSprings(pair: PairTuning, taxonomy: Taxonomy): ResolvedSprings {
   const { mapping, spring: overrides } = pair
   if (mapping.axis === taxonomy.styleAxis() && isIdentityMapping(mapping)) {
-    const table = new Map(taxonomy.edgeTypes.map(e => [e.id, e]))
+    const table = new Map(taxonomy.edgeTypes().map(e => [e.id, e]))
     return {
       mapping,
       classify: (edge, src, tgt) => {

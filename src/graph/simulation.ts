@@ -17,7 +17,7 @@ import {
 } from './forces'
 import type { Rng } from './rng'
 import type { EdgeCategory, LayoutFrame, LayoutSubject, ResolvedPhysics } from './forces'
-import type { ResolvedScalarAxis, ScalarTuning } from './scalar'
+import type { ResolvedScalar, ScalarTuning } from './scalar'
 import { isScalarTuning } from './scalar'
 import type { AxisLabels, AxisNamer, AxisId, AxisValue, AxisMapping } from './axis'
 import { identityMapping, isIdentityMapping, labelled, labelledBy, mappingKey, valuesOn } from './axis'
@@ -96,10 +96,10 @@ export function withOverride<T>(tuning: AxisTuning<T>, bucketId: string, value: 
  * (`isScalarTuning`, `isScalarAxis`) and two loud casts for the callers that
  * hold the kind already (`mappedTuning`, `mappedAxis`).
  */
-export type LayoutTuning = AxisTuning<BandRange> | ScalarTuning
+export type BandAxisTuning = AxisTuning<BandRange> | ScalarTuning
 
-/** The mapped half of a layout tuning; loud where a caller expects buckets and meets a scalar. */
-export function mappedTuning(t: LayoutTuning): AxisTuning<BandRange> {
+/** The mapped half of a band-axis tuning; loud where a caller expects buckets and meets a scalar. */
+export function mappedTuning(t: BandAxisTuning): AxisTuning<BandRange> {
   if (isScalarTuning(t)) throw new Error(`expected a mapped axis, got scalar ${JSON.stringify(t.scalar)}`)
   return t
 }
@@ -142,7 +142,7 @@ export function styleIdentityMapping(taxonomy: Taxonomy, labels?: AxisLabels): A
     label: taxonomy.styleLabel(),
     labelFor: styleLabelFor(taxonomy, labels),
     abbreviationFor: value => engineOf(taxonomy).abbreviationFor(value),
-  }, taxonomy.styleValues)
+  }, taxonomy.styleValues())
 }
 
 /** A single-axis tuning on the style axis, bucketed by identity, nothing overridden. */
@@ -219,7 +219,7 @@ function nodeAxes(taxonomy: Taxonomy, graph: Graph): AxisId[] {
   const style = taxonomy.styleAxis()
   const out: AxisId[] = []
   const seen = new Set<AxisId>([style])
-  for (const d of taxonomy.filterAxes) {
+  for (const d of taxonomy.filterAxes()) {
     if (seen.has(d.id)) continue
     seen.add(d.id); out.push(d.id)
   }
@@ -255,14 +255,14 @@ export function labelledParams(params: ForceParams, taxonomy: Taxonomy, labels: 
   const named = (m: AxisMapping): AxisMapping => !isIdentityMapping(m) ? m
     : m.axis === taxonomy.styleAxis() ? styleIdentityMapping(taxonomy, labels)
     : identityMapping(namerFor(taxonomy, m.axis, labels), m.buckets.map(b => b.id))
-  const layout = (t: LayoutTuning): LayoutTuning => (isScalarTuning(t) ? t : { ...t, mapping: named(t.mapping) })
+  const layout = (t: BandAxisTuning): BandAxisTuning => (isScalarTuning(t) ? t : { ...t, mapping: named(t.mapping) })
   return { ...params, pair: { ...params.pair, mapping: named(params.pair.mapping) }, bandX: layout(params.bandX), bandY: layout(params.bandY) }
 }
 
 /** One choice for a layout axis: a mapping (with its cost) or a computed scalar. */
 export type LayoutAxisOption =
   | { readonly kind: 'mapping'; readonly option: AxisOption }
-  | { readonly kind: 'scalar'; readonly scalar: ResolvedScalarAxis }
+  | { readonly kind: 'scalar'; readonly scalar: ResolvedScalar }
 
 /** Every axis X or Y can key on: the axes push/pull can (already measured), then every scalar the taxonomy knows. The host's mappings are the pair forces' alone. */
 export function layoutAxisOptions(axes: readonly AxisOption[], taxonomy: Taxonomy): LayoutAxisOption[] {
@@ -277,7 +277,7 @@ export function layoutAxisOptions(axes: readonly AxisOption[], taxonomy: Taxonom
  * options and reads the current one back: what the dropdown's values are and
  * what the tuning answers to.
  */
-export function layoutAxisKey(choice: LayoutTuning | LayoutAxisOption): string {
+export function layoutAxisKey(choice: BandAxisTuning | LayoutAxisOption): string {
   if ('kind' in choice) return choice.kind === 'scalar' ? `scalar:${choice.scalar.id}` : mappingKey(choice.option.mapping)
   return isScalarTuning(choice) ? `scalar:${choice.scalar}` : mappingKey(choice.mapping)
 }
@@ -309,7 +309,7 @@ export function retunedFor(params: ForceParams, taxonomy: Taxonomy, graph: Graph
   // A scalar the taxonomy does not know falls back whatever the graph holds:
   // the check reads only the taxonomy, so a stored layout naming a scalar
   // since renamed never reaches the kernels, even while the graph is empty.
-  const knownScalar = (t: LayoutTuning): LayoutTuning =>
+  const knownScalar = (t: BandAxisTuning): BandAxisTuning =>
     isScalarTuning(t) && !engineOf(taxonomy).scalars.some(sc => sc.id === t.scalar) ? identityTuning<BandRange>(taxonomy) : t
   if (graph.nodes.length === 0) {
     const bandX = knownScalar(params.bandX)
@@ -352,7 +352,7 @@ export function retunedFor(params: ForceParams, taxonomy: Taxonomy, graph: Graph
   })
   // A scalar axis has no buckets to go stale; it falls back only when the
   // taxonomy no longer knows the scalar (a swap), with the style identity.
-  const refreshLayout = (tuning: LayoutTuning): LayoutTuning =>
+  const refreshLayout = (tuning: BandAxisTuning): BandAxisTuning =>
     isScalarTuning(tuning)
       ? (engineOf(taxonomy).scalars.some(sc => sc.id === tuning.scalar) ? tuning : identityTuning<BandRange>(taxonomy))
       : refresh(tuning, m => ({ mapping: m, overrides: new Map() }), bucketsFit)
@@ -405,8 +405,8 @@ export interface GravityParams {
    * A strength of zero switches an axis off; when both are off and
    * topological gravity is too, center gravity is the baseline.
    */
-  bandX: LayoutTuning
-  bandY: LayoutTuning
+  bandX: BandAxisTuning
+  bandY: BandAxisTuning
   gravityX: number
   gravityY: number
   // Band falloff exponent applied to the displacement outside the rest band

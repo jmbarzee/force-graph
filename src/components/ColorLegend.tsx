@@ -1,14 +1,14 @@
 import React from 'react'
 import './ColorLegend.css'
 import type { ChannelKey, ColorChannels } from '../graph/coloring'
-import type { GroupsControl } from './GraphView'
+import type { GroupsHandle } from './GraphView'
 
 /** The legend's inputs: each channel's keys as drawn and the view's control over the glow's, both from `legend`. */
 export interface ColorLegendProps {
   /** Each channel's keys as drawn. */
   channels: ColorChannels
   /** Which glow keys are shown, a checkbox per glow key when the filter is writable, and hover emphasis. */
-  control: GroupsControl
+  control: GroupsHandle
   /** A section's heading, by channel; absent, "Fill", "Glow" or "Ring". */
   titles?: Partial<Record<keyof ColorChannels, string>>
   /** The host's own controls, such as a picker for what the glow follows: above the sections, and still while they scroll. */
@@ -46,7 +46,7 @@ export function ColorLegend({ channels, control, titles, children, className }: 
 }
 
 /** A key's swatch and label; under a glow's `control`, its checkbox and hover emphasis too. */
-function KeyRow({ item, control }: { item: ChannelKey; control?: GroupsControl }) {
+function KeyRow({ item, control }: { item: ChannelKey; control?: GroupsHandle }) {
   const on = control?.shown(item.id) ?? true
   const toggle = control?.toggle
   const Row = toggle ? 'label' : 'div'

@@ -5,8 +5,8 @@ import React from 'react'
 import './GraphView.css'
 import { intensityAt, nodesById, isContainment, peakOf, seriesOf, unitWeight, windowOf, withContainmentEdges } from '../graph/model'
 import type { Graph, GraphEdge, GraphNode } from '../graph/model'
-import type { AxisSelection, FilterState, AxisLocks } from '../filter/types'
-import { GROUPS, changedAxes, initialFilter, filterStatesEqual, hiddenMatchesOf, isEmptySelection, listEqual, locksEqual, reseedFilter, selectionFor, selectionsEqual, selects, withSelection } from '../filter/types'
+import type { AxisChosen, FilterState, AxisLocks } from '../filter/types'
+import { GROUPS, changedAxes, initialFilter, filterStatesEqual, hiddenMatchesOf, isEmptyChosen, listEqual, locksEqual, reseedFilter, chosenOn, selects, setsEqual, withChosen } from '../filter/types'
 import { reconcileFilter } from '../filter/reconcile'
 import { toggleValue } from '../filter/toggle'
 import { NO_OVERRIDES } from '../filter/linked'
@@ -14,7 +14,7 @@ import type { LinkedViewState } from '../filter/linked'
 import type { ForceParams, SimNode, Simulation } from '../graph/simulation'
 import { bandOverlay, resolvePhysics } from '../graph/forces'
 import { countsOn, mappingKey, valuesOn } from '../graph/axis'
-import type { AxisId, AxisLabels, AxisMapping } from '../graph/axis'
+import type { AxisId, AxisLabels, AxisMapping, AxisValue } from '../graph/axis'
 import { colorChannels, coloringsEqual, fillOf, glowOf, resolveColoring } from '../graph/coloring'
 import type { ColorChannels, Coloring, SetColoring } from '../graph/coloring'
 import { FillContext, useFill } from './graph-view/useFill'
@@ -90,7 +90,7 @@ export interface NodeAction {
  * entry they are values of: `GROUPS` for the groups, the axis for a filter
  * axis this view shows, none for any other.
  */
-export interface GroupsControl {
+export interface GroupsHandle {
   /** Whether the filter shows this key; always, with no entry. */
   shown(id: string): boolean
   /** Show or hide this key, as the bar writes an axis: `onFilterChange` names the entry touched. Absent when the filter is read-only, or with no entry. */
@@ -167,8 +167,8 @@ export interface GraphViewProps {
   keyboard?: 'pane' | 'global' | 'none'
   /** Where nodes start, by id — a layout the host kept (`getPositions`). Read whenever the simulation is built; a node the live layout already holds keeps its place. One covering every node opens at rest, unsettled: hand back what `onSettled` kept, or call `setPositions` to settle from rough positions. */
   defaultPositions?: ReadonlyMap<string, Position>
-  /** Chip badge counts per axis and value — the host's reading of its own data. Absent, the graph's entity counts (the copies of one `copyKey` once); `faceted`, those counts under the other axes' selections. */
-  counts?: ReadonlyMap<string, ReadonlyMap<string, number>> | 'faceted'
+  /** Chip badge counts per axis and value — the host's reading of its own data. Absent, the graph's entity counts (the copies of one `copyKey` once); `faceted`, those counts under the other axes' choices. */
+  counts?: ReadonlyMap<AxisId, ReadonlyMap<AxisValue, number>> | 'faceted'
   /** The host's findings bars, rendered under the filter chips. */
   findings?: React.ReactNode
   /** Groups over the whole graph, derived from the data or listed: what the `GROUPS` filter and cohesion read, and the glow unless `coloring.glow` says otherwise. The view settles membership once per graph and groups, then restricts each to the visible set and colours it. */
@@ -176,7 +176,7 @@ export interface GraphViewProps {
   /** A multiplier on the stiffness of every edge whose two ends share a visible group, so members drift together. Default 1, off. */
   groupCohesion?: number
   /** The host's legend (`ColorLegend`, or its own), rendered inside the pane — which sets `--gv-toolbar-height` on its root so a legend can anchor under the bar — and handed each channel's keys as drawn and the view's control over the glow's. */
-  legend?: (channels: ColorChannels, control: GroupsControl) => React.ReactNode
+  legend?: (channels: ColorChannels, control: GroupsHandle) => React.ReactNode
   /**
    * Where the nodes' colours come from. `fill` colours each node's body by
    * its key — the canvas, the chips, the control rows and the hover box
@@ -224,7 +224,7 @@ export interface GraphViewProps {
   style?: React.CSSProperties
 
   /**
-   * The selection per axis. Controlled while defined: the view shows it and
+   * The choice per axis. Controlled while defined: the view shows it and
    * never rewrites it — a host that controls the filter re-seeds it for a
    * new graph itself (`reseedFilter`). Absent, the view keeps the filter:
    * `defaultFilter`, or `initialFilter(taxonomy, graph)`, re-seeded from
@@ -244,7 +244,7 @@ export interface GraphViewProps {
   /**
    * Where the view's own filter starts when the host does not control it —
    * a start that depends on the host's state, which a descriptor's
-   * `initialSelection` cannot see. Read once; it counts as the user's on
+   * `initialChosen` cannot see. Read once; it counts as the user's on
    * every axis where it differs from `initialFilter(taxonomy, graph)`, and a
    * later graph re-seeds the rest.
    */
@@ -258,11 +258,11 @@ export interface GraphViewProps {
   /** The locks a host-side focus into this view overrode (`useLinkedViews`'s `switchTo`); flashed once per key, as the view's own are. */
   overriddenLocks?: LinkedViewState['overriddenLocks']
   /** The axes shown, in order. Default: `defaultAxes`, else every declared filter axis. Editable in the bar unless controlled without a callback. */
-  axes?: readonly string[]
+  axes?: readonly AxisId[]
   /** Every change to the axes shown. */
-  onAxesChange?: (next: readonly string[]) => void
+  onAxesChange?: (next: readonly AxisId[]) => void
   /** Where the view's own axes start when the host does not control them. Read once. */
-  defaultAxes?: readonly string[]
+  defaultAxes?: readonly AxisId[]
   /** The search control. Default: `defaultSearch`, else closed and empty. */
   search?: SearchState
   /** Every change to the search. */
@@ -412,7 +412,7 @@ export const GraphView = React.forwardRef<GraphViewHandle, GraphViewProps>(funct
   }, [filterRef, setFilterState, onFilterChangeRef])
   // The axes the user has touched — in the bar, through the handle's
   // `updateFilter`, or where `defaultFilter` differs from the opening filter.
-  // State, not an inference: a selection that happens to equal a graph's
+  // State, not an inference: a choice that happens to equal a graph's
   // opening one is not thereby untouched. A later graph re-seeds the rest.
   const [touchedAxes] = React.useState(() => new Set(defaultFilterProp ? changedAxes(initialFilter(taxonomy, hostGraph), defaultFilterProp) : []))
   const userWriteFilter = React.useCallback((next: FilterState, touched: readonly AxisId[]) => {
@@ -422,7 +422,7 @@ export const GraphView = React.forwardRef<GraphViewHandle, GraphViewProps>(funct
   // A graph that changes while the view keeps the filter itself re-seeds
   // every axis the user has not touched: a host that mounts empty while its
   // data loads is not left blank, and a value first seen later is not born
-  // hidden. The user's selections stand; a host that controls the filter
+  // hidden. The user's choices stand; a host that controls the filter
   // owns it, and the view never rewrites it.
   const seededFromRef = React.useRef(hostGraph)
   React.useEffect(() => {
@@ -434,7 +434,7 @@ export const GraphView = React.forwardRef<GraphViewHandle, GraphViewProps>(funct
   }, [hostGraph]) // eslint-disable-line react-hooks/exhaustive-deps
   const [rawLocks, setLocks] = useControllable(locksProp, onLocksChange, () => defaultLocks ?? new Map<string, boolean>(), 'locks')
   const locks = useStable(rawLocks, locksEqual)
-  const [rawAxes, setAxes] = useControllable(hostAxes, onAxesChange, () => defaultAxes ?? taxonomy.filterAxes.map(d => d.id), 'axes')
+  const [rawAxes, setAxes] = useControllable(hostAxes, onAxesChange, () => defaultAxes ?? taxonomy.filterAxes().map(d => d.id), 'axes')
   const axes = useStable(rawAxes, listEqual)
   const axesEditable = hostAxes === undefined || onAxesChange !== undefined
   const [search, setSearch] = useControllable(searchProp, onSearchChange, () => defaultSearch ?? { query: '', active: false }, 'search')
@@ -473,7 +473,7 @@ export const GraphView = React.forwardRef<GraphViewHandle, GraphViewProps>(funct
   // What each filter axis can take, read off the graph: the engine declares no
   // value vocabulary, so the bar learns an axis's domain from the nodes.
   const valuesByAxis = React.useMemo(
-    () => new Map(taxonomy.filterAxes.map(d => [d.id, valuesOn(graph.nodes, d.id)])),
+    () => new Map(taxonomy.filterAxes().map(d => [d.id, valuesOn(graph.nodes, d.id)])),
     [graph, taxonomy],
   )
   // The fill, resolved apart from the simulation: a new colouring repaints.
@@ -725,7 +725,7 @@ export const GraphView = React.forwardRef<GraphViewHandle, GraphViewProps>(funct
   const controlledSelection = selectedIds !== undefined
   useControlledWarning('selectedIds', controlledSelection)
   const [ownSelected, setOwnSelected] = React.useState(defaultSelectedIds)
-  const rawSelected = useStable(controlledSelection ? selectedIds : ownSelected, selectionsEqual)
+  const rawSelected = useStable(controlledSelection ? selectedIds : ownSelected, setsEqual)
   const selected = React.useMemo(() => heldBy(rawSelected, hostIndex), [rawSelected, hostIndex])
   const selectedRef = useLatest(selected)
   const onSelectionChangeRef = useLatest(onSelectionChange)
@@ -736,7 +736,7 @@ export const GraphView = React.forwardRef<GraphViewHandle, GraphViewProps>(funct
   const requestSelect = React.useCallback((next: ReadonlySet<string>) => {
     const held = heldBy(next, hostIndexRef.current)
     if (!controlledSelection) setOwnSelected(held)
-    if (!selectionsEqual(held, selectedRef.current)) onSelectionChangeRef.current?.([...held].map(id => hostIndexRef.current.get(id)!))
+    if (!setsEqual(held, selectedRef.current)) onSelectionChangeRef.current?.([...held].map(id => hostIndexRef.current.get(id)!))
   }, [controlledSelection, hostIndexRef, selectedRef, onSelectionChangeRef])
   const selectOnly = React.useCallback((id: string | null) => {
     if (id === null) requestSelect(NO_SELECTION)
@@ -778,16 +778,16 @@ export const GraphView = React.forwardRef<GraphViewHandle, GraphViewProps>(funct
   const [emphasizedGroup, setEmphasizedGroup] = React.useState<string | null>(null)
   const glowEntry = !glowColoring || glowColoring.by === 'groups' ? GROUPS
     : glowColoring.by === 'axis' && filterAxes.some(d => d.id === glowColoring.axis) ? glowColoring.axis : undefined
-  const groupsHandle = React.useMemo<GroupsControl>(() => {
+  const groupsHandle = React.useMemo<GroupsHandle>(() => {
     if (glowEntry === undefined) return { shown: () => true, emphasize: setEmphasizedGroup }
-    const selection = selectionFor(filter, glowEntry)
-    // An `emptyMeans: 'all'` axis with nothing selected shows every value.
-    const showsEvery = (s: AxisSelection) => isEmptySelection(s) && taxonomy.axisFor(glowEntry)?.emptyMeans === 'all'
+    const chosen = chosenOn(filter, glowEntry)
+    // An `emptyMeans: 'all'` axis with nothing chosen shows every value.
+    const showsEvery = (s: AxisChosen) => isEmptyChosen(s) && taxonomy.axisFor(glowEntry)?.emptyMeans === 'all'
     return {
-      shown: id => showsEvery(selection) || selects(selection, id),
+      shown: id => showsEvery(chosen) || selects(chosen, id),
       toggle: filterWritable ? id => {
         const f = filterRef.current
-        const next = showsEvery(selectionFor(f, glowEntry)) ? withSelection(f, glowEntry, { except: new Set([id]) }) : toggleValue(f, glowEntry, id)
+        const next = showsEvery(chosenOn(f, glowEntry)) ? withChosen(f, glowEntry, { except: new Set([id]) }) : toggleValue(f, glowEntry, id)
         userWriteFilter(next, [glowEntry])
       } : undefined,
       emphasize: setEmphasizedGroup,
@@ -1236,7 +1236,7 @@ export const GraphView = React.forwardRef<GraphViewHandle, GraphViewProps>(funct
             labels={labels}
             theme={theme}
             counts={counts}
-            values={valuesByAxis}
+            available={valuesByAxis}
             filter={filter}
             onFilterChange={userWriteFilter}
             locks={locks}
@@ -1525,7 +1525,7 @@ function EdgeHoverTooltip({ hover, edge, type, undirected, hostNodeOf, onMouseEn
   const source = hostNodeOf(edge.sourceId)
   const target = hostNodeOf(edge.targetId)
   if (!source || !target) return null
-  const tooltip = type === undefined ? undefined : taxonomy.edgeTypes.find(t => t.id === type)?.tooltip
+  const tooltip = type === undefined ? undefined : taxonomy.edgeTypes().find(t => t.id === type)?.tooltip
   const contextLines = linesOf(engineOf(taxonomy).edgeContextLine(edge, source, target))
   return (
     <div className="gv-graph-hover-tooltip" style={{ left: hover.x, top: hover.y }} onMouseEnter={onMouseEnter} onMouseLeave={onMouseLeave}>

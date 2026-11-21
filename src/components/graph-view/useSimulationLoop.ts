@@ -6,7 +6,7 @@
 // inputs (the explicit data links) rather than owning any of them.
 
 import type { FilterState } from '../../filter/types'
-import { GROUPS, selectionFor, selectionsEqual } from '../../filter/types'
+import { GROUPS, chosenOn, chosenEqual } from '../../filter/types'
 import { foldReheatPolicy, reheatOf } from '../../graph/axis'
 import type { ResolvedAxisDescriptor } from '../../graph/axis'
 import { passesFilter } from './visibleGraph'
@@ -123,10 +123,10 @@ export function useSimulationLoop({
     if (!sim) { prevFilter.current = filter; return }
 
     // A group toggle reheats as an allow-list does, which no axis outdoes.
-    const { alpha, seedRevealed, refit, resume } = !selectionsEqual(selectionFor(prev, GROUPS), selectionFor(filter, GROUPS))
+    const { alpha, seedRevealed, refit, resume } = !chosenEqual(chosenOn(prev, GROUPS), chosenOn(filter, GROUPS))
       ? GROUPS_REHEAT
       : foldReheatPolicy(axes.filter(
-        dim => !selectionsEqual(selectionFor(prev, dim.id), selectionFor(filter, dim.id)),
+        dim => !chosenEqual(chosenOn(prev, dim.id), chosenOn(filter, dim.id)),
       ))
 
     if (alpha > 0) {

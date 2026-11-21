@@ -6,7 +6,7 @@ import { useLinkedViews } from './useLinkedViews'
 import type { LinkedViews, LinkedViewsOptions } from './useLinkedViews'
 import { createTaxonomy } from '../../graph/taxonomy'
 import type { Graph, GraphNode } from '../../graph/model'
-import { selectionFor, withLock, withSelection } from '../../filter/types'
+import { chosenOn, withLock, withChosen } from '../../filter/types'
 
 beforeEach(() => {
   ;(globalThis as { IS_REACT_ACT_ENVIRONMENT?: boolean }).IS_REACT_ACT_ENVIRONMENT = true
@@ -14,8 +14,8 @@ beforeEach(() => {
 
 // Two allow-lists; `site` opens without `z`, which only the grown graph has, so a re-seed shows.
 const taxonomy = createTaxonomy({
-  styleAxis: 'kind', styles: [],
-  filterAxes: [{ id: 'team', emptyMeans: 'none' }, { id: 'site', emptyMeans: 'none', initialSelection: values => values.filter(v => v !== 'z') }],
+  styleAxis: 'kind', values: [],
+  filterAxes: [{ id: 'team', emptyMeans: 'none' }, { id: 'site', emptyMeans: 'none', initialChosen: values => values.filter(v => v !== 'z') }],
 })
 const graphOf = (...pairs: [string, string][]): Graph => ({ nodes: pairs.map(([team, site], i): GraphNode => ({ id: `n${i}`, name: team, values: { team, site } })), edges: [] })
 const first = graphOf(['a', 'x'], ['b', 'y'])
@@ -40,12 +40,12 @@ async function mount(options: Options) {
 }
 
 it('focuses a second view by a FocusTarget, widening it and carrying the target', async () => {
-  const hook = await mount({ graph: { list: first }, initial: () => ({ filter: new Map([['team', new Set(['a'])]]) }) })
+  const hook = await mount({ graph: { list: first }, defaults: () => ({ filter: new Map([['team', new Set(['a'])]]) }) })
   const target = { values: { team: 'b' } }
   await act(async () => { hook.linked().focus('list', target) })
   const list = hook.linked().of('list')
   expect(list.focus).toEqual({ id: undefined, key: 1, target })
-  expect(selectionFor(list.filter, 'team')).toEqual(new Set(['a', 'b']))
+  expect(chosenOn(list.filter, 'team')).toEqual(new Set(['a', 'b']))
 })
 
 it('clears a FocusTarget focus when the host\'s view reports it', async () => {
@@ -59,21 +59,21 @@ it('clears a FocusTarget focus when the host\'s view reports it', async () => {
 it('re-seeds each view from its own graph', async () => {
   const hook = await mount({ graph: { list: first, graph: first } })
   await hook.render({ graph: { list: first, graph: grown } })
-  expect(selectionFor(hook.linked().of('graph').filter, 'site')).toEqual({ except: new Set(['z']) })
-  expect(selectionFor(hook.linked().of('list').filter, 'site')).toEqual({ except: new Set() })
+  expect(chosenOn(hook.linked().of('graph').filter, 'site')).toEqual({ except: new Set(['z']) })
+  expect(chosenOn(hook.linked().of('list').filter, 'site')).toEqual({ except: new Set() })
 })
 
 it('keeps an axis updateFilter wrote when a later graph re-seeds the rest', async () => {
   const hook = await mount({ graph: { graph: first } })
-  await act(async () => { hook.linked().updateFilter('graph', f => withSelection(f, 'team', new Set(['a']))) })
+  await act(async () => { hook.linked().updateFilter('graph', f => withChosen(f, 'team', new Set(['a']))) })
   await hook.render({ graph: { graph: grown } })
-  expect(selectionFor(hook.linked().of('graph').filter, 'team')).toEqual(new Set(['a']))
-  expect(selectionFor(hook.linked().of('graph').filter, 'site')).toEqual({ except: new Set(['z']) })
+  expect(chosenOn(hook.linked().of('graph').filter, 'team')).toEqual(new Set(['a']))
+  expect(chosenOn(hook.linked().of('graph').filter, 'site')).toEqual({ except: new Set(['z']) })
 })
 
 it('keys the locks a focus overrides, and a manual switch clears them under a new key', async () => {
   const locked = { filter: new Map([['team', new Set(['a'])]]), locks: withLock(new Map(), 'team', true) }
-  const hook = await mount({ graph: { graph: grown }, initial: view => (view === 'graph' ? locked : undefined) })
+  const hook = await mount({ graph: { graph: grown }, defaults: view => (view === 'graph' ? locked : undefined) })
   await act(async () => { hook.linked().focus('graph', grown.nodes[2]!) })
   expect(hook.linked().of('graph').overriddenLocks).toEqual({ axes: new Set(['team']), key: 1 })
   await act(async () => { hook.linked().switchTo('list') })

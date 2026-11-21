@@ -15,7 +15,7 @@ import type { Coloring } from '../graph/coloring'
 import type { GraphNode } from '../graph/model'
 import { createTaxonomy } from '../graph/taxonomy'
 
-const taxonomy = createTaxonomy({ styleAxis: 'kind', styles: [] })
+const taxonomy = createTaxonomy({ styleAxis: 'kind', values: [] })
 
 beforeEach(() => {
   ;(globalThis as { IS_REACT_ACT_ENVIRONMENT?: boolean }).IS_REACT_ACT_ENVIRONMENT = true
@@ -64,7 +64,7 @@ it("takes the bar's tokens for its resolved theme only", async () => {
   const host = mount()
   const tokens = createTheme({ light: { colorSurface: '#fff8e1' }, dark: { colorSurface: '#111111' } })
   await act(async () => {
-    createRoot(host).render(React.createElement(FilterBar, { taxonomy, tokens, theme: 'dark', values: new Map(), filter: new Map(), onFilterChange: () => {} }))
+    createRoot(host).render(React.createElement(FilterBar, { taxonomy, tokens, theme: 'dark', available: new Map(), filter: new Map(), onFilterChange: () => {} }))
   })
   expect(host.querySelector<HTMLElement>('[data-gv-theme]')?.style.getPropertyValue('--gv-color-surface')).toBe('#111111')
 })
@@ -88,7 +88,7 @@ const notes = { nodes: ['C', 'C#'].map((note): GraphNode => ({ id: note, name: n
 const byNote: Coloring = { by: 'axis', axis: 'note' }
 
 it("pins a host's stylesheet without a view to the style values' alone", () => {
-  const styled = createTaxonomy({ styleAxis: 'kind', styles: [
+  const styled = createTaxonomy({ styleAxis: 'kind', values: [
     { id: 'teachingLab', label: 'Lab', color: { light: { fill: '#0f766e', border: '#094740' }, dark: { fill: '#2dd4bf', border: '#094740' } } },
     { id: 'office', label: 'Office', color: { light: { fill: '#64748b', border: '#3c4653' }, dark: { fill: '#64748b', border: '#3c4653' } } },
   ] })

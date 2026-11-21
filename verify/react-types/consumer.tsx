@@ -3,7 +3,7 @@ import React from 'react'
 import { FilterBar, GraphView, createTaxonomy, initialFilter, useHostTheme } from '@jmbarzee/force-graph'
 import type { Graph, GraphViewHandle } from '@jmbarzee/force-graph'
 
-const taxonomy = createTaxonomy({ styleAxis: 'kind', styles: [], filterAxes: [] })
+const taxonomy = createTaxonomy({ styleAxis: 'kind', values: [], filterAxes: [] })
 const graph: Graph = { nodes: [], edges: [] }
 
 export function Host() {

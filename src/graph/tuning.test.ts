@@ -6,7 +6,7 @@ import { defaultTuningFor, tuningsEqual } from './tuning-internal'
 
 const taxonomy = createTaxonomy({
   styleAxis: 'kind',
-  styles: [{ id: 'service', label: 'service', color: { light: { fill: '#000000', border: '#000000' }, dark: { fill: '#ffffff', border: '#ffffff' } } }],
+  values: [{ id: 'service', label: 'service', color: { light: { fill: '#000000', border: '#000000' }, dark: { fill: '#ffffff', border: '#ffffff' } } }],
   filterAxes: [{ id: 'kind', label: 'kind', emptyMeans: 'none' }, { id: 'team', label: 'team', emptyMeans: 'all' }],
   pairMappings: [{ id: 'role', label: 'Role', axis: 'kind', buckets: [{ id: 'all', label: 'All', abbreviation: 'A', values: ['service'] }] }],
 })

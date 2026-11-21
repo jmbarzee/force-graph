@@ -110,7 +110,7 @@ describe('GraphCanvas', () => {
     const props = { nodes: [], edges: [], onHoverNode, onHoverEdge } as unknown as React.ComponentProps<typeof GraphCanvas>
     const el = document.body.appendChild(document.createElement('div'))
     const root = createRoot(el)
-    act(() => root.render(React.createElement(TaxonomyContext.Provider, { value: createTaxonomy({ styleAxis: 'kind', styles: [] }) },
+    act(() => root.render(React.createElement(TaxonomyContext.Provider, { value: createTaxonomy({ styleAxis: 'kind', values: [] }) },
       React.createElement(GraphCanvas, props))))
     act(() => { el.querySelector('canvas')!.dispatchEvent(new PointerEvent('pointerout', { bubbles: true })) })
     expect(onHoverNode).toHaveBeenCalledWith(null)
@@ -143,7 +143,7 @@ describe('GraphCanvas', () => {
     } as unknown as React.ComponentProps<typeof GraphCanvas>
     const el = document.body.appendChild(document.createElement('div'))
     const root = createRoot(el)
-    act(() => root.render(React.createElement(TaxonomyContext.Provider, { value: createTaxonomy({ styleAxis: 'kind', styles: [] }) },
+    act(() => root.render(React.createElement(TaxonomyContext.Provider, { value: createTaxonomy({ styleAxis: 'kind', values: [] }) },
       React.createElement(GraphCanvas, all))))
     act(() => frame!(0))
     act(() => root.unmount())

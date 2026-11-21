@@ -7,7 +7,7 @@ import { GraphView } from './GraphView'
 import type { GraphViewHandle, GraphViewProps } from './GraphView'
 import { createTaxonomy } from '../graph/taxonomy'
 import type { Graph, GraphNode } from '../graph/model'
-import { withSelection } from '../filter/types'
+import { withChosen } from '../filter/types'
 
 const drawn = vi.hoisted(() => ({ focused: null as string | null, hover: (_id: string | null) => {} }))
 vi.mock('./GraphCanvas', () => ({
@@ -30,7 +30,7 @@ beforeEach(() => {
 // axis filters too, so a test can hide a container and keep its child.
 const taxonomy = createTaxonomy({
   styleAxis: 'kind',
-  styles: [{ id: 'root', label: 'Tree' }, { id: 'a', label: 'Branch' }, { id: 'b', label: 'Branch' }, { id: 'a1', label: 'Fruit' }, { id: 'z', label: 'Stone' }],
+  values: [{ id: 'root', label: 'Tree' }, { id: 'a', label: 'Branch' }, { id: 'b', label: 'Branch' }, { id: 'a1', label: 'Fruit' }, { id: 'z', label: 'Stone' }],
   filterAxes: [{ id: 'kind', emptyMeans: 'none' }],
 })
 const node = (id: string, name: string, parentId?: string): GraphNode => ({ id, name, parentId, values: { kind: id === 'r' ? 'root' : id } })
@@ -52,7 +52,7 @@ async function mount(props: Partial<GraphViewProps> = {}, graph = tree) {
     return event.defaultPrevented
   }
   const tab = async (times: number, init: KeyboardEventInit = {}) => { for (let i = 0; i < times; i++) await press('Tab', init) }
-  const hide = (...kinds: string[]) => act(async () => ref.current!.updateFilter(f => withSelection(f, 'kind', new Set(['root', 'a', 'b', 'a1', 'z'].filter(k => !kinds.includes(k))))))
+  const hide = (...kinds: string[]) => act(async () => ref.current!.updateFilter(f => withChosen(f, 'kind', new Set(['root', 'a', 'b', 'a1', 'z'].filter(k => !kinds.includes(k))))))
   const said = () => el.querySelector('[role="status"]')!.textContent
   const boxed = () => el.querySelector('.gv-tooltip-name')?.textContent
   return { ref, el, pane, render, press, tab, hide, said, boxed }

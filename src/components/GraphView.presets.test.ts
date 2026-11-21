@@ -32,7 +32,7 @@ const frame = (ms: number) => act(async () => {
   for (const cb of due) cb(performance.now() + ms)
 })
 
-const taxonomy = createTaxonomy({ styleAxis: 'kind', styles: [], filterAxes: [] })
+const taxonomy = createTaxonomy({ styleAxis: 'kind', values: [], filterAxes: [] })
 const graph: Graph = { nodes: [{ id: 'a', name: 'a', values: {} }, { id: 'b', name: 'b', values: {} }], edges: [{ id: 'ab', sourceId: 'a', targetId: 'b' }] }
 const SPREAD = TUNING_PRESETS.findIndex(p => p.label === 'Spread out')
 const spread = createTuning(TUNING_PRESETS[SPREAD]!.tuning, taxonomy)

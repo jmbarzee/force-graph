@@ -26,7 +26,7 @@ beforeEach(async () => {
     'onFitView', 'onHoverNode', 'onSelectNode', 'onLassoSelect', 'onHoverEdge'].map(name => [name, vi.fn()]))
   const el = document.body.appendChild(document.createElement('div'))
   root = createRoot(el)
-  await act(async () => root.render(React.createElement(TaxonomyContext.Provider, { value: createTaxonomy({ styleAxis: 'kind', styles: [], filterAxes: [] }) },
+  await act(async () => root.render(React.createElement(TaxonomyContext.Provider, { value: createTaxonomy({ styleAxis: 'kind', values: [], filterAxes: [] }) },
     React.createElement(GraphCanvas, {
       ...props, nodes: [node], edges: [], viewport, nodeScale: DEFAULT_NODE_SCALE,
       selectedNodeIds: new Set(), highlightedNodes: null, highlightedEdges: null, hoveredNodeId: null, hoveredEdgeId: null,
