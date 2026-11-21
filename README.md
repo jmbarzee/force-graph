@@ -594,7 +594,8 @@ The typed path produces the same variables: `createTheme({ light, dark })`
 takes, per theme, the tokens to override, each by its role — the token
 without `--gv-`, camel-cased (`--gv-focus-ring-color` → `focusRingColor`) —
 and refuses an unknown role at compile time. `GraphView` and `FilterBar` take
-its result as `tokens` and carry the resolved theme's on their roots:
+its result as `tokens` and carry the resolved theme's inline on their roots,
+where they win over a host's CSS override of the same token:
 
 ```tsx
 const tokens = createTheme({ light: { accent: '#0f766e' }, dark: { colorSurface: '#111' } })
