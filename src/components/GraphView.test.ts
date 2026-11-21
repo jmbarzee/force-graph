@@ -2,7 +2,7 @@
 import React, { act } from 'react'
 import { createRoot } from 'react-dom/client'
 import type { Root } from 'react-dom/client'
-import { afterEach, beforeEach, describe, expect, it, vi } from 'vitest'
+import { afterEach, beforeEach, describe, expect, it, onTestFinished, vi } from 'vitest'
 import { GraphView } from './GraphView'
 import type { ColorChannels, Coloring, ResolvedColoring } from '../graph/coloring'
 import type { GraphViewHandle, GraphViewProps, GroupsHandle } from './GraphView'
@@ -402,6 +402,28 @@ it('says so when the filter draws no node, and stops once it draws one', async (
 it('leaves an empty graph to the host', async () => {
   const view = await mount({}, graphOf())
   expect(view.el.querySelector('.gv-graph-empty')).toBeNull()
+})
+
+it("shows its fallback for a hook's throw, leaves the host's siblings mounted, and nulls the ref", async () => {
+  // The boundary logs the throw, and React dispatches it as a window error.
+  const error = vi.spyOn(console, 'error').mockImplementation(() => {})
+  const quiet = (e: ErrorEvent) => e.preventDefault()
+  window.addEventListener('error', quiet)
+  onTestFinished(() => { window.removeEventListener('error', quiet); error.mockRestore() })
+  const refusing = createTaxonomy({
+    styleAxis: 'kind', values: [],
+    filterAxes: [{ id: 'team', emptyMeans: 'none', initialChosen: () => { throw new Error('seed refused') } }],
+  })
+  const ref = React.createRef<GraphViewHandle>()
+  const el = document.createElement('div')
+  await act(async () => {
+    newRoot(el).render(React.createElement('div', null,
+      React.createElement('p', { id: 'sibling' }),
+      React.createElement(GraphView, { ref, graph: first, taxonomy: refusing })))
+  })
+  expect(el.querySelector('[role="alert"]')?.textContent).toContain('seed refused')
+  expect(el.querySelector('#sibling')).not.toBeNull()
+  expect(ref.current).toBeNull()
 })
 
 describe('edge hover', () => {
