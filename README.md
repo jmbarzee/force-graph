@@ -422,7 +422,8 @@ the console. Everything else is optional.
   double-click zoom) and `scrubber` (shown only for a valid `window`) —
   `strings` for the host's own words (every string the pane and its bar
   render, titles and `aria-label`s included, over the English
-  `DEFAULT_STRINGS`; `FilterBar` takes it too),
+  `DEFAULT_STRINGS`; `FilterBar` takes it too; a `ColorLegend` the host
+  renders through `legend` takes its titles from its own `titles`),
   `systemTheme` (what `'system'` means, for a host that knows its own
   theme), `className`, `style`, and `defaultPositions` (kept positions,
   read whenever the simulation is built; a node the live layout already
