@@ -416,7 +416,9 @@ the console. Everything else is optional.
   cluster), `diagnostics`,
   `shortcuts`, `directionLine` (the hover box's), `activateZoom` (the
   double-click zoom) and `scrubber` (shown only for a valid `window`) —
-  `searchTitle` and `searchPlaceholder` for the host's own words,
+  `strings` for the host's own words (every string the pane and its bar
+  render, titles and `aria-label`s included, over the English
+  `DEFAULT_STRINGS`; `FilterBar` takes it too),
   `systemTheme` (what `'system'` means, for a host that knows its own
   theme), `className`, `style`, and `defaultPositions` (kept positions,
   read whenever the simulation is built; a node the live layout already
@@ -670,9 +672,7 @@ smoothly, a few thousand do not (Barnes-Hut,
 [#30](https://github.com/jmbarzee/force-graph/issues/30)). The push/pull and
 layout controls bound their tokens by a ceiling
 ([SPEC § The control panel](SPEC.md#the-control-panel)).
-What is not built is filed as issues: animated reveals
-([#8](https://github.com/jmbarzee/force-graph/issues/8)) and the pane's
-strings in other languages
-([#13](https://github.com/jmbarzee/force-graph/issues/13)).
+What is not built is filed as an issue: animated reveals
+([#8](https://github.com/jmbarzee/force-graph/issues/8)).
 
 `src/index.ts` names the whole surface.

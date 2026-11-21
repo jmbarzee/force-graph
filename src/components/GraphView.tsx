@@ -45,6 +45,8 @@ import { zoomAt } from '../graph/viewport'
 import { GraphCanvas } from './GraphCanvas'
 import type { EdgeHover } from './GraphCanvas'
 import { CanvasErrorBoundary } from './CanvasErrorBoundary'
+import { StringsContext, stringsOf, useStrings } from './graph-view/strings'
+import type { GraphViewStrings } from './graph-view/strings'
 import { GraphControlPanel } from './GraphControlPanel'
 import { hiddenByOf } from './controls/NothingVisible'
 import { Scrubber } from './Scrubber'
@@ -192,10 +194,8 @@ export interface GraphViewProps {
   nodeAction?: NodeAction | ((node: GraphNode) => NodeAction | null)
   /** Which parts of the pane's chrome are offered. Default: everything, the lock toggles only when `locks` is controlled with its callback. */
   chrome?: GraphViewChrome
-  /** The search control's title, for a host with its own words. */
-  searchTitle?: string
-  /** The search field's placeholder, for a host with its own words. */
-  searchPlaceholder?: string
+  /** The pane's and its bar's words, over `DEFAULT_STRINGS`. */
+  strings?: Partial<GraphViewStrings>
   /**
    * The selected nodes, when the host controls the selection: the view shows
    * these and nothing else while it is defined, the empty set none. Compared
@@ -364,8 +364,7 @@ export const GraphView = React.forwardRef<GraphViewHandle, GraphViewProps>(funct
   markedEdges,
   nodeAction,
   chrome,
-  searchTitle = 'Search nodes (/)',
-  searchPlaceholder = 'Search nodes...',
+  strings,
   selectedIds, defaultSelectedIds = NO_SELECTION,
   focus,
   onFocusResult,
@@ -438,6 +437,9 @@ export const GraphView = React.forwardRef<GraphViewHandle, GraphViewProps>(funct
   const [rawAxes, setAxes] = useControllable(hostAxes, onAxesChange, () => defaultAxes ?? taxonomy.filterAxes().map(d => d.id), 'axes')
   const axes = useStable(rawAxes, listEqual)
   const axesEditable = hostAxes === undefined || onAxesChange !== undefined
+  const s = React.useMemo(() => stringsOf(strings), [strings])
+  // The pane binds `/` itself, not its bar.
+  const barStrings = React.useMemo(() => ({ ...s, searchTitle: () => s.searchTitle(keyboard === 'none' ? null : '/') }), [s, keyboard])
   const [search, setSearch] = useControllable(searchProp, onSearchChange, () => defaultSearch ?? { query: '', active: false }, 'search')
   const [themeChoice, setThemeChoice] = useControllable(themeProp, onThemeChange, () => defaultTheme ?? 'system', 'theme')
   const [rawPlayhead, setPlayhead] = useControllable(playheadProp, onPlayheadChange, () => defaultPlayhead ?? null, 'playhead')
@@ -1126,7 +1128,7 @@ export const GraphView = React.forwardRef<GraphViewHandle, GraphViewProps>(funct
 
   const nodeCount = visibleNodes.length
   const edgeCount = visibleEdges.length
-  const counted = `${nodeCount} node${nodeCount !== 1 ? 's' : ''}, ${edgeCount} edge${edgeCount !== 1 ? 's' : ''}`
+  const counted = s.counts(nodeCount, edgeCount)
   const [paneFocused, setPaneFocused] = React.useState(false)
   const boxedNodeId = hoveredNodeId ?? (paneFocused ? focusedNodeId : null)
   const focusedNode = focusedNodeId === null ? undefined : getSimNode(focusedNodeId)
@@ -1138,13 +1140,14 @@ export const GraphView = React.forwardRef<GraphViewHandle, GraphViewProps>(funct
   return (
     <TaxonomyContext.Provider value={taxonomy}>
     <FillContext.Provider value={fill}>
-    <CanvasErrorBoundary what="graph view">
+    <StringsContext.Provider value={s}>
+    <CanvasErrorBoundary failed={s.paneFailed}>
     <div
       className={`gv-graph-view${className ? ` ${className}` : ''}`}
       ref={containerRef}
       data-gv-theme={theme}
       role="region"
-      aria-label={`Graph, ${counted}`}
+      aria-label={s.paneLabel(counted)}
       tabIndex={keyboard === 'none' ? undefined : 0}
       onKeyDown={keyboard === 'pane' ? paneKeyDown : undefined}
       onFocus={e => { if (e.target === e.currentTarget) { setPaneFocused(true); enteredRef.current = true } }}
@@ -1153,7 +1156,7 @@ export const GraphView = React.forwardRef<GraphViewHandle, GraphViewProps>(funct
     >
       {/* Canvas fills the full viewport beneath the floating overlay */}
       <div className="gv-graph-canvas-area">
-        <CanvasErrorBoundary>
+        <CanvasErrorBoundary failed={s.canvasFailed}>
           <GraphCanvas
             nodes={visibleNodes}
             edges={visibleEdges}
@@ -1213,7 +1216,7 @@ export const GraphView = React.forwardRef<GraphViewHandle, GraphViewProps>(funct
         <div className="gv-graph-announce" role="status">
           {focusedNode && [focusedNode.name, styleLabelOf(focusedNode), ...contextOf(focusedNode)].map((part, i) => <span key={i}>{i > 0 && ', '}{part}</span>)}
         </div>
-        {nodeCount === 0 && (simRef.current?.nodes.length ?? 0) > 0 && <p className="gv-graph-empty">No nodes match the filter.</p>}
+        {nodeCount === 0 && (simRef.current?.nodes.length ?? 0) > 0 && <p className="gv-graph-empty">{s.paneEmpty}</p>}
         {shownEdge && shownOrigin && (
           <EdgeHoverTooltip
             hover={shownEdge}
@@ -1249,8 +1252,7 @@ export const GraphView = React.forwardRef<GraphViewHandle, GraphViewProps>(funct
             search={search}
             onSearchChange={setSearch}
             searchInputRef={searchInputRef}
-            searchTitle={searchTitle}
-            searchPlaceholder={searchPlaceholder}
+            strings={barStrings}
             hiddenMatches={hiddenMatches}
             findings={findings}
           />
@@ -1283,28 +1285,28 @@ export const GraphView = React.forwardRef<GraphViewHandle, GraphViewProps>(funct
 
       {/* Bottom-center: the theme button, and the simulation controls and live fps under `transport`. */}
       {(show.transport || show.themeToggle) && <div className="gv-graph-bottom-center">
-        {show.transport && <button className="gv-graph-toolbar-btn" onClick={handleFitToView} title="Fit to view (F)">Fit</button>}
+        {show.transport && <button className="gv-graph-toolbar-btn" onClick={handleFitToView} title={s.fitTitle}>{s.fit}</button>}
         {show.themeToggle && (
           <button
             className={`gv-graph-toolbar-btn${themeChoice === 'system' ? '' : ' active'}`}
             onClick={() => setThemeChoice(THEME_CHOICES[(THEME_CHOICES.indexOf(themeChoice) + 1) % THEME_CHOICES.length])}
-            title={`Colour scheme: ${themeChoice}${themeChoice === 'system' ? ` (${theme})` : ''} — click to change`}
-            aria-label="Colour scheme"
+            title={s.themeTitle(themeChoice, theme)}
+            aria-label={s.themeLabel}
           >
-            {themeChoice === 'system' ? 'Auto' : themeChoice === 'light' ? 'Light' : 'Dark'}
+            {s.theme(themeChoice)}
           </button>
         )}
         {show.transport && <>
           <button
             className={`gv-graph-toolbar-btn ${running ? 'active' : ''}`}
             onClick={handleToggleRunning}
-            title={running ? 'Pause simulation (Space)' : 'Resume simulation (Space)'}
+            title={running ? s.pauseTitle : s.playTitle}
           >
-            {running ? 'Pause' : 'Play'}
+            {running ? s.pause : s.play}
           </button>
           {/* Always rendered (reserving its width) so toggling Play/Pause never
               shifts the centred cluster; hidden when the simulation is paused. */}
-          <span className={`gv-graph-count-fps${running ? '' : ' hidden'}`} title="Simulation frames per second">{fps} fps</span>
+          <span className={`gv-graph-count-fps${running ? '' : ' hidden'}`} title={s.fpsTitle}>{s.fps(fps)}</span>
         </>}
       </div>}
 
@@ -1339,27 +1341,26 @@ export const GraphView = React.forwardRef<GraphViewHandle, GraphViewProps>(funct
       {show.shortcuts && shortcutsOpen && (
         <div className="gv-graph-shortcuts-panel">
           <div className="gv-graph-shortcuts-title">
-            Keyboard Shortcuts
+            {s.shortcutsTitle}
             <button className="gv-graph-shortcuts-close" onClick={() => setShortcutsOpen(false)}>&times;</button>
           </div>
           <div className="gv-graph-shortcuts-list">
-            <Shortcut keys="Tab / Shift+Tab" desc="Next / previous node" />
-            <Shortcut keys="Enter" desc="Select focused node" />
-            <Shortcut keys="Escape" desc="Deselect / close" />
-            <Shortcut keys="Arrow keys" desc="Pan viewport" />
-            <Shortcut keys="+ / -" desc="Zoom in / out" />
-            <Shortcut keys="F" desc="Fit to view" />
-            {show.search && <Shortcut keys="/" desc="Open search" />}
-            <Shortcut keys="Space" desc="Toggle simulation" />
-            <Shortcut keys="Shift + hover" desc="Upstream deps" />
-            <Shortcut keys="Ctrl/Meta + click" desc="Add or remove a node" />
-            <Shortcut keys="Ctrl/Meta + drag" desc="Lasso nodes into the selection" />
-            <Shortcut keys="?" desc="This panel" />
+            {[
+              s.shortcutTab, s.shortcutEnter, s.shortcutEscape, s.shortcutArrows, s.shortcutZoom, s.shortcutFit,
+              ...(show.search ? [s.shortcutSearch] : []),
+              s.shortcutRun, s.shortcutUpstream, s.shortcutToggle, s.shortcutLasso, s.shortcutHelp,
+            ].map(([keys, action]) => (
+              <div key={keys} className="gv-graph-shortcut-row">
+                <kbd className="gv-graph-shortcut-key">{keys}</kbd>
+                <span className="gv-graph-shortcut-desc">{action}</span>
+              </div>
+            ))}
           </div>
         </div>
       )}
     </div>
     </CanvasErrorBoundary>
+    </StringsContext.Provider>
     </FillContext.Provider>
     </TaxonomyContext.Provider>
   )
@@ -1367,17 +1368,14 @@ export const GraphView = React.forwardRef<GraphViewHandle, GraphViewProps>(funct
 
 /** The pane's own findings about the host's graph: each with its code; errors name edges the view does not draw. */
 function GraphDiagnostics({ diagnostics }: { diagnostics: readonly GraphDiagnostic[] }) {
+  const s = useStrings()
   const errors = diagnostics.filter(d => d.severity === 'error').length
-  const warnings = diagnostics.length - errors
-  const parts: string[] = []
-  if (errors > 0) parts.push(`${errors} graph error${errors === 1 ? '' : 's'}`)
-  if (warnings > 0) parts.push(`${warnings} graph warning${warnings === 1 ? '' : 's'}`)
   return (
     <details className={`gv-graph-diagnostics${errors > 0 ? ' has-errors' : ''}`} role={errors > 0 ? 'alert' : undefined}>
-      <summary>{parts.join(', ')}{errors > 0 ? ' — what is named is not drawn' : ''}</summary>
+      <summary>{s.diagnosticsSummary(errors, diagnostics.length - errors)}</summary>
       <ul>
         {diagnostics.map((d, i) => (
-          <li key={i} className={`gv-graph-diagnostic ${d.severity}`}><code>{d.code}</code>{d.message}</li>
+          <li key={i} className={`gv-graph-diagnostic ${d.severity}`}><code>{d.code}</code>{s.diagnostic(d)}</li>
         ))}
       </ul>
     </details>
@@ -1412,6 +1410,7 @@ function GraphHoverTooltip({ nodeId, simRef, visibleEdges, undirected, visibleId
   const taxonomy = useTaxonomy()
   const engine = engineOf(taxonomy)
   const fill = useFill(taxonomy)
+  const s = useStrings()
   if (!nodeId) return null
   const sim = simRef.current
   if (!sim) return null
@@ -1480,8 +1479,8 @@ function GraphHoverTooltip({ nodeId, simRef, visibleEdges, undirected, visibleId
       {compositionLine && <div className="gv-tooltip-summary">{compositionLine}</div>}
       {badgesLine && <div className="gv-tooltip-summary">{badgesLine}</div>}
       {copyCount > 1 && (
-        <div className="gv-tooltip-duplicates" title="The same entity appears in more than one place. Hovering any copy marks all copies.">
-          copy {copyIndex} of {copyCount}
+        <div className="gv-tooltip-duplicates" title={s.hoverCopyTitle}>
+          {s.hoverCopy(copyIndex, copyCount)}
         </div>
       )}
       {summaryKind !== 'none' && (outgoing > 0 || incoming > 0 || both > 0) && (
@@ -1491,7 +1490,7 @@ function GraphHoverTooltip({ nodeId, simRef, visibleEdges, undirected, visibleId
           {both > 0 && <span className="gv-tooltip-conn-both">↔{both}</span>}
         </div>
       )}
-      {directionLine && <div className="gv-tooltip-direction">{shiftHeld ? 'dependents' : 'dependencies'}</div>}
+      {directionLine && <div className="gv-tooltip-direction">{shiftHeld ? s.hoverDependents : s.hoverDependencies}</div>}
       {action && (
         <button
           className="gv-tooltip-cross-view"
@@ -1540,13 +1539,3 @@ function EdgeHoverTooltip({ hover, edge, type, undirected, hostNodeOf, onMouseEn
     </div>
   )
 }
-
-function Shortcut({ keys, desc }: { keys: string; desc: string }) {
-  return (
-    <div className="gv-graph-shortcut-row">
-      <kbd className="gv-graph-shortcut-key">{keys}</kbd>
-      <span className="gv-graph-shortcut-desc">{desc}</span>
-    </div>
-  )
-}
-

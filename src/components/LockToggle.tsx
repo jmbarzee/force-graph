@@ -8,6 +8,7 @@
 // sets for ~600ms after a focus transition that bypassed the lock.
 
 import './LockToggle.css'
+import { useStrings } from './graph-view/strings'
 
 interface LockToggleProps {
   locked: boolean
@@ -18,9 +19,8 @@ interface LockToggleProps {
 }
 
 export function LockToggle({ locked, onClick, flashing, label }: LockToggleProps) {
-  const title = locked
-    ? `${label} filter locked — held as it is; click to unlock`
-    : `${label} filter unlocked — click to lock and hold it as it is`
+  const s = useStrings()
+  const title = locked ? s.lockOn(label) : s.lockOff(label)
   const className = [
     'gv-lock-toggle',
     locked ? 'locked' : '',

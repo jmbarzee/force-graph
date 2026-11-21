@@ -18,6 +18,7 @@ import './ForceMap.css'
 import { Plot } from './controls/Plot'
 import { Slider } from './controls/Slider'
 import { NothingVisible } from './controls/NothingVisible'
+import { useStrings } from './graph-view/strings'
 
 const clamp = (v: number, lo: number, hi: number) => Math.max(lo, Math.min(hi, v))
 const snap = (v: number, step: number) => Math.round(v / step) * step
@@ -296,21 +297,20 @@ export function niceStep(max: number, target: number): number {
 }
 
 export function ForceCurves({
-  curves, baselineY, hoveredId, onHover, xLabel, yLabel, exp, ariaLabel, xMax,
+  curves, baselineY, hoveredId, onHover, exp, ariaLabel, xMax,
 }: {
   curves: CurveItem[]
   // y of an optional horizontal baseline; omit for none.
   baselineY?: number
   hoveredId: string | null
   onHover: (id: string | null) => void
-  xLabel: string
-  yLabel: string
-  exp: GlobalSlider & { label?: string }
+  exp: GlobalSlider
   ariaLabel: string
   // The x-axis domain max (in data units). When set, draws value-anchored
   // gridlines at a nice step — they re-space as the domain changes while tuning.
   xMax?: number
 }) {
+  const s = useStrings()
   const gridXs: number[] = []
   if (xMax !== undefined && xMax > 0) {
     const step = niceStep(xMax, 6)
@@ -319,7 +319,7 @@ export function ForceCurves({
   return (
     <div className="gv-spring-curves">
       {curves.length > 0 && <>
-        <div className="gv-spring-axis-label gv-spring-curves-axis-y">{yLabel}</div>
+        <div className="gv-spring-axis-label gv-spring-curves-axis-y">{s.curveForce}</div>
 
         <svg
           className="gv-spring-curves-svg"
@@ -375,11 +375,11 @@ export function ForceCurves({
           })}
         </svg>
 
-        <div className="gv-spring-axis-label gv-spring-curves-axis-x">{xLabel}</div>
+        <div className="gv-spring-axis-label gv-spring-curves-axis-x">{s.curveDistance}</div>
       </>}
 
       <div className="gv-spring-curves-exp" title={exp.title}>
-        <span className="gv-spring-exp-label">{exp.label ?? 'exp'}</span>
+        <span className="gv-spring-exp-label">{s.curveExp}</span>
         <Slider
           min={exp.min} max={exp.max} step={exp.step}
           value={exp.value}

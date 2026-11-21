@@ -1,4 +1,5 @@
 import React from 'react'
+import { useStrings } from '../graph-view/strings'
 import type { Ladder } from './ladders'
 
 /** A surface's collapsed ladders, expanded at first, and the toggle for one. */
@@ -18,6 +19,7 @@ export function LadderToggles({ ladders, collapsed, onToggle }: {
   collapsed: ReadonlySet<string>
   onToggle: (id: string) => void
 }) {
+  const s = useStrings()
   if (ladders.length === 0) return null
   return (
     <div className="gv-ctl-ladder-toggles">
@@ -27,7 +29,7 @@ export function LadderToggles({ ladders, collapsed, onToggle }: {
           type="button"
           className="gv-ctl-ladder-toggle"
           aria-pressed={collapsed.has(l.id)}
-          title={`Tune the ${l.id} ladder's rungs as one`}
+          title={s.ladderToggle(l.id)}
           onClick={() => onToggle(l.id)}
         >
           {l.id}

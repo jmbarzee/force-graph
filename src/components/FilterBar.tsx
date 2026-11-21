@@ -39,6 +39,8 @@ import type { FilterState, AxisLocks, HiddenMatches } from '../filter/types'
 import { toggleGroup } from '../filter/toggle'
 import { LockToggle } from './LockToggle'
 import { SearchIcon } from './icons/SearchIcon'
+import { StringsContext, stringsOf, useStrings } from './graph-view/strings'
+import type { GraphViewStrings } from './graph-view/strings'
 
 const NO_LOCKS: ReadonlySet<string> = new Set()
 
@@ -116,9 +118,8 @@ interface FilterBarBaseProps<R extends SearchRecord> {
   onSearchChange?: (next: SearchState) => void
   /** The search input, for a host that focuses it from its own shortcut. Absent, a shown bar binds `/` to it while focus is not in an editable field. */
   searchInputRef?: React.RefObject<HTMLInputElement | null>
-  /** Default: "Search", with the key when the bar binds `/`. */
-  searchTitle?: string
-  searchPlaceholder?: string
+  /** The bar's words, over `DEFAULT_STRINGS`. */
+  strings?: Partial<GraphViewStrings>
   /** Every record the view holds, shown or hidden: with `matches`, the bar badges each chip with the matches it hides and the search with their total. */
   records?: readonly R[]
   /** Whether a record matches the search's query. */
@@ -168,6 +169,7 @@ function ChipRow({ className, open, onOpenChange, children }: {
   onOpenChange: (open: boolean) => void
   children: React.ReactNode
 }) {
+  const s = useStrings()
   const ref = React.useRef<HTMLDivElement>(null)
   const [line, setLine] = React.useState(() => firstLine([]))
   // Measured before paint on every render, since chips, counts and badges
@@ -203,8 +205,8 @@ function ChipRow({ className, open, onOpenChange, children }: {
           className="gv-header-more"
           onClick={() => onOpenChange(!open)}
           aria-expanded={open}
-          title={open ? 'Show one row' : `Show ${line.rest} more`}
-        >{open ? 'Less' : `+${line.rest}`}</button>
+          title={open ? s.rowLessTitle : s.rowMoreTitle(line.rest)}
+        >{open ? s.rowLess : s.rowMore(line.rest)}</button>
       )}
     </>
   )
@@ -241,8 +243,7 @@ export function FilterBar<R extends SearchRecord = SearchRecord>({
   search: searchProp,
   onSearchChange,
   searchInputRef: hostInputRef,
-  searchTitle,
-  searchPlaceholder = 'Search…',
+  strings,
   records,
   matches,
   hiddenMatches,
@@ -255,6 +256,7 @@ export function FilterBar<R extends SearchRecord = SearchRecord>({
   const taxonomy = taxonomyProp ?? fromContext
   if (!taxonomy) throw new Error('FilterBar has no taxonomy: pass `taxonomy`, or mount it inside <TaxonomyContext.Provider value={…}>.')
   const fill = useFill(taxonomy)
+  const s = React.useMemo(() => stringsOf(strings), [strings])
   // The filter, locks and axes compared by content, as the pane compares
   // them: a host rebuilding one each render changes nothing here.
   const filter = useStable(filterProp, filterStatesEqual)
@@ -387,6 +389,7 @@ export function FilterBar<R extends SearchRecord = SearchRecord>({
   }, [bindsSlash, openSearchRef])
 
   return (
+    <StringsContext.Provider value={s}>
     <div className={`gv-canvas-header${refreshing ? ' refresh-flash' : ''}`} ref={rootRef} data-gv-theme={theme} style={schemeStyle}>
       {axes.map(axis => {
         // An axis the taxonomy does not declare filters nothing and offers no
@@ -414,8 +417,8 @@ export function FilterBar<R extends SearchRecord = SearchRecord>({
               <ChipRow className={look.rowClass} open={open.has(axis)} onOpenChange={to => setAxisOpen(axis, to)}>
                 <span className="gv-header-axis-label">{label}</span>
                 {empty && (
-                  <span className="gv-header-axis-empty" title={descriptor ? `${label} has no values in this view` : `${label} is not an axis the taxonomy declares`}>
-                    {descriptor ? `no ${label.toLowerCase()} values` : 'not declared'}
+                  <span className="gv-header-axis-empty" title={descriptor ? s.axisEmptyTitle(label) : s.axisUndeclaredTitle(label)}>
+                    {descriptor ? s.axisEmpty(label) : s.axisUndeclared}
                   </span>
                 )}
                 {chips.map(chip => {
@@ -436,13 +439,13 @@ export function FilterBar<R extends SearchRecord = SearchRecord>({
                       className={cls}
                       style={tint === undefined ? undefined : ({ ['--gv-chip-tint' as string]: `var(${fill.keys.get(tint)!.cssVar})` } as React.CSSProperties)}
                       onClick={() => change(toggleGroup(filter, axis, chip.values), axis)}
-                      title={chip.tooltip ?? (isActive ? `Hide ${chip.label.toLowerCase()}` : `Show ${chip.label.toLowerCase()}`)}
+                      title={chip.tooltip ?? (isActive ? s.chipHide(chip.label) : s.chipShow(chip.label))}
                     >
                       {chip.icon && <span className={look.iconClass}>{chip.icon}</span>}
                       <span className={look.labelClass}>{chip.label}</span>
                       {count !== undefined && <span className="gv-header-chip-count">{count}</span>}
                       {hiddenCount > 0 && (
-                        <span className="gv-header-hidden-badge" title={`${hiddenCount} match${hiddenCount !== 1 ? 'es' : ''} hidden by this filter`}>
+                        <span className="gv-header-hidden-badge" title={s.chipHidden(hiddenCount)}>
                           {hiddenCount}
                         </span>
                       )}
@@ -481,7 +484,7 @@ export function FilterBar<R extends SearchRecord = SearchRecord>({
                     setAxes(axes.filter(d => d !== axis))
                     setAxisOpen(axis, false)
                   }}
-                  title={`Remove the ${label} filter`}
+                  title={s.axisRemove(label)}
                 >×</button>
               )}
             </div>
@@ -495,7 +498,7 @@ export function FilterBar<R extends SearchRecord = SearchRecord>({
           <button
             className="gv-header-add-button"
             onClick={() => (addable.length === 1 ? setAxes([...axes, addable[0]!]) : setAddOpen(open => !open))}
-            title={addable.length === 1 ? `Add the ${labelOf(addable[0]!)} filter` : 'Add a filter'}
+            title={addable.length === 1 ? s.axisAdd(labelOf(addable[0]!)) : s.axisAddMenu}
             aria-haspopup={addable.length > 1 ? 'menu' : undefined}
             aria-expanded={addable.length > 1 ? addOpen : undefined}
           >+</button>
@@ -515,7 +518,7 @@ export function FilterBar<R extends SearchRecord = SearchRecord>({
 
       {showSearch && <div className="gv-header-controls-section">
         <div className={`gv-header-search ${searchActive ? 'active' : ''}`}>
-          <button className="gv-header-search-toggle" onClick={toggleSearch} title={searchTitle ?? (bindsSlash ? 'Search (/)' : 'Search')}>
+          <button className="gv-header-search-toggle" onClick={toggleSearch} title={s.searchTitle(bindsSlash ? '/' : null)}>
             <SearchIcon size={14} />
           </button>
           {searchActive && (
@@ -523,14 +526,14 @@ export function FilterBar<R extends SearchRecord = SearchRecord>({
               ref={searchInputRef}
               className="gv-header-search-input"
               type="text"
-              placeholder={searchPlaceholder}
+              placeholder={s.searchPlaceholder}
               value={searchQuery}
               onChange={e => setSearch({ query: e.target.value, active: true })}
               onKeyDown={e => { if (e.key === 'Escape') toggleSearch() }}
             />
           )}
           {hiddenCount > 0 && (
-            <span className="gv-header-search-badge" title={`${hiddenCount} match${hiddenCount !== 1 ? 'es' : ''} hidden by filters`}>
+            <span className="gv-header-search-badge" title={s.searchHidden(hiddenCount)}>
               +{hiddenCount}
             </span>
           )}
@@ -539,5 +542,6 @@ export function FilterBar<R extends SearchRecord = SearchRecord>({
 
       {findings}
     </div>
+    </StringsContext.Provider>
   )
 }

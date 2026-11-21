@@ -1,6 +1,7 @@
 import React from 'react'
 import type { FilterState } from '../../filter/types'
 import { passesGroups } from '../../filter/types'
+import { useStrings } from '../graph-view/strings'
 import './controls.css'
 
 /** The control a force tab names when nothing is visible: the legend's groups, or else the filter bar's chips. */
@@ -17,11 +18,7 @@ export function hiddenByOf(
 
 export const HiddenByContext = React.createContext<HiddenBy>('chips')
 
-const LINE: Record<HiddenBy, string> = {
-  legend: 'Nothing visible — turn a group on in the legend.',
-  chips: 'Nothing visible on this axis — turn a chip on.',
-}
-
 export function NothingVisible() {
-  return <p className="gv-ctl-nothing-visible">{LINE[React.useContext(HiddenByContext)]}</p>
+  const s = useStrings()
+  return <p className="gv-ctl-nothing-visible">{React.useContext(HiddenByContext) === 'legend' ? s.nothingVisibleLegend : s.nothingVisibleChips}</p>
 }
