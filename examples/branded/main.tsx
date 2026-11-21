@@ -6,15 +6,15 @@ import './brand.css'
 
 const taxonomy = createTaxonomy({
   styleAxis: 'kind',
-  styles: [
+  values: [
     { id: 'harbour', label: 'Harbour', icon: '⚓', summaryKind: 'children',
       color: { light: { fill: '#0B4F6C', border: '#062F40' }, dark: { fill: '#5FB3D4', border: '#0B4F6C' } }, size: { r: 18 } },
     { id: 'berth', label: 'Berth', icon: '▬',
       color: { light: { fill: '#E4572E', border: '#9C3415' }, dark: { fill: '#F08A6C', border: '#E4572E' } } },
   ],
   edgeTypes: [
-    { id: 'in', sourceValue: 'berth', targetValue: 'harbour', relation: 'containment' },
-    { id: 'ferry', sourceValue: 'berth', targetValue: 'berth', relation: 'dependency' },
+    { id: 'in', sources: 'berth', targets: 'harbour', relation: 'containment' },
+    { id: 'ferry', sources: 'berth', targets: 'berth', relation: 'dependency' },
   ],
 })
 

@@ -6,7 +6,7 @@ import { presetChoices, presetIndex, presetTarget, tweenTuning, TUNING_PRESETS }
 import type { PresetChoice } from './presets'
 import { DEFAULT_NODE_SCALE } from './node-scale'
 
-const bare = createTaxonomy({ styleAxis: 'kind', styles: [], filterAxes: [{ id: 'kind', label: 'kind', emptyMeans: 'none' }] })
+const bare = createTaxonomy({ styleAxis: 'kind', values: [], filterAxes: [{ id: 'kind', label: 'kind', emptyMeans: 'none' }] })
 const empty = { nodes: [], edges: [] }
 
 const readable = (c: PresetChoice) => {

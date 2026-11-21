@@ -5,15 +5,15 @@ import { groupSlotsOf } from './groups'
 import type { NodeGroup } from './groups'
 import type { GraphEdge, GraphNode } from './model'
 import { PALETTE, pairOf } from './scheme'
-import type { NodeStyle } from './shapes'
+import type { ValueSpec } from './shapes'
 import { createTaxonomy } from './taxonomy'
 
-const style = (id: string, label: string, light: string, dark: string): NodeStyle => ({
+const style = (id: string, label: string, light: string, dark: string): ValueSpec => ({
   id, label, color: { light: { fill: light, border: light }, dark: { fill: dark, border: dark } },
 })
 const taxonomy = createTaxonomy({
   styleAxis: 'kind',
-  styles: [style('service', 'Service', '#111111', '#eeeeee'), style('queue', 'Queue', '#222222', '#dddddd'), style('store', 'Store', '#333333', '#cccccc')],
+  values: [style('service', 'Service', '#111111', '#eeeeee'), style('queue', 'Queue', '#222222', '#dddddd'), style('store', 'Store', '#333333', '#cccccc')],
   filterAxes: [
     { id: 'kind', emptyMeans: 'all' },
     { id: 'team', emptyMeans: 'all', labelFor: v => v.toUpperCase(), chipsFor: values => [...values].sort().map(v => ({ id: v, label: v, values: [v] })) },
@@ -144,7 +144,7 @@ describe('coloringsEqual', () => {
 })
 
 describe('fillOf', () => {
-  it('follows the style axis when absent, in the styles’ own colours, a node of no declared style keyless', () => {
+  it('follows the style axis when absent, in the values’ own colours, a node of no declared style keyless', () => {
     const fill = fillOf(undefined, { nodes, edges: [] }, taxonomy)
     expect(fill.axis).toBe('kind')
     expect([...fill.keys.keys()]).toEqual(['service', 'queue', 'store'])

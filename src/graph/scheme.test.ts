@@ -15,7 +15,7 @@ describe('hueOf', () => {
 describe('keyVars', () => {
   const taxonomy = createTaxonomy({
     styleAxis: 'kind',
-    styles: [{ id: 'red', label: 'Red', color: { light: { fill: '#111111', border: '#000000' }, dark: { fill: '#eeeeee', border: '#ffffff' } } }],
+    values: [{ id: 'red', label: 'Red', color: { light: { fill: '#111111', border: '#000000' }, dark: { fill: '#eeeeee', border: '#ffffff' } } }],
     filterAxes: [{ id: 'team', emptyMeans: 'all' }],
   })
   const graph = { nodes: [{ id: 'a', name: 'a', values: { kind: 'red', team: 'red' } }, { id: 'b', name: 'b', values: { kind: 'red', team: 'blueTeam' } }], edges: [] }

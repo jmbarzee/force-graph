@@ -5,14 +5,14 @@ import type { Root } from 'react-dom/client'
 import { afterEach, beforeEach, describe, expect, it, vi } from 'vitest'
 import { GraphView } from './GraphView'
 import type { ColorChannels, Coloring, ResolvedColoring } from '../graph/coloring'
-import type { GraphViewHandle, GraphViewProps, GroupsControl } from './GraphView'
+import type { GraphViewHandle, GraphViewProps, GroupsHandle } from './GraphView'
 import { createTaxonomy } from '../graph/taxonomy'
 import { createTuning } from '../graph/tuning'
 import type { Tuning } from '../graph/tuning'
 import type { Graph, GraphNode } from '../graph/model'
 import type { GraphDiagnostic } from '../graph/validate'
 import type { FilterState } from '../filter/types'
-import { GROUPS, initialFilter, selectionFor, withSelection } from '../filter/types'
+import { GROUPS, initialFilter, chosenOn, withChosen } from '../filter/types'
 import { ColorLegend } from './ColorLegend'
 import type { GlowGroup, NodeGroup } from '../graph/groups'
 import { PALETTE } from '../graph/scheme'
@@ -61,8 +61,8 @@ beforeEach(() => {
 
 // Two allow-lists; `site` opens without `z`, which only the grown graph has, so a re-seed shows.
 const taxonomy = createTaxonomy({
-  styleAxis: 'kind', styles: [],
-  filterAxes: [{ id: 'team', emptyMeans: 'none' }, { id: 'site', emptyMeans: 'none', initialSelection: values => values.filter(v => v !== 'z') }],
+  styleAxis: 'kind', values: [],
+  filterAxes: [{ id: 'team', emptyMeans: 'none' }, { id: 'site', emptyMeans: 'none', initialChosen: values => values.filter(v => v !== 'z') }],
 })
 const graphOf = (...pairs: [string, string][]): Graph => ({ nodes: pairs.map(([team, site], i): GraphNode => ({ id: `n${i}`, name: team, values: { team, site } })), edges: [] })
 const first = graphOf(['a', 'x'], ['b', 'y'])
@@ -83,18 +83,18 @@ async function mount(props: Partial<React.ComponentProps<typeof GraphView>>, sta
 
 it('writes one axis through updateFilter, and re-seeds the rest when the graph grows', async () => {
   const view = await mount({})
-  await act(async () => view.ref.current!.updateFilter(f => withSelection(f, 'team', new Set(['a']))))
-  expect(selectionFor(view.last(), 'team')).toEqual(new Set(['a']))
+  await act(async () => view.ref.current!.updateFilter(f => withChosen(f, 'team', new Set(['a']))))
+  expect(chosenOn(view.last(), 'team')).toEqual(new Set(['a']))
   await view.render(grown)
-  expect(selectionFor(view.last(), 'team')).toEqual(new Set(['a']))
-  expect(selectionFor(view.last(), 'site')).toEqual({ except: new Set(['z']) })
+  expect(chosenOn(view.last(), 'team')).toEqual(new Set(['a']))
+  expect(chosenOn(view.last(), 'site')).toEqual({ except: new Set(['z']) })
 })
 
 it('keeps the axes defaultFilter changed, and re-seeds the rest', async () => {
   const view = await mount({ defaultFilter: new Map([['team', { except: new Set(['a']) }], ['site', { except: new Set() }]]) }, graphOf())
   await view.render(grown)
-  expect(selectionFor(view.last(), 'team')).toEqual({ except: new Set(['a']) })
-  expect(selectionFor(view.last(), 'site')).toEqual({ except: new Set(['z']) })
+  expect(chosenOn(view.last(), 'team')).toEqual({ except: new Set(['a']) })
+  expect(chosenOn(view.last(), 'site')).toEqual({ except: new Set(['z']) })
 })
 
 it('names a parent cycle and draws past it with every node hidden', async () => {
@@ -128,20 +128,20 @@ it("hides a group's glow and only-members from its legend row, and a focus turns
   const view = await mountGroups({})
   await act(async () => view.el.querySelector<HTMLInputElement>('.gv-color-legend input')!.click())
   const [hidden, touched] = view.lastWrite()
-  expect(selectionFor(hidden, GROUPS)).toEqual({ except: new Set(['red']) })
+  expect(chosenOn(hidden, GROUPS)).toEqual({ except: new Set(['red']) })
   expect(touched).toEqual([GROUPS])
   expect(drawn.glows.map(g => [g.id, [...g.nodeIds]])).toEqual([['blue', ['n1']]])
   let shown = false
   await act(async () => { shown = view.ref.current!.focusNode('n0') })
   expect(shown).toBe(true)
-  expect(view.lastWrite()).toEqual([withSelection(hidden, GROUPS, { except: new Set() }), []])
+  expect(view.lastWrite()).toEqual([withChosen(hidden, GROUPS, { except: new Set() }), []])
 })
 
 it('asks the host to widen a controlled group filter for a focus, and writes nothing of its own', async () => {
-  const filter = withSelection(initialFilter(taxonomy, first), GROUPS, { except: new Set(['red']) })
+  const filter = withChosen(initialFilter(taxonomy, first), GROUPS, { except: new Set(['red']) })
   const view = await mountGroups({ filter })
   await act(async () => { view.ref.current!.focusNode('n0') })
-  expect(selectionFor(view.lastWrite()[0], GROUPS)).toEqual({ except: new Set() })
+  expect(chosenOn(view.lastWrite()[0], GROUPS)).toEqual({ except: new Set() })
   expect(drawn.glows.map(g => g.id)).toEqual(['blue'])
 })
 
@@ -155,7 +155,7 @@ it('reports a group colour it cannot read once, and draws the group from the pal
 it("runs a layout scalar's compute once per edit, for the panel, the overlay and the simulation alike", async () => {
   let computed = 0
   const counted = createTaxonomy({
-    styleAxis: 'kind', styles: [],
+    styleAxis: 'kind', values: [],
     scalars: [{ id: 'rank', compute: graph => { computed++; return new Map([...graph.nodes].map((n, i) => [n.id, i])) } }],
   })
   const tuningAt = (gravityY: number) => createTuning({ forces: { bandY: { scalar: 'rank' }, gravityY } }, counted)
@@ -230,7 +230,7 @@ it('reads a new graph as unchanged only when its window, weights and series are'
 it('names a search result\'s style by labels, then by labelFor, then by the style\'s label', async () => {
   const styled = createTaxonomy({
     styleAxis: 'kind',
-    styles: ['svc', 'db', 'queue'].map(id => ({ id, label: `${id} style`, color: { light: { fill: '#000000', border: '#000000' }, dark: { fill: '#ffffff', border: '#ffffff' } } })),
+    values: ['svc', 'db', 'queue'].map(id => ({ id, label: `${id} style`, color: { light: { fill: '#000000', border: '#000000' }, dark: { fill: '#ffffff', border: '#ffffff' } } })),
     filterAxes: [{ id: 'kind', emptyMeans: 'none', labelFor: v => (v === 'db' ? 'Database' : `${v} style`) }],
   })
   const graph: Graph = { nodes: ['svc', 'db', 'queue'].map((kind, i): GraphNode => ({ id: `n${i}`, name: `match ${kind}`, values: { kind } })), edges: [] }
@@ -241,7 +241,7 @@ it('names a search result\'s style by labels, then by labelFor, then by the styl
 describe('coloring.fill', () => {
   // The team chips name a key no fill declares.
   const filled = createTaxonomy({
-    styleAxis: 'kind', styles: [{ id: 'svc', label: 'Service' }],
+    styleAxis: 'kind', values: [{ id: 'svc', label: 'Service' }],
     filterAxes: [{ id: 'team', emptyMeans: 'all', chipsFor: values => values.map(v => ({ id: v, label: v, values: [v], tint: 'mauve' })) }],
   })
   const graph: Graph = { nodes: [{ id: 'n0', name: 'zero', values: { kind: 'svc', team: 'red' } }], edges: [] }
@@ -313,7 +313,7 @@ describe('coloring.ring', () => {
 
 /** Mount a view over `groups`, re-rendered with each colouring, and what its legend and filter were last handed. */
 async function mountLegend(coloring?: GraphViewProps['coloring'], props: Partial<GraphViewProps> = {}) {
-  let last: [ColorChannels, GroupsControl] | undefined
+  let last: [ColorChannels, GroupsHandle] | undefined
   const writes: [FilterState, readonly string[]][] = []
   const root = newRoot(document.createElement('div'))
   const render = (next?: GraphViewProps['coloring']) => act(async () => {
@@ -341,14 +341,14 @@ describe('coloring.glow', () => {
     const view = await mountLegend({ glow: { by: 'axis', axis: 'team' } })
     await act(async () => view.last()[1].toggle!('a'))
     const [hidden, touched] = view.lastWrite()
-    expect(selectionFor(hidden, 'team')).toEqual({ except: new Set(['a']) })
+    expect(chosenOn(hidden, 'team')).toEqual({ except: new Set(['a']) })
     expect(touched).toEqual(['team'])
     expect(view.last()[1].shown('a')).toBe(false)
     expect(view.last()[0].glow!.map(k => [k.id, k.visible])).toEqual([['a', false], ['b', true]])
   })
 
-  it('hides only the toggled value of an emptyMeans all axis that selects nothing', async () => {
-    const narrowing = createTaxonomy({ styleAxis: 'kind', styles: [], filterAxes: [{ id: 'team', emptyMeans: 'all' }] })
+  it('hides only the toggled value of an emptyMeans all axis that chooses nothing', async () => {
+    const narrowing = createTaxonomy({ styleAxis: 'kind', values: [], filterAxes: [{ id: 'team', emptyMeans: 'all' }] })
     const view = await mountLegend({ glow: { by: 'axis', axis: 'team' } }, { taxonomy: narrowing, defaultFilter: new Map([['team', new Set<string>()]]) })
     expect(view.last()[1].shown('a')).toBe(true)
     await act(async () => view.last()[1].toggle!('a'))
@@ -378,7 +378,7 @@ describe('legend', () => {
 it('says so when the filter draws no node, and stops once it draws one', async () => {
   const view = await mount({ defaultFilter: new Map([['team', { except: new Set(['a', 'b']) }], ['site', { except: new Set() }]]) })
   expect(view.el.querySelector('.gv-graph-empty')?.textContent).toBe('No nodes match the filter.')
-  await act(async () => view.ref.current!.updateFilter(f => withSelection(f, 'team', new Set(['a']))))
+  await act(async () => view.ref.current!.updateFilter(f => withChosen(f, 'team', new Set(['a']))))
   expect(view.el.querySelector('.gv-graph-empty')).toBeNull()
 })
 

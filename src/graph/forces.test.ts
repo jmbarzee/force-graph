@@ -4,19 +4,19 @@ import { identityMapping } from './axis'
 import { pairTuning, withSpringOverride } from './simulation'
 import { createTaxonomy } from './taxonomy'
 import { MIDDLING_SPRING } from './shapes'
-import type { NodeStyle } from './shapes'
+import type { ValueSpec } from './shapes'
 
-const style = (id: string): NodeStyle => ({
+const spec = (id: string): ValueSpec => ({
   id, label: id,
   color: { light: { fill: '#000000', border: '#000000' }, dark: { fill: '#ffffff', border: '#ffffff' } },
 })
 
 describe('springFor', () => {
   const taxonomy = createTaxonomy({
-    styleAxis: 'kind', styles: [style('service'), style('queue')],
-    edgeTypes: [{ id: 'calls', relation: 'dependency', sourceValue: 'service', targetValue: 'service' }],
+    styleAxis: 'kind', values: [spec('service'), spec('queue')],
+    edgeTypes: [{ id: 'calls', relation: 'dependency', sources: 'service', targets: 'service' }],
   })
-  const pair = pairTuning(identityMapping(taxonomy.axisFor('kind')!, taxonomy.styleValues))
+  const pair = pairTuning(identityMapping(taxonomy.axisFor('kind')!, taxonomy.styleValues()))
   const edge = { id: 'e', sourceId: 'a', targetId: 'b' }
   const service = { values: { kind: 'service' } }
   const queue = { values: { kind: 'queue' } }

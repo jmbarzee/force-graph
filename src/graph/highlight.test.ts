@@ -31,7 +31,7 @@ describe('highlightOf', () => {
     ]
     const byId = new Map(nodes.map(n => [n.id, n]))
     const graph = { visibleNodes: nodes, visibleEdges: chains, visibleIds: new Set(byId.keys()), getNode: (id: string) => byId.get(id) }
-    const taxonomy = createTaxonomy({ styleAxis: 'kind', styles: [], filterAxes: [] })
+    const taxonomy = createTaxonomy({ styleAxis: 'kind', values: [], filterAxes: [] })
     const lit = highlightOf(taxonomy, [byId.get('p')!, byId.get('x')!], 'downstream', graph, new Set())
     expect(lit.nodes).toEqual(new Set(['p', 'q', 'x', 'y', 'z']))
     expect(lit.edges).toEqual(new Set(['pq', 'xy', 'yz']))

@@ -54,7 +54,7 @@ library holds and why.
 - **The filter is axis-keyed, copy-on-write and compared by content.**
   Removing an axis from the bar unfilters it. Re-seeding on a new graph follows
   the axes the user has not touched — explicit state the bar reports with
-  every write, never an inference from the previous graph's opening selection.
+  every write, never an inference from the previous graph's opening choice.
 - **Each axis's reheat follows from `keepCamera`**: an axis that refits (an
   allow-list's default) seeds revealed nodes at their ancestors; one that
   keeps the camera reheats in place.

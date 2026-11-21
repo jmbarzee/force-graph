@@ -5,7 +5,7 @@
 // across axes: that is what keeps the model explainable, and it is why nothing
 // here offers a way to combine two axes.
 //
-// **Values are strings, and that is load-bearing rather than lazy.** Selections
+// **Values are strings, and that is load-bearing rather than lazy.** Choices
 // end up as `Set` and `Map` keys in the force kernels, and a `Set` deduplicates
 // by value for a string and by *identity* for an object. A composite value —
 // an object, a tuple, a freshly-built key — silently degenerates to one entry
@@ -32,7 +32,7 @@ export type AxisValues = Readonly<Record<AxisId, AxisValue>>
 /**
  * Fold anything into a stable value key.
  *
- * Composite selections are the trap this exists for. Passing an array or an
+ * Composite choices are the trap this exists for. Passing an array or an
  * object gives a deterministic string rather than a new object each call, so a
  * `Set` of these deduplicates the way the caller expects.
  */
@@ -97,19 +97,19 @@ export interface ReheatPolicy {
 
 /**
  * One filter axis, as a host declares it: its id, its label, and what an
- * empty selection on it means. Everything else is policy with a default that
+ * empty choice on it means. Everything else is policy with a default that
  * follows from `emptyMeans`, because the two kinds of axis want opposite
  * answers to each question:
  *
  *   - an **allow-list** (`emptyMeans: 'none'`): a node with no value is
- *     hidden, a focus always expands the selection, a change reseeds the
+ *     hidden, a focus always expands the choice, a change reseeds the
  *     revealed nodes at their ancestors, refits the camera and reheats to
- *     0.5, and the initial selection is every value;
+ *     0.5, and the initial choice is every value;
  *   - a **narrowing** axis (`emptyMeans: 'all'`): a node with no value stays
- *     visible, a focus expands only an already-active selection (adding the
+ *     visible, a focus expands only an already-active choice (adding the
  *     first value would narrow everything to one thing — the opposite of
  *     focus), a change reheats to 0.3 in place and keeps the user's pan and
- *     zoom, and the initial selection is empty.
+ *     zoom, and the initial choice is empty.
  *
  * **It does not carry the values.** Those are derived, not declared: the style
  * axis's values come from the taxonomy, and an origin axis's from scanning the
@@ -122,15 +122,15 @@ export interface AxisDescriptor {
   /** Human label for the axis itself, e.g. for a dropdown or a chip group. Default: the id. */
   label?: string
   /**
-   * What an EMPTY selection on this axis means: `none` hides everything (the
+   * What an EMPTY choice on this axis means: `none` hides everything (the
    * chips are an allow-list), `all` shows everything (the chips narrow).
    */
   emptyMeans: 'all' | 'none'
-  /** What happens to a node carrying NO value on this axis while a selection is active. */
+  /** What happens to a node carrying NO value on this axis while a choice is active. */
   absentMeans?: 'visible' | 'hidden'
   /**
    * How a focus widens this axis to reveal its target: `always` adds the
-   * target's value; `whenActive` adds it only while a selection is active
+   * target's value; `whenActive` adds it only while a choice is active
    * (on a narrowing axis, adding the first value would narrow everything to
    * that one value — the opposite of a reveal). Default: `always` on an
    * allow-list, `whenActive` on a narrowing axis.
@@ -154,7 +154,7 @@ export interface AxisDescriptor {
   chipsFor?(values: readonly AxisValue[]): readonly FilterChip[]
   /**
    * The order chips take: listed values first, in this order, the rest after
-   * them in first-encounter order. Default: the taxonomy's `styles` order on
+   * them in first-encounter order. Default: the taxonomy's `values` order on
    * the style axis, none elsewhere.
    */
   order?: readonly AxisValue[]
@@ -167,27 +167,27 @@ export interface AxisDescriptor {
   /** A value's glyph, drawn on its chip. Absent: the style's icon on the style axis, none elsewhere. */
   iconFor?(value: AxisValue): string
   /**
-   * The values selected when the view first opens, given the values the
+   * The values chosen when the view first opens, given the values the
    * graph presents on this axis. Absent: every value on an allow-list,
    * none on a narrowing axis. `initialFilter` reads it; a host that passes the
    * `defaultFilter` prop has chosen its own start, and this is not consulted.
    */
-  initialSelection?(values: readonly AxisValue[]): readonly AxisValue[]
+  initialChosen?(values: readonly AxisValue[]): readonly AxisValue[]
   /**
    * How the bar draws this axis's chips. `chip` (the default) is a tinted,
    * glyph-led button that reads as a category; `tag` is a quieter, neutral
    * label that reads as an origin — a file, a source, a place — and shows an
-   * "everything included" state when the selection is empty on an
+   * "everything included" state when the choice is empty on an
    * `emptyMeans: 'all'` axis.
    */
   presentation?: 'chip' | 'tag'
 }
 
-/** A filter axis with every policy filled in — what `Taxonomy.filterAxes` carries. */
+/** A filter axis with every policy filled in — what `Taxonomy.filterAxes()` carries. */
 export interface ResolvedAxisDescriptor extends AxisNamer {
-  /** What an empty selection means: `none` hides everything, `all` shows everything. */
+  /** What an empty choice means: `none` hides everything, `all` shows everything. */
   emptyMeans: 'all' | 'none'
-  /** What happens to a node carrying no value on this axis while a selection is active. */
+  /** What happens to a node carrying no value on this axis while a choice is active. */
   absentMeans: 'visible' | 'hidden'
   /** How a focus widens this axis to reveal its target. */
   widens: 'always' | 'whenActive'
@@ -199,8 +199,8 @@ export interface ResolvedAxisDescriptor extends AxisNamer {
   iconFor(value: AxisValue): string
   /** The chips the available values group into. */
   chipsFor(values: readonly AxisValue[]): readonly FilterChip[]
-  /** The values selected when the view first opens, given the values the graph presents. */
-  initialSelection(values: readonly AxisValue[]): readonly AxisValue[]
+  /** The values chosen when the view first opens, given the values the graph presents. */
+  initialChosen(values: readonly AxisValue[]): readonly AxisValue[]
   /** How the bar draws the chips: a tinted `chip`, or a neutral `tag`. */
   presentation: 'chip' | 'tag'
 }
@@ -270,7 +270,7 @@ export function resolveDescriptor(d: AxisDescriptor, style: StyleNamer, labels?:
       const present = new Set(values)
       return chipsFor([...[...order].filter(v => present.has(v)), ...values.filter(v => !order.has(v))])
     },
-    initialSelection: d.initialSelection ?? (values => (allow ? values : [])),
+    initialChosen: d.initialChosen ?? (values => (allow ? values : [])),
     presentation: d.presentation ?? 'chip',
   }
   relabel.set(resolved, next => resolveDescriptor(d, style, next))
@@ -464,7 +464,7 @@ export function valuesOn(
  * one entity (`copyKey`) count once; a subject with neither key nor id counts
  * as itself. An axis no subject has a value on gets an empty map, never a
  * missing one. Given `facets`, a subject counts on an axis only when the
- * filter's selections on the other axes pass it.
+ * filter's choices on the other axes pass it.
  */
 export function countsOn(
   subjects: Iterable<{ values: AxisValues; id?: string; copyKey?: string }>,

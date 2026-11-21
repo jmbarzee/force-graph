@@ -19,7 +19,7 @@ export type { LinkedViewState } from '../../filter/linked'
 
 /** The state props of one linked view — spread onto its `GraphView` or `FilterBar`. */
 export interface LinkedViewProps {
-  /** The view's selections. */
+  /** The view's choices. */
   filter: FilterState
   /** A change to the filter; `touched` names the axes the user changed (the bar's and the pane's writes name them), which a later graph then leaves alone. */
   onFilterChange: (next: FilterState, touched?: readonly AxisId[]) => void
@@ -52,13 +52,13 @@ export interface LinkedViewsOptions<V extends string> {
   /** The views, by the names the host switches between. Read once. */
   views: readonly V[]
   /** Where each view starts; a part left out defaults — the taxonomy's default filter over the view's `graph`, no locks, every declared axis. Read once. A filter given here counts as the user's on every axis where it differs from that default. */
-  initial?: (view: V) => { filter?: FilterState; locks?: AxisLocks; axes?: readonly AxisId[] } | undefined
+  defaults?: (view: V) => { filter?: FilterState; locks?: AxisLocks; axes?: readonly AxisId[] } | undefined
   /** The graph each view shows, by view: its default filter is seeded from it, a later one re-seeds that view on the axes the user has not touched, and a focus into it widens by its whole chips. */
   graph?: Partial<Record<V, Pick<Graph, 'nodes'>>>
   /** The view shown first. Default: the first of `views`. Read once. */
-  start?: V
+  defaultView?: V
   /** Where the shared search starts — a persisted query, say. Default: closed and empty. Read once. */
-  initialSearch?: SearchState
+  defaultSearch?: SearchState
   /** Names for values, per axis, handed to every view. */
   labels?: AxisLabels
 }
@@ -67,11 +67,11 @@ export interface LinkedViewsOptions<V extends string> {
 export interface LinkedViews<V extends string> {
   /** One view's state props. Throws for a view not in `views`. */
   of(view: V): LinkedViewProps
-  /** The view shown: `start`, then the last `switchTo` or `focus`. */
+  /** The view shown: `defaultView`, then the last `switchTo` or `focus`. */
   readonly active: V
   /**
    * Switch to `to` from the active view and make it active: a manual switch
-   * (the default) adopts the active view's selections on the destination's
+   * (the default) adopts the active view's choices on the destination's
    * axes except where locked; a focus widens the destination to show the
    * target and flashes the locks it overrode. Returns the destination's new
    * filter and the overridden locks.
@@ -109,32 +109,32 @@ function recordOver<V extends string, T>(views: readonly V[], make: (view: V) =>
  * One record per view — filter, locks, axes, the locks the last focus into it
  * overrode, the focus asked of it — with each view's props (`of`), the view
  * shown (`active`), `switchTo` and `focus`, a per-view or all-views filter
- * rewrite, the shared `search`, and the whole as `state`. `views`, `initial`,
- * `start` and `initialSearch` are read once. A later graph for a view
+ * rewrite, the shared `search`, and the whole as `state`. `views`, `defaults`,
+ * `defaultView` and `defaultSearch` are read once. A later graph for a view
  * re-seeds it on the axes the user has not touched — the ones no write
  * through `onFilterChange` or `updateFilter` named, and on which a filter
- * `initial` gave did not differ from the default — so a host that mounts
- * empty is not left blank and the user's own selections stand.
+ * `defaults` gave did not differ from the default — so a host that mounts
+ * empty is not left blank and the user's own choices stand.
  */
-export function useLinkedViews<V extends string>({ taxonomy, views, initial, graph, start, initialSearch, labels }: LinkedViewsOptions<V>): LinkedViews<V> {
+export function useLinkedViews<V extends string>({ taxonomy, views, defaults, graph, defaultView, defaultSearch, labels }: LinkedViewsOptions<V>): LinkedViews<V> {
   // The axes the user has touched, per view: state, not an inference — a
-  // selection that happens to equal a graph's opening one is not thereby
-  // untouched. A filter `initial` gave starts touched where it differs from
+  // choice that happens to equal a graph's opening one is not thereby
+  // untouched. A filter `defaults` gave starts touched where it differs from
   // the default; every write that names its axes adds them.
   const touchedRef = React.useRef<Record<V, Set<AxisId>>>(recordOver(views, () => new Set<AxisId>()))
   const [state, setState] = React.useState<Readonly<Record<V, LinkedViewState>>>(() => recordOver(views, view => {
-    const given = initial?.(view)
+    const given = defaults?.(view)
     const seed = initialFilter(taxonomy, graph?.[view] ?? { nodes: [] })
     if (given?.filter !== undefined) for (const axis of changedAxes(seed, given.filter)) touchedRef.current[view].add(axis)
     return {
       filter: given?.filter ?? seed,
       locks: given?.locks ?? new Map(),
-      axes: given?.axes ?? taxonomy.filterAxes.map(d => d.id),
+      axes: given?.axes ?? taxonomy.filterAxes().map(d => d.id),
       overriddenLocks: NO_OVERRIDES,
     }
   }))
-  const [active, setActive] = React.useState<V>(() => start ?? views[0]!)
-  const [search, setSearch] = React.useState<SearchState>(() => initialSearch ?? { query: '', active: false })
+  const [active, setActive] = React.useState<V>(() => defaultView ?? views[0]!)
+  const [search, setSearch] = React.useState<SearchState>(() => defaultSearch ?? { query: '', active: false })
   const [focusRequests, setFocusRequests] = React.useState<Readonly<Record<V, LinkedViewProps['focus']>>>(() => recordOver(views, () => null))
   const focusSeq = React.useRef(0)
   const stateRef = useLatest(state)
@@ -163,7 +163,7 @@ export function useLinkedViews<V extends string>({ taxonomy, views, initial, gra
   // A graph that arrives for a view after the mount re-seeds that view on the
   // axes the user has not touched — so a host that mounts empty while its
   // data loads is not left with a list that shows nothing, and a value first
-  // seen later is not born hidden. The user's selections stand. Run every
+  // seen later is not born hidden. The user's choices stand. Run every
   // render, since `graph` is a new record each time: its graphs compare one
   // by one.
   const seededFromRef = React.useRef(graph)

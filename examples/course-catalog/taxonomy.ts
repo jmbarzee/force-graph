@@ -5,7 +5,7 @@
 import { createTaxonomy, isContainment, payloadNumber, payloadString } from '@jmbarzee/force-graph'
 import type {
   AxisDescriptor, EdgeType, FilterChip, GraphNode, Highlight, HighlightGraph,
-  NodeStyle, TaxonomySpec, ReadableGraph, ScalarAxis,
+  ValueSpec, TaxonomySpec, ReadableGraph, Scalar,
 } from '@jmbarzee/force-graph'
 
 /** Node axes. `entity` is both the style axis and the allow-list filter. */
@@ -16,12 +16,12 @@ export const REQUIREMENT = 'requirement'
 
 export type Entity = 'faculty' | 'department' | 'course' | 'lab'
 
-// The node styles, top of the hierarchy first. A value declares what it is
+// The values, top of the hierarchy first. A value declares what it is
 // called, how it looks and how big it is; the rest is the library's — the
 // charge and rest band follow from the radius and the position in this list.
 // Only faculties and departments summarise what they contain; the others show
 // their dependency degree, which is the default.
-export const VALUES: readonly NodeStyle[] = [
+export const VALUES: readonly ValueSpec[] = [
   {
     id: 'faculty',
     label: 'Faculty',
@@ -62,7 +62,7 @@ export const VALUES: readonly NodeStyle[] = [
   },
 ]
 
-const styleOf = (id: Entity): NodeStyle => VALUES.find(v => v.id === id)!
+const styleOf = (id: Entity): ValueSpec => VALUES.find(v => v.id === id)!
 
 // ── Edges ───────────────────────────────────────────────────────────────────
 
@@ -72,8 +72,8 @@ const styleOf = (id: Entity): NodeStyle => VALUES.find(v => v.id === id)!
 const contains = (id: string, label: string, child: Entity, parent: Entity, strength: number, distance: number): EdgeType => ({
   id,
   label,
-  sourceValue: child,
-  targetValue: parent,
+  sources: child,
+  targets: parent,
   relation: 'containment',
   physics: { strength, distance },
   tooltip: `${styleOf(child).label} in ${styleOf(parent).label}`,
@@ -88,12 +88,12 @@ export const EDGE_TYPES: readonly EdgeType[] = [
     // require a course or another lab, so each end is a course or a lab.
     id: 'prerequisite',
     label: 'Pre',
-    sourceValue: ['course', 'lab'],
-    targetValue: ['course', 'lab'],
+    sources: ['course', 'lab'],
+    targets: ['course', 'lab'],
     relation: 'dependency',
     physics: { strength: 0.6, distance: 260 },
     tooltip: 'Must be passed first',
-    style: {
+    stroke: {
       color: { light: '#B45309', dark: '#FBBF24' },
       alpha: 0.8,
       dash: [],
@@ -104,14 +104,14 @@ export const EDGE_TYPES: readonly EdgeType[] = [
     // Same endpoints as a prerequisite; only the edge's own `requirement` tells them apart.
     id: 'corequisite',
     label: 'Co-req',
-    sourceValue: ['course', 'lab'],
-    targetValue: ['course', 'lab'],
+    sources: ['course', 'lab'],
+    targets: ['course', 'lab'],
     relation: 'dependency',
     match: { [REQUIREMENT]: 'corequisite' },
     direction: 'undirected',
     physics: { strength: 1.2, distance: 120 },
     tooltip: 'Taken in the same term',
-    style: {
+    stroke: {
       color: { light: '#7C3AED', dark: '#C4B5FD' },
       alpha: 0.85,
       dash: [6, 3],
@@ -121,13 +121,13 @@ export const EDGE_TYPES: readonly EdgeType[] = [
   {
     id: 'recommended',
     label: 'Rec',
-    sourceValue: ['course', 'lab'],
-    targetValue: ['course', 'lab'],
+    sources: ['course', 'lab'],
+    targets: ['course', 'lab'],
     relation: 'dependency',
     match: { [REQUIREMENT]: 'recommended' },
     physics: { strength: 0.2, distance: 420 },
     tooltip: 'Recommended background',
-    style: {
+    stroke: {
       color: { light: '#64748B', dark: '#94A3B8' },
       alpha: 0.5,
       dash: [1, 4],
@@ -166,20 +166,20 @@ const FILTERS: readonly AxisDescriptor[] = [
   {
     id: ENTITY,
     label: 'Show',
-    // An allow-list: nothing selected shows nothing. Its names come from the
+    // An allow-list: nothing chosen shows nothing. Its names come from the
     // style axis, which this is; its chips group three values into two.
     emptyMeans: 'none',
     chipsFor: values => ENTITY_CHIPS.filter(c => c.values.some(v => values.includes(v))),
-    // Opens on everything but labs. The selection names whole chips: the
+    // Opens on everything but labs. The choice names whole chips: the
     // Organisation chip covers `faculty` and `department`, so `department`
-    // alone would split it and the library would select the whole chip anyway,
+    // alone would split it and the library would choose the whole chip anyway,
     // with a warning.
-    initialSelection: () => ['faculty', 'department', 'course'],
+    initialChosen: () => ['faculty', 'department', 'course'],
   },
   {
     id: CAMPUS,
     label: 'Campus',
-    // Nothing selected shows every campus; faculties and departments have none
+    // Nothing chosen shows every campus; faculties and departments have none
     // and always show. A narrowing axis, so the policies and the one chip per
     // campus are the defaults.
     emptyMeans: 'all',
@@ -192,7 +192,7 @@ const FILTERS: readonly AxisDescriptor[] = [
 // A scalar answers the payload's raw number and the frame maps it onto [0, 1]:
 // by the largest (the default), so the heaviest course sits at 1, or by the
 // range, so the lowest level sits at 0.
-function scalarOf(id: string, label: string, tooltip: string, key: string, normalize?: ScalarAxis['normalize']): ScalarAxis {
+function scalarOf(id: string, label: string, tooltip: string, key: string, normalize?: Scalar['normalize']): Scalar {
   return {
     id,
     label,
@@ -209,7 +209,7 @@ function scalarOf(id: string, label: string, tooltip: string, key: string, norma
   }
 }
 
-const SCALARS: readonly ScalarAxis[] = [
+const SCALARS: readonly Scalar[] = [
   scalarOf('credits', 'Credits', 'Credit weight, as a share of the heaviest course', 'credits'),
   scalarOf('level', 'Level', 'Course level (1xx … 3xx), lowest at 0', 'level', 'range'),
 ]
@@ -246,7 +246,7 @@ function highlight(active: GraphNode, base: Highlight, graph: HighlightGraph): H
 export const spec: TaxonomySpec = {
   styleAxis: ENTITY,
   styleLabel: 'Entity',
-  styles: VALUES,
+  values: VALUES,
   filterAxes: FILTERS,
   edgeTypes: EDGE_TYPES,
   scalars: SCALARS,

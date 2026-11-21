@@ -88,7 +88,7 @@ that would animate a reveal or a hide are
 | Drag a node | Move it, held in place until release; the layout reheats around it |
 | Click a node / the background | Select it alone / clear the selection |
 | Ctrl/Meta+click a node | Add it to the selection, or remove it |
-| Double-click a node | Frame it and its neighbours (`chrome.activateZoom`), and `onNodeActivate` |
+| Double-click a node | Frame it and its neighbors (`chrome.activateZoom`), and `onNodeActivate` |
 | Double-click the background | Frame the visible set |
 
 **Fit** (the button, `fit()`) frames every visible node. A layout that
@@ -116,7 +116,7 @@ the host's controls.
 
 An axis whose chips overflow its row shows the row and a count of the rest;
 the count opens it and **Less** closes it. Every axis starts closed, and which
-are open is not remembered. A change to an axis's selection from outside the
+are open is not remembered. A change to an axis's chosen values from outside the
 bar — a focus, a view switch, the host — opens it, so the chips that turned on
 are in view when they flash; so does the keyboard reaching a chip past the row.
 A click in the bar leaves its axis as the user has it, and a re-seed — the pane
@@ -323,7 +323,7 @@ Which groups are shown is the filter's `GROUPS` entry, saved and controlled
 with the axes: a hidden group draws no glow and hides every node no shown
 group holds, a node in no group always passing. Each visible
 member gets a radial halo in its group's colour that fuses with its
-neighbours' into one blob; an edge glows when both ends are in one group. A
+neighbors' into one blob; an edge glows when both ends are in one group. A
 group without a `color` takes a small cycling palette's slot, settled in list
 or key order over the whole graph: its own place, or the next slot no earlier
 group joined to it by an edge holds — so touching groups differ in hue while
@@ -353,7 +353,7 @@ group filter; glowing by campus, they write the campus axis.
   win.
 - **Detail by zoom.** A node's rings draw at every zoom, and it stays
   hoverable and clickable at every zoom.
-- **Edges.** Stroked by their resolved type (`EdgeType.style`), widened by
+- **Edges.** Stroked by their resolved type (`EdgeType.stroke`), widened by
   `weight`, up to double — a graduated edge keeps the type and weight of the
   edge it stands for. Dependency edges carry an
   8 px arrowhead toward the dependency, at every zoom; containment is
@@ -367,8 +367,8 @@ A host with a second view links them through `useLinkedViews`
 ([README § Two views sharing a bar](README.md#two-views-sharing-a-bar)).
 
 - **The search query** is shared by every view.
-- **A switch reconciles.** A manual switch adopts the source view's selection
-  on every axis the destination shows, except where the destination is locked;
+- **A switch reconciles.** A manual switch adopts the source view's chosen
+  values on every axis the destination shows, except where the destination is locked;
   its group filter stays its own. A focus widens the destination only as far
   as its target needs, by each axis's `widens` and by whole chips, turns on
   every group of a target the group filter hides, and overrides a lock for
@@ -382,7 +382,7 @@ A host with a second view links them through `useLinkedViews`
   adoption from the next switch.
 - **Focus into the graph** is `focusNode`
   ([README § The view](README.md#the-view)). Its frame of the node and its
-  neighbours holds as the first layout's does; when a settled layout, a pan,
+  neighbors holds as the first layout's does; when a settled layout, a pan,
   zoom or drag lets it go, a ring round the node fades over 600 ms, and a
   newer frame lets it go without one.
 

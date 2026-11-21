@@ -9,7 +9,7 @@
 
 import { TaxonomyContext } from './graph-view/useTaxonomy'
 import { useFill } from './graph-view/useFill'
-import type { AxisId, AxisLabels, AxisValues, FilterChip } from '../graph/axis'
+import type { AxisId, AxisLabels, AxisValue, AxisValues, FilterChip } from '../graph/axis'
 import type { Fill } from '../graph/coloring'
 import { countsOn, labelled, valuesOn } from '../graph/axis'
 import type { Graph } from '../graph/model'
@@ -28,13 +28,13 @@ export function tintOf(chip: FilterChip, axis: AxisId, fill: Fill): string | und
   const key = chip.tint ?? (axis === fill.axis && chip.values.length === 1 ? chip.values[0] : undefined)
   return key !== undefined && fill.keys.has(key) ? key : undefined
 }
-import { hiddenMatchesOf, passesSelection, selectionFor } from '../filter/types'
+import { hiddenMatchesOf, passesChosen, chosenOn } from '../filter/types'
 import { NO_OVERRIDES } from '../filter/linked'
 import type { LinkedViewState } from '../filter/linked'
 import React from 'react'
 import './FilterBar.css'
 import type { ResolvedAxisDescriptor } from '../graph/axis'
-import { changedAxes, filterStatesEqual, isEmptySelection, listEqual, lockedFor, locksEqual, seedSelection, selects, selectionsEqual, withLock, withSelection } from '../filter/types'
+import { changedAxes, filterStatesEqual, isEmptyChosen, listEqual, lockedFor, locksEqual, seedChosen, selects, chosenEqual, withLock, withChosen } from '../filter/types'
 import type { FilterState, AxisLocks, HiddenMatches } from '../filter/types'
 import { toggleGroup } from '../filter/toggle'
 import { LockToggle } from './LockToggle'
@@ -60,7 +60,7 @@ export interface FilterBarChrome {
 
 /**
  * The bar's inputs. The filter and its callback are the one requirement; the
- * values each axis offers come from `values` or from `graph` — one of the
+ * values each axis offers come from `available` or from `graph` — one of the
  * two — and everything else the pane supplies for its own bar has a default
  * here, so a host's second view renders the same bar without rebuilding the
  * pane's internals.
@@ -68,13 +68,13 @@ export interface FilterBarChrome {
 export type FilterBarProps<R extends SearchRecord = SearchRecord> = FilterBarBaseProps<R> & (
   | {
       /** Values available per axis — the one source every axis's chips are built from; an axis with no entry renders an empty, disabled section rather than vanishing. */
-      values: ReadonlyMap<string, readonly string[]>
+      available: ReadonlyMap<AxisId, readonly AxisValue[]>
       graph?: undefined
     }
   | {
       /** The graph the bar filters: the values each axis offers are read off its nodes. */
       graph: Graph
-      values?: undefined
+      available?: undefined
     }
 )
 
@@ -99,8 +99,8 @@ interface FilterBarBaseProps<R extends SearchRecord> {
   systemTheme?: Theme
   /** Per theme, the tokens `createTheme` overrides on the bar's root. A pane's bar takes the pane's. */
   tokens?: ThemeTokens
-  /** Chip badge counts per axis and value, read by the host off its own data. Absent: the graph's entity counts (the copies of one `copyKey` once) when `graph` is given, else no badges; `faceted`, those counts under the other axes' selections (needs `graph`; with only `values`, no badges). */
-  counts?: ReadonlyMap<string, ReadonlyMap<string, number>> | 'faceted'
+  /** Chip badge counts per axis and value, read by the host off its own data. Absent: the graph's entity counts (the copies of one `copyKey` once) when `graph` is given, else no badges; `faceted`, those counts under the other axes' choices (needs `graph`; with only `available`, no badges). */
+  counts?: ReadonlyMap<AxisId, ReadonlyMap<AxisValue, number>> | 'faceted'
   filter: FilterState
   /** Every change the user makes, with the axis they changed — for a host that keeps which axes are the user's (`reseedFilter`). */
   onFilterChange: (next: FilterState, touched: readonly AxisId[]) => void
@@ -126,9 +126,9 @@ interface FilterBarBaseProps<R extends SearchRecord> {
   /** A host's own `hiddenMatchesOf` result, which sets every badge. Default: read off `records`. */
   hiddenMatches?: Pick<HiddenMatches, 'hiddenCount' | 'hiddenByAxis'>
   /** The axes shown, in order; may be empty. Default: every declared axis, editable in place. */
-  axes?: readonly string[]
+  axes?: readonly AxisId[]
   /** Omitted by a host that controls the axes and does not want it edited in place. */
-  onAxesChange?: (next: readonly string[]) => void
+  onAxesChange?: (next: readonly AxisId[]) => void
   /** The host's findings bars, rendered under the chips. */
   findings?: React.ReactNode
   /** Flash the whole bar once whenever this value changes to something truthy — a counter a host bumps when its data reloads. */
@@ -147,7 +147,7 @@ export function firstLine(items: readonly { top: number; bottom: number }[]): { 
   return { height: Math.max(...onIt.map(i => i.bottom)), rest: items.length - onIt.length }
 }
 
-/** The axes a change of filter opens: those whose selection changed, but for the ones it leaves as they are. */
+/** The axes a change of filter opens: those whose choice changed, but for the ones it leaves as they are. */
 export function axesOpenedBy(prev: FilterState, next: FilterState, leftAsIs: readonly AxisId[]): AxisId[] {
   return changedAxes(prev, next).filter(axis => !leftAsIs.includes(axis))
 }
@@ -157,7 +157,7 @@ export function axesReseeded(taxonomy: Taxonomy, prev: ReadonlyMap<string, reado
   return [...new Set([...prev.keys(), ...next.keys()])].filter(axis => {
     const d = taxonomy.axisFor(axis)
     const values = next.get(axis) ?? []
-    return d !== undefined && !listEqual(prev.get(axis) ?? [], values) && selectionsEqual(selectionFor(filter, axis), seedSelection(taxonomy, d, values))
+    return d !== undefined && !listEqual(prev.get(axis) ?? [], values) && chosenEqual(chosenOn(filter, axis), seedChosen(taxonomy, d, values))
   })
 }
 
@@ -230,7 +230,7 @@ export function FilterBar<R extends SearchRecord = SearchRecord>({
   systemTheme,
   tokens,
   counts: hostCounts,
-  values: hostValues,
+  available: hostAvailable,
   graph,
   filter: filterProp,
   onFilterChange,
@@ -284,7 +284,7 @@ export function FilterBar<R extends SearchRecord = SearchRecord>({
     const timer = setTimeout(() => setRefreshing(false), 600)
     return () => clearTimeout(timer)
   }, [refreshFlash])
-  const [rawAxes, setAxes] = useControllable(hostAxes, onAxesChange, () => taxonomy.filterAxes.map(d => d.id), 'axes')
+  const [rawAxes, setAxes] = useControllable(hostAxes, onAxesChange, () => taxonomy.filterAxes().map(d => d.id), 'axes')
   const axes = useStable(rawAxes, listEqual)
   const axesEditable = hostAxes === undefined || onAxesChange !== undefined
   const [search, setSearch] = useControllable(searchProp, onSearchChange, () => ({ query: '', active: false }), 'search')
@@ -317,13 +317,13 @@ export function FilterBar<R extends SearchRecord = SearchRecord>({
   // Values for every declared axis, not only the shown ones: an axis the user
   // removed is offered back by "+" only if its values are known.
   const valuesByAxis = React.useMemo(
-    () => hostValues ?? new Map([...new Set([...taxonomy.filterAxes.map(d => d.id), ...axes])].map(d => [d, graph ? valuesOn(graph.nodes, d) : []])),
-    [hostValues, graph, axes, taxonomy],
+    () => hostAvailable ?? new Map([...new Set([...taxonomy.filterAxes().map(d => d.id), ...axes])].map(d => [d, graph ? valuesOn(graph.nodes, d) : []])),
+    [hostAvailable, graph, axes, taxonomy],
   )
   const tracked = useRecentlyChanged(filter, valuesByAxis)
   const recentlyChanged = hostRecentlyChanged ?? tracked
   // Opened before paint, so the chips that turned on flash in view. An axis
-  // whose values changed since the last filter change and whose selection is
+  // whose values changed since the last filter change and whose choice is
   // their seed is being re-seeded, and stays as it is.
   const seenFilter = React.useRef(filter)
   const seenValues = React.useRef(valuesByAxis)
@@ -341,7 +341,7 @@ export function FilterBar<R extends SearchRecord = SearchRecord>({
   const hidden = React.useMemo(() => {
     if (hiddenMatches) return hiddenMatches
     if (!records || !matches || !searchQuery) return undefined
-    const visibleIds = new Set(records.filter(node => passesSelection({ filter, taxonomy, axes, node })).map(r => r.id))
+    const visibleIds = new Set(records.filter(node => passesChosen({ filter, taxonomy, axes, node })).map(r => r.id))
     return hiddenMatchesOf({ nodes: records, filter, taxonomy, axes, visibleIds, matches: r => matches(r, searchQuery) })
   }, [hiddenMatches, records, matches, searchQuery, filter, taxonomy, axes])
   const hiddenCount = hidden?.hiddenCount ?? 0
@@ -358,12 +358,12 @@ export function FilterBar<R extends SearchRecord = SearchRecord>({
   })
 
   // Axes the host declares that the bar is not already showing.
-  const available = taxonomy.filterAxes
+  const addable = taxonomy.filterAxes()
     .map(d => d.id)
     .filter(id => !axes.includes(id) && (valuesByAxis.get(id)?.length ?? 0) > 0)
   // The menu is for a choice: with fewer than two to choose from it closes,
   // so a stale open flag cannot show it again on a later render.
-  React.useEffect(() => { if (available.length < 2) setAddOpen(false) }, [available.length])
+  React.useEffect(() => { if (addable.length < 2) setAddOpen(false) }, [addable.length])
 
   const openSearch = () => {
     if (!searchActive) setSearch({ query: searchQuery, active: true })
@@ -401,12 +401,12 @@ export function FilterBar<R extends SearchRecord = SearchRecord>({
         // No values to offer: the header and its remove control render anyway.
         const empty = chips.length === 0
 
-        const selection = selectionFor(filter, axis)
+        const chosen = chosenOn(filter, axis)
         const locked = lockedFor(locks, axis)
-        // An `emptyMeans: 'all'` axis with nothing selected is not "off" — it is
+        // An `emptyMeans: 'all'` axis with nothing chosen is not "off" — it is
         // matching everything, and the chips say so rather than reading as a
         // filter that hides the lot.
-        const allIncluded = isEmptySelection(selection) && descriptor?.emptyMeans === 'all'
+        const allIncluded = isEmptyChosen(chosen) && descriptor?.emptyMeans === 'all'
 
         return (
           <React.Fragment key={axis}>
@@ -419,7 +419,7 @@ export function FilterBar<R extends SearchRecord = SearchRecord>({
                   </span>
                 )}
                 {chips.map(chip => {
-                  const isActive = chip.values.some(v => selects(selection, v))
+                  const isActive = chip.values.some(v => selects(chosen, v))
                   const isChanged = chip.values.some(v => recentlyChanged.get(axis)?.has(v))
                   const hiddenCount = chip.values.reduce((sum, v) => sum + (look.hidden?.get(v) ?? 0), 0)
                   const count = look.counts === undefined ? undefined : chip.values.reduce((sum, v) => sum + (look.counts!.get(v) ?? 0), 0)
@@ -463,17 +463,17 @@ export function FilterBar<R extends SearchRecord = SearchRecord>({
                   className="gv-header-remove"
                   onClick={() => {
                     // Removing an axis also stops it filtering. Keeping the
-                    // selection would leave the view filtered by something with
+                    // choice would leave the view filtered by something with
                     // no on-screen representation and no way to reach it —
                     // invisible state that reads as a bug.
                     //
                     // "Stops filtering" is NOT "empty", and that difference is
                     // this axis's `emptyMeans` again. On a narrowing axis an
-                    // empty selection matches everything; on an allow-list it
+                    // empty choice matches everything; on an allow-list it
                     // matches NOTHING, so clearing it would blank the view
                     // instead of unfiltering it. Match-everything is therefore empty for
                     // one and an exclusion of nothing for the other.
-                    change(withSelection(
+                    change(withChosen(
                       filter,
                       axis,
                       descriptor?.emptyMeans !== 'none' ? new Set<string>() : { except: new Set<string>() },
@@ -490,18 +490,18 @@ export function FilterBar<R extends SearchRecord = SearchRecord>({
         )
       })}
 
-      {axesEditable && available.length > 0 && (
+      {axesEditable && addable.length > 0 && (
         <div className="gv-header-add">
           <button
             className="gv-header-add-button"
-            onClick={() => (available.length === 1 ? setAxes([...axes, available[0]!]) : setAddOpen(open => !open))}
-            title={available.length === 1 ? `Add the ${labelOf(available[0]!)} filter` : 'Add a filter'}
-            aria-haspopup={available.length > 1 ? 'menu' : undefined}
-            aria-expanded={available.length > 1 ? addOpen : undefined}
+            onClick={() => (addable.length === 1 ? setAxes([...axes, addable[0]!]) : setAddOpen(open => !open))}
+            title={addable.length === 1 ? `Add the ${labelOf(addable[0]!)} filter` : 'Add a filter'}
+            aria-haspopup={addable.length > 1 ? 'menu' : undefined}
+            aria-expanded={addable.length > 1 ? addOpen : undefined}
           >+</button>
-          {addOpen && available.length > 1 && (
+          {addOpen && addable.length > 1 && (
             <div className="gv-header-add-menu" role="menu" onKeyDown={e => { if (e.key === 'Escape') setAddOpen(false) }}>
-              {available.map(id => (
+              {addable.map(id => (
                 <button key={id} role="menuitem" className="gv-header-add-menu-item" onClick={() => { setAxes([...axes, id]); setAddOpen(false) }}>
                   {labelOf(id)}
                 </button>

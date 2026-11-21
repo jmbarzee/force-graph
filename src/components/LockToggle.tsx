@@ -1,5 +1,5 @@
 // A small lock-icon button on each of the filter bar's axis sections. A
-// locked axis holds its selection: a host that reconciles the filter between
+// locked axis holds its choice: a host that reconciles the filter between
 // its views (`reconcileFilter`'s `manual` transition) leaves a locked axis as
 // it is.
 //

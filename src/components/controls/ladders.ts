@@ -23,7 +23,7 @@ export function laddersOn(taxonomy: Taxonomy, mapping: AxisMapping, shown: reado
   if (!bucketsStyles(taxonomy, mapping)) return []
   const on = new Set(shown)
   const rungs = new Map<string, string[]>()
-  for (const v of taxonomy.styleValues) {
+  for (const v of taxonomy.styleValues()) {
     const id = taxonomy.styleOf(v).ladder
     if (id === undefined || !on.has(v)) continue
     rungs.set(id, [...(rungs.get(id) ?? []), v])

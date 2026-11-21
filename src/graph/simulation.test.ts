@@ -9,7 +9,7 @@ import type { Graph, GraphNode } from './model'
 
 const taxonomy = createTaxonomy({
   styleAxis: 'kind',
-  styles: [{ id: 'service', label: 'service', color: { light: { fill: '#000000', border: '#000000' }, dark: { fill: '#ffffff', border: '#ffffff' } } }],
+  values: [{ id: 'service', label: 'service', color: { light: { fill: '#000000', border: '#000000' }, dark: { fill: '#ffffff', border: '#ffffff' } } }],
 })
 const node = (id: string): GraphNode => ({ id, name: id, values: { kind: 'service' } })
 const graph: Graph = {
@@ -82,7 +82,7 @@ describe('a declared pair mapping', () => {
   const kinds = ['scheduler', 'router', 'worker', 'store']
   const declaring = createTaxonomy({
     styleAxis: 'kind',
-    styles: kinds.map(id => ({ id, label: id, color: { light: { fill: '#000000', border: '#000000' }, dark: { fill: '#ffffff', border: '#ffffff' } } })),
+    values: kinds.map(id => ({ id, label: id, color: { light: { fill: '#000000', border: '#000000' }, dark: { fill: '#ffffff', border: '#ffffff' } } })),
     filterAxes: [{ id: 'team', emptyMeans: 'all' }],
     pairMappings: [{
       id: 'role', label: 'Role', axis: 'kind', buckets: [
@@ -107,7 +107,7 @@ describe('a declared pair mapping', () => {
   })
 
   it('keys apart from the view\'s mappings whatever its id', () => {
-    const named = createTaxonomy({ styleAxis: 'kind', styles: [], pairMappings: [{ ...engineOf(declaring).pairMappings[0], id: 'kind:identity' }] })
+    const named = createTaxonomy({ styleAxis: 'kind', values: [], pairMappings: [{ ...engineOf(declaring).pairMappings[0], id: 'kind:identity' }] })
     const keys = axisOptions(named, byKind).map(o => mappingKey(o.mapping))
     expect(new Set(keys).size).toBe(keys.length)
   })
@@ -122,7 +122,7 @@ describe('a declared pair mapping', () => {
 describe('labelledParams', () => {
   const taxonomy = createTaxonomy({
     styleAxis: 'kind',
-    styles: [{ id: 'svc', label: 'Service', color: { light: { fill: '#000000', border: '#000000' }, dark: { fill: '#ffffff', border: '#ffffff' } } }],
+    values: [{ id: 'svc', label: 'Service', color: { light: { fill: '#000000', border: '#000000' }, dark: { fill: '#ffffff', border: '#ffffff' } } }],
     filterAxes: [{ id: 'login', emptyMeans: 'all' }],
   })
   const params = { ...defaultParamsFor(taxonomy), bandX: { mapping: identityMapping(taxonomy.axisFor('login')!, ['ada', 'grace']), overrides: new Map() } }
@@ -137,7 +137,7 @@ describe('labelledParams', () => {
   it('names a style bucket labels does not name by the style axis\'s labelFor', () => {
     const filtered = createTaxonomy({
       styleAxis: 'kind',
-      styles: ['svc', 'db'].map(id => ({ id, label: `${id} style`, color: { light: { fill: '#000000', border: '#000000' }, dark: { fill: '#ffffff', border: '#ffffff' } } })),
+      values: ['svc', 'db'].map(id => ({ id, label: `${id} style`, color: { light: { fill: '#000000', border: '#000000' }, dark: { fill: '#ffffff', border: '#ffffff' } } })),
       filterAxes: [{ id: 'kind', emptyMeans: 'none', labelFor: v => (v === 'db' ? 'Database' : `${v} style`) }],
     })
     const named = labelledParams(defaultParamsFor(filtered), filtered, { kind: { svc: 'Service' } })

@@ -75,7 +75,7 @@
   font-weight: 500;
 }
 
-/* Third state: no files selected → all files implicitly included */
+/* Third state: no files chosen → all files implicitly included */
 .gv-tag.all-included {
   border-color: color-mix(in srgb, var(--gv-accent) var(--gv-accent-tint-ring), transparent);
   background: color-mix(in srgb, var(--gv-accent) var(--gv-accent-tint-weak), transparent);
@@ -437,7 +437,7 @@
 }
 
 /* The same third state on a chip-presentation axis: an `emptyMeans: 'all'`
-   axis with nothing selected is matching everything, whichever look it wears. */
+   axis with nothing chosen is matching everything, whichever look it wears. */
 .gv-chip.all-included {
   border-color: color-mix(in srgb, var(--gv-accent) var(--gv-accent-tint-ring), transparent);
   background: color-mix(in srgb, var(--gv-accent) var(--gv-accent-tint-weak), transparent);

@@ -40,7 +40,7 @@ const tick = (n = Infinity) => act(async () => {
   }
 })
 
-const taxonomy = createTaxonomy({ styleAxis: 'kind', styles: [], filterAxes: [] })
+const taxonomy = createTaxonomy({ styleAxis: 'kind', values: [], filterAxes: [] })
 const graph: Graph = {
   nodes: ['a', 'b', 'c', 'd'].map(id => ({ id, name: id, values: {} })),
   edges: [{ id: 'a-b', sourceId: 'a', targetId: 'b' }, { id: 'c-d', sourceId: 'c', targetId: 'd' }],
@@ -89,7 +89,7 @@ it('selects the target of a focus the user lets go before it frames', async () =
 
 // Under a controlled filter: `n0` is hidden until the host widens `team`, and
 // `n2`, with no `site`, no filter can show.
-const teams = createTaxonomy({ styleAxis: 'kind', styles: [], filterAxes: [{ id: 'team', emptyMeans: 'none' }, { id: 'site', emptyMeans: 'none' }] })
+const teams = createTaxonomy({ styleAxis: 'kind', values: [], filterAxes: [{ id: 'team', emptyMeans: 'none' }, { id: 'site', emptyMeans: 'none' }] })
 const staff: Graph = {
   nodes: ([['n0', { team: 'a', site: 'x' }], ['n1', { team: 'b', site: 'x' }], ['n2', { team: 'a' }]] as const).map(([id, values]) => ({ id, name: id, values })),
   edges: [],

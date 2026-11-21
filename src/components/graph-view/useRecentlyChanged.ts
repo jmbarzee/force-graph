@@ -6,7 +6,7 @@
 
 import React from 'react'
 import type { FilterState } from '../../filter/types'
-import { filterStatesEqual, namedBy, selectionFor, selects } from '../../filter/types'
+import { filterStatesEqual, namedBy, chosenOn, selects } from '../../filter/types'
 import { useLatest, useStable } from './useControllable'
 
 /** The values that just turned on, per axis. */
@@ -28,8 +28,8 @@ export function useRecentlyChanged(rawFilter: FilterState, valuesByAxis: Readonl
     if (filterStatesEqual(prev, filter)) return
     const changed = new Map<string, Set<string>>()
     for (const [axis, after] of filter) {
-      const before = selectionFor(prev, axis)
-      // An axis's presented values too: a change of kind turns on values neither selection names.
+      const before = chosenOn(prev, axis)
+      // An axis's presented values too: a change of kind turns on values neither choice names.
       for (const v of new Set([...namedBy(after), ...namedBy(before), ...(valuesRef.current.get(axis) ?? [])])) {
         if (!selects(after, v) || selects(before, v)) continue
         const set = changed.get(axis) ?? new Set<string>()

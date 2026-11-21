@@ -657,14 +657,14 @@ export function GraphCanvas({
           Math.max(sy, ty) < -CULL_MARGIN || Math.min(sy, ty) > h + CULL_MARGIN) continue
 
         const edgeHighlighted = d.highlightedEdges?.has(edge.id) ?? false
-        const style = d.edgeStrokes.get(edge) ?? NEUTRAL_STROKE
-        const baseAlpha = style.alpha
+        const stroke = d.edgeStrokes.get(edge) ?? NEUTRAL_STROKE
+        const baseAlpha = stroke.alpha
         // An edge is search-dimmed if a search is active and either
         // endpoint isn't a match — keeps the visible chain readable
         // without showing edges to dimmed nodes.
         const edgeSearchDimmed = d.searchMatchIds !== null &&
           (!d.searchMatchIds.has(edge.sourceId) || !d.searchMatchIds.has(edge.targetId))
-        // Highlights override the per-style alpha so the active subgraph
+        // Highlights override the per-stroke alpha so the active subgraph
         // pops; dim non-highlighted/non-matching edges down to DIM_ALPHA.
         const edgeDimmed = hasHighlight ? !edgeHighlighted : edgeSearchDimmed
         const hovered = edge.id === d.hoveredEdgeId
@@ -683,9 +683,9 @@ export function GraphCanvas({
 
         ctx.globalAlpha = edgeAlpha
         ctx.beginPath()
-        ctx.setLineDash([...style.dash])
-        ctx.strokeStyle = style.color[d.theme]
-        ctx.lineWidth = style.width + (hovered ? 2 : 0)
+        ctx.setLineDash([...stroke.dash])
+        ctx.strokeStyle = stroke.color[d.theme]
+        ctx.lineWidth = stroke.width + (hovered ? 2 : 0)
         ctx.moveTo(sx, sy)
         ctx.lineTo(tx, ty)
         ctx.stroke()
@@ -712,7 +712,7 @@ export function GraphCanvas({
             ay - ARROWHEAD_SIZE * Math.sin(angle + Math.PI / 6),
           )
           ctx.closePath()
-          ctx.fillStyle = style.color[d.theme]
+          ctx.fillStyle = stroke.color[d.theme]
           ctx.fill()
         }
 
@@ -843,23 +843,23 @@ export function GraphCanvas({
           if (activePullKey) {
             // Border: a tension-coloured casing wider than the edge, then the
             // edge's own colour redrawn on top at full opacity.
-            const style = d.edgeStrokes.get(edge) ?? NEUTRAL_STROKE
+            const stroke = d.edgeStrokes.get(edge) ?? NEUTRAL_STROKE
             ctx.beginPath()
             ctx.moveTo(sx, sy)
             ctx.lineTo(tx, ty)
             ctx.strokeStyle = tensionColor
             ctx.globalAlpha = 0.9
-            ctx.lineWidth = style.width + 5
+            ctx.lineWidth = stroke.width + 5
             ctx.setLineDash([])
             ctx.stroke()
 
             ctx.beginPath()
             ctx.moveTo(sx, sy)
             ctx.lineTo(tx, ty)
-            ctx.strokeStyle = style.color[d.theme]
+            ctx.strokeStyle = stroke.color[d.theme]
             ctx.globalAlpha = 1
-            ctx.lineWidth = style.width
-            ctx.setLineDash([...style.dash])
+            ctx.lineWidth = stroke.width
+            ctx.setLineDash([...stroke.dash])
             ctx.stroke()
             ctx.setLineDash([])
             continue

@@ -13,7 +13,7 @@ beforeEach(() => {
   ;(globalThis as { IS_REACT_ACT_ENVIRONMENT?: boolean }).IS_REACT_ACT_ENVIRONMENT = true
 })
 
-const taxonomyOf = () => createTaxonomy({ styleAxis: 'kind', styles: [], filterAxes: [] })
+const taxonomyOf = () => createTaxonomy({ styleAxis: 'kind', values: [], filterAxes: [] })
 const graphOf = (...ids: string[]): Graph => ({ nodes: ids.map(id => ({ id, name: id, values: {} })), edges: [] })
 const kept = new Map([['a', { x: 0, y: 0 }], ['b', { x: 100, y: 0 }]])
 
