@@ -105,7 +105,7 @@ export interface GraphViewChrome {
   search?: boolean
   /** The lock toggle on each axis. Default: only when the host controls `locks` with `onLocksChange` — a one-view host has nothing to lock against, and a value without its callback is read-only. */
   locks?: boolean
-  /** The Fit / theme / Play cluster and the node count. */
+  /** The Fit / Play cluster and the node count. */
   transport?: boolean
   /** The pane's own list of the graph's defects under the bar. */
   diagnostics?: boolean
@@ -113,7 +113,7 @@ export interface GraphViewChrome {
   shortcuts?: boolean
   /** The control panel (the forces, the node scale). */
   controls?: boolean
-  /** The Auto / Light / Dark button. It sits in the transport cluster, so `transport: false` hides it too. */
+  /** The Auto / Light / Dark button, whatever `transport` says. */
   themeToggle?: boolean
   /** The "dependencies / dependents" line in the hover box. */
   directionLine?: boolean
@@ -138,7 +138,7 @@ export interface GraphViewHandle {
   fit(): void
   /** Every node's position, by id — a layout the host may keep and hand back as `defaultPositions`. */
   getPositions(): Map<string, Position>
-  /** Move nodes to the given positions (pinned ones stay) and let the layout settle around them. */
+  /** Move nodes to the given positions — all but one the user is dragging, which stays under the pointer — and let the layout settle around them. */
   setPositions(positions: ReadonlyMap<string, Position>): void
   /** Rewrite the filter from its current value: the axes `fn` changes count as the user's, a later graph re-seeds the rest, and `onFilterChange` reports the write. */
   updateFilter(fn: (filter: FilterState) => FilterState): void
@@ -201,7 +201,8 @@ export interface GraphViewProps {
    * these and nothing else while it is defined, the empty set none. Compared
    * by value, so a set rebuilt each render is no change. A selection the user
    * makes arrives through `onSelectionChange`; the host answers by setting
-   * this, or does not. Absent, the view keeps the selection itself.
+   * this, or does not. An id the graph does not hold is ignored, unreported,
+   * until a graph holds it. Absent, the view keeps the selection itself.
    */
   selectedIds?: ReadonlySet<string>
   /** Where the view's own selection starts when the host does not control it. Read once. */
@@ -220,7 +221,7 @@ export interface GraphViewProps {
   onFocusResult?: (request: FocusRequest, shown: boolean) => void
   /** Added to the root's class list; the root keeps its own. */
   className?: string
-  /** Merged onto the root's style; the scheme's variables stay. */
+  /** Merged onto the root's style after the scheme's variables, so a key here wins over theirs. */
   style?: React.CSSProperties
 
   /**
@@ -288,7 +289,7 @@ export interface GraphViewProps {
    * `defaultTuning`, else the taxonomy's defaults.
    */
   tuning?: Tuning
-  /** Every change to the tuning — the user's in the control panel and the view's retune for a new graph or taxonomy. */
+  /** Every change to the tuning — the user's in the control panel and the view's retune for the graph and taxonomy it faces, the first included: a tuning the first graph does not fit is reported on mount. */
   onTuningChange?: (next: Tuning) => void
   /** Where the view's own tuning starts when the host does not control it — `createTuning`'s or `tuningFromJSON`'s answer, say. Read once. */
   defaultTuning?: Tuning
@@ -1281,8 +1282,8 @@ export const GraphView = React.forwardRef<GraphViewHandle, GraphViewProps>(funct
       </div>}
 
       {/* Bottom-center: simulation controls + live fps. */}
-      {show.transport && <div className="gv-graph-bottom-center">
-        <button className="gv-graph-toolbar-btn" onClick={handleFitToView} title="Fit to view (F)">Fit</button>
+      {(show.transport || show.themeToggle) && <div className="gv-graph-bottom-center">
+        {show.transport && <button className="gv-graph-toolbar-btn" onClick={handleFitToView} title="Fit to view (F)">Fit</button>}
         {show.themeToggle && (
           <button
             className={`gv-graph-toolbar-btn${themeChoice === 'system' ? '' : ' active'}`}
@@ -1293,16 +1294,18 @@ export const GraphView = React.forwardRef<GraphViewHandle, GraphViewProps>(funct
             {themeChoice === 'system' ? 'Auto' : themeChoice === 'light' ? 'Light' : 'Dark'}
           </button>
         )}
-        <button
-          className={`gv-graph-toolbar-btn ${running ? 'active' : ''}`}
-          onClick={handleToggleRunning}
-          title={running ? 'Pause simulation (Space)' : 'Resume simulation (Space)'}
-        >
-          {running ? 'Pause' : 'Play'}
-        </button>
-        {/* Always rendered (reserving its width) so toggling Play/Pause never
-            shifts the centred cluster; hidden when the simulation is paused. */}
-        <span className={`gv-graph-count-fps${running ? '' : ' hidden'}`} title="Simulation frames per second">{fps} fps</span>
+        {show.transport && <>
+          <button
+            className={`gv-graph-toolbar-btn ${running ? 'active' : ''}`}
+            onClick={handleToggleRunning}
+            title={running ? 'Pause simulation (Space)' : 'Resume simulation (Space)'}
+          >
+            {running ? 'Pause' : 'Play'}
+          </button>
+          {/* Always rendered (reserving its width) so toggling Play/Pause never
+              shifts the centred cluster; hidden when the simulation is paused. */}
+          <span className={`gv-graph-count-fps${running ? '' : ' hidden'}`} title="Simulation frames per second">{fps} fps</span>
+        </>}
       </div>}
 
       {show.scrubber && timeWindow && <Scrubber window={timeWindow} playhead={playhead} onPlayheadChange={setPlayhead} />}

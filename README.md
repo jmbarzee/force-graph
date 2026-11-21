@@ -98,7 +98,7 @@ never by spreading the built object.
   | `physics.band.y` | the value's slice of the stack, by its position in the order |
   | `physics.band.x` | 0 to 380 (`BAND_FRAME.x`) |
   | `whenHidden` | `'ascend'`: a dependency edge touching a hidden node re-points to its nearest visible ancestor; `'splice'` follows the node's own edges through |
-  | `summaryKind` | `'degree'` (`→3 ←2` in the hover box); `'children'` counts what the node contains; `'none'` shows neither |
+  | `summaryKind` | `'degree'` (`→3 ←2` in the hover box); `'children'` counts what the node contains, above the degree; `'none'` shows neither |
   | `ladder` | none: the value is a rung of no ladder |
 
   `fallbackValue` draws a value nobody declared; `styleLabel` names the axis
@@ -407,8 +407,8 @@ the console. Everything else is optional.
   answering one or null), `chrome` to turn parts of
   the pane off — `controls` (the control panel), `themeToggle` (the theme
   button), `search`, `locks` (the lock toggles; off until the host controls
-  `locks` with `onLocksChange`), `transport` (the Fit / theme / Play / count
-  cluster, which takes the theme button with it), `diagnostics`,
+  `locks` with `onLocksChange`), `transport` (the Fit / Play / count
+  cluster), `diagnostics`,
   `shortcuts`, `directionLine` (the hover box's), `activateZoom` (the
   double-click zoom) and `scrubber` (shown only for a valid `window`) —
   `searchTitle` and `searchPlaceholder` for the host's own words,
@@ -418,18 +418,6 @@ the console. Everything else is optional.
   holds keeps its place; one covering every node opens at rest, unsettled:
   hand back what `onSettled` kept, or call `setPositions` to settle from
   rough positions).
-- **Outputs.** `onSelectionChange(nodes)` in the order they were selected,
-  `onNodeActivate(node)` on a double-click, `onHover(node | null)`,
-  `onEdgeHover(edge | null)` for the edge under the pointer while no node is,
-  `onThemeResolved(theme)`,
-  `onDiagnostics(diagnostics)` whenever the graph's defects are recomputed
-  (the first graph's included), `onTuningChange(tuning)`,
-  `onPlayheadChange(playhead)`,
-  `onSettled(positions)` each time the simulation comes to rest on its own
-  (not on a pause). Every node handed out is the host's own object. The
-  resolved theme is for the host's own chrome beside the pane; a host that
-  writes it as a `data-theme` on an ancestor of the pane passes `systemTheme`
-  too, so `'system'` follows the host's answer and not the pane's own echo.
 - **The handle.** Through a ref, `focusNode(id)` reveals, frames and selects
   a node in one call — it widens the filter on the axes shown and the groups
   it belongs to when the group filter hides it, flashes a lock
@@ -445,9 +433,7 @@ the console. Everything else is optional.
   the user's.
 - **What to know.** The view's own filter re-seeds on a graph change for
   every axis the user has not touched — a controlled filter never does — and
-  `onFilterChange` hears it. `onHover(null)` and `onEdgeHover(null)` arrive
-  150 ms after the pointer leaves, so a tooltip can be reached; a graduated
-  edge is handed as the host's edge it stands for. Removing an axis in the
+  `onFilterChange` hears it. Removing an axis in the
   bar resets its chosen values to "match everything" and fires `onFilterChange`
   before `onAxesChange`; an axis the taxonomy does not declare renders as a
   header with its remove control and filters nothing. Derived containment
@@ -462,6 +448,33 @@ the console. Everything else is optional.
   shell's active tab) or `'none'` (a hidden tab). The root is focusable under
   `'pane'` and `'global'` alike. The keys are
   [SPEC § Keyboard](SPEC.md#keyboard).
+
+## Lifecycle
+
+When each output fires. Every node handed out is the host's own object.
+
+| Output | Fires | On mount |
+|---|---|---|
+| `onSelectionChange(nodes)` | a selection the user makes — a click, a lasso, Enter, Escape, a search pick, a focus landing, the handle — in the order selected; with the view keeping the selection, also when selected nodes leave the graph; never for `selectedIds` | when `defaultSelectedIds` names a node the graph lacks, or a `focus` given at mount lands |
+| `onFocusResult(request, shown)` | once per `focus` request: when it lands, or at once when no filter can show its node; never for one withdrawn | for a `focus` given at mount |
+| `onFilterChange(next, touched, focus?)` | the bar, a legend's toggle, `updateFilter`, a focus's widening, and the view's own re-seed on a new graph | when a `focus` given at mount must widen |
+| `onLocksChange(next)` | a lock toggled | no |
+| `onAxesChange(next)` | an axis added or removed in the bar | no |
+| `onSearchChange(next)` | the search opened, typed in or closed | no |
+| `onThemeChange(next)` | the theme button | no |
+| `onThemeResolved(theme)` | the resolved theme changing — for the host's own chrome; a host that writes it as an ancestor's `data-theme` passes `systemTheme` too, so `'system'` follows the host and not the pane's echo | yes |
+| `onTuningChange(next)` | the control panel, a preset, and the view's retune for a new graph or taxonomy | when the tuning it opens with does not fit the first graph |
+| `onPlayheadChange(next)` | the scrubber's seek, play and reset | no |
+| `onDiagnostics(diagnostics)` | the defects recomputed — a new graph, taxonomy, `groups` or colouring — an empty list included | yes |
+| `onHover(node \| null)` | the pointer reaching a node; null 150 ms after it leaves, so a tooltip can be reached | no |
+| `onEdgeHover(edge \| null)` | the pointer on an edge while on no node, a graduated edge handed as the host's edge it stands for; null 150 ms after | no |
+| `onNodeActivate(node)` | a double-click on a node | no |
+| `onSettled(positions)` | the simulation coming to rest on its own, not on a pause | once the opening layout rests: the first frame, when `defaultPositions` covers every node |
+| `focusNode(id)` | `onFilterChange` when it widens, then `onSelectionChange` once the node shows; its answer, not `onFocusResult`, says whether it can | — |
+| `select(id \| null)` | `onSelectionChange` when the selection changes | — |
+| `fit()`, `getPositions()` | nothing | — |
+| `setPositions(positions)` | `onSettled` once the layout rests again | — |
+| `updateFilter(fn)` | `onFilterChange` when `fn` changes the filter | — |
 
 ## Two views sharing a bar
 
@@ -649,21 +662,9 @@ smoothly, a few thousand do not (Barnes-Hut,
 [#30](https://github.com/jmbarzee/force-graph/issues/30)). The push/pull and
 layout controls bound their tokens by a ceiling
 ([SPEC § The control panel](SPEC.md#the-control-panel)).
-What is not built is filed as issues:
-
-- **The graph and taxonomy** — colour by another axis
-  ([#9](https://github.com/jmbarzee/force-graph/issues/9)),
-  undirected edges ([#11](https://github.com/jmbarzee/force-graph/issues/11)),
-  an edge time series played back
-  ([#33](https://github.com/jmbarzee/force-graph/issues/33)).
-- **Interaction** — selecting several nodes
-  ([#28](https://github.com/jmbarzee/force-graph/issues/28)), edge hover and
-  its outputs ([#16](https://github.com/jmbarzee/force-graph/issues/16)), a
-  neighbourhood frame that leaves hidden neighbours out
-  ([#26](https://github.com/jmbarzee/force-graph/issues/26)),
-  animated reveals ([#8](https://github.com/jmbarzee/force-graph/issues/8)).
-- **The package** — the pane's strings in other languages
-  ([#13](https://github.com/jmbarzee/force-graph/issues/13)), the React 19
-  types gate ([#14](https://github.com/jmbarzee/force-graph/issues/14)).
+What is not built is filed as issues: animated reveals
+([#8](https://github.com/jmbarzee/force-graph/issues/8)) and the pane's
+strings in other languages
+([#13](https://github.com/jmbarzee/force-graph/issues/13)).
 
 `src/index.ts` names the whole surface.

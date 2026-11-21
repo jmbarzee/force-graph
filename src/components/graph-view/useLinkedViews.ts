@@ -39,7 +39,7 @@ export interface LinkedViewProps {
   onSearchChange: (next: SearchState) => void
   /** The focus `linked.focus` asked of this view, until the pane reports it: its `target`, and the node's `id` when it was a node. A `FilterBar` ignores it; a host's own view reveals the record the target names. */
   focus: { id?: string; key: number; target: FocusTarget } | null
-  /** The pane's report on `focus`, which clears it. */
+  /** The report on `focus`, which clears it. A `GraphView` makes it; a host's own view makes it once it has revealed the record, or the request stays, for a view mounting later under that name to act on again. */
   onFocusResult: (request: Partial<FocusRequest>, shown: boolean) => void
   /** The hook's `labels`, the same in every view's props. */
   labels?: AxisLabels

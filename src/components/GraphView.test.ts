@@ -212,6 +212,16 @@ it('shows no scrubber for a graph without a window, or when chrome turns it off'
   expect((await mount({}, { ...played, window: undefined })).el.querySelector('.gv-scrubber')).toBeNull()
 })
 
+it('shows the theme button as chrome.themeToggle says, whatever chrome.transport says', async () => {
+  const shown = async (chrome: GraphViewProps['chrome']) => {
+    const { el } = await mount({ chrome })
+    return { theme: el.querySelector('[aria-label="Colour scheme"]') !== null, fit: el.querySelector('[title="Fit to view (F)"]') !== null }
+  }
+  expect(await shown({ transport: false })).toEqual({ theme: true, fit: false })
+  expect(await shown({ themeToggle: false })).toEqual({ theme: false, fit: true })
+  expect(await shown({ transport: false, themeToggle: false })).toEqual({ theme: false, fit: false })
+})
+
 it('reads a new graph as unchanged only when its window, weights and series are', async () => {
   const warn = vi.spyOn(console, 'warn').mockImplementation(() => {})
   const said = () => warn.mock.calls.some(([m]) => String(m).includes('nothing in it did'))

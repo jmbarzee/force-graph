@@ -97,9 +97,10 @@ export interface ValueSpec {
    */
   whenHidden?: 'ascend' | 'splice'
   /**
-   * The glanceable summary for a node of this value: the children it contains,
+   * The glanceable summary in the hover box of a node of this value: `degree`,
+   * its dependency degree (`→3 ←2`); `children`, the children it contains,
    * counted per style value and named by that value's abbreviation
-   * (`2 Sv · 1 Pd`); its dependency degree (`→3 ←2`); or nothing.
+   * (`2 Sv · 1 Pd`), above the same degree row; `none`, neither.
    */
   summaryKind?: 'children' | 'degree' | 'none'
   /**
