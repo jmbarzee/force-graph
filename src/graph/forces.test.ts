@@ -90,7 +90,6 @@ describe('layoutFrame', () => {
       const taxonomy = createTaxonomy({ styleAxis: 'kind', values: [], scalars: x === y ? [x] : [x, y] })
       return layoutFrame(graph, resolvePhysics({ ...defaultParamsFor(taxonomy), bandX: { scalar: x.id, span }, bandY: { scalar: y.id, span } }, taxonomy))
     }
-    // Each diagnostic, as the scalar it names and the node it refused.
     const said = (code: string, scalar: string, nodeId?: string) => ({ code, ...(nodeId && { nodeId }), message: expect.stringContaining(`scalar "${scalar}"`) })
 
     it('computes one scalar once, and reports each refusal once', () => {

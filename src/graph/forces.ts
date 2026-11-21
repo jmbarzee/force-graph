@@ -348,7 +348,6 @@ export function layoutFrame(graph: ReadableGraph, resolved: ResolvedPhysics): La
   const all = [...graph.nodes]
   const centerFor = (a: ResolvedBandAxis) => (isScalarAxis(a) ? 0 : medianBandCenter(all, a))
   const diagnostics: GraphDiagnostic[] = []
-  // Checked once per scalar, so one on both axes computes and reports once.
   const checked = new Map<Scalar, Map<string, number>>()
   const scoresFor = (a: ResolvedBandAxis) => {
     if (!isScalarAxis(a)) return undefined
