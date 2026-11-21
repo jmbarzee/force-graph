@@ -15,6 +15,8 @@ import { SpringMap, SpringCurves } from './SpringControls'
 import { EquationSection } from './controls/EquationSection'
 import { SubTabs, SubTab, SubTabBodies, SubTabBody } from './controls/SubTab'
 import { FormulaValue } from './controls/PopContext'
+import { useStrings } from './graph-view/strings'
+import type { GraphViewStrings } from './graph-view/strings'
 import type { ForceSection } from './GraphControlPanel'
 
 type PairForce = 'push' | 'pull'
@@ -56,16 +58,17 @@ const PULL_EQUATION = (
 )
 
 /** What the dropdown says about an axis: its cost when it fits, why not when it does not. */
-function optionLabel(o: AxisOption): string {
+function optionLabel(o: AxisOption, s: GraphViewStrings): string {
   return fitsCeiling(o)
     ? `${o.mapping.label} (${o.pushTokens} · ${o.pullTokens})`
-    : `${o.mapping.label} — ${Math.max(o.pushTokens, o.pullTokens)} tokens (max ${TOKEN_CEILING})`
+    : s.pushPullTooMany(o.mapping.label, Math.max(o.pushTokens, o.pullTokens), TOKEN_CEILING)
 }
 
 export function PushPullControls({
   params, resolved, axes, present, onParamChange, onAxisChange, onActiveSection,
   hoveredPushBucket, onHoverPushBucket, hoveredEdge, onHoverEdge,
 }: PushPullProps) {
+  const s = useStrings()
   const [sub, setSub] = React.useState<PairForce>('push')
   const current = mappingKey(params.pair.mapping)
   return (
@@ -73,12 +76,12 @@ export function PushPullControls({
       {/* The axis both forces key on — above the sub-tabs so it stays visible
           whichever force is being edited. */}
       <div className="gv-axis-row">
-        <label className="gv-axis-label" htmlFor="pushpull-axis">axis</label>
+        <label className="gv-axis-label" htmlFor="pushpull-axis">{s.axis}</label>
         <select
           id="pushpull-axis"
           className="gv-axis-select"
           value={current}
-          title="The axis push and pull key on. Tokens are the visible set's: a push token per bucket some visible node falls in, a pull token per spring category some sprung edge falls in; the counts measure the whole graph"
+          title={s.pushPullAxisTitle}
           onChange={e => {
             const option = axes.find(o => mappingKey(o.mapping) === e.target.value)
             if (option) onAxisChange(option.mapping)
@@ -86,15 +89,15 @@ export function PushPullControls({
         >
           {axes.map(o => (
             <option key={mappingKey(o.mapping)} value={mappingKey(o.mapping)} disabled={!fitsCeiling(o)}>
-              {optionLabel(o)}
+              {optionLabel(o, s)}
             </option>
           ))}
         </select>
       </div>
 
-      <SubTabs label="Pair force">
-        <SubTab label="Push" active={sub === 'push'} onSelect={() => setSub('push')} />
-        <SubTab label="Pull" active={sub === 'pull'} onSelect={() => setSub('pull')} />
+      <SubTabs label={s.pairForce}>
+        <SubTab label={s.push} active={sub === 'push'} onSelect={() => setSub('push')} />
+        <SubTab label={s.pull} active={sub === 'pull'} onSelect={() => setSub('pull')} />
       </SubTabs>
 
       <SubTabBodies>

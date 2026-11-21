@@ -19,6 +19,7 @@ import { Equation } from './controls/Equation'
 import { FormulaValue } from './controls/PopContext'
 import { SubTabs, SubTab, SubTabBodies, SubTabBody } from './controls/SubTab'
 import { AxisControls } from './AxisControls'
+import { useStrings } from './graph-view/strings'
 import type { GravityHover } from './AxisControls'
 
 export type { GravityHover, LayoutAxis } from './AxisControls'
@@ -40,14 +41,15 @@ interface GravityControlProps {
 type GravitySub = 'x' | 'y' | 'topological'
 
 export function GravityControls({ params, resolved, axes, onParamChange, onRelayout, hovered, onHover, present }: GravityControlProps) {
+  const s = useStrings()
   const [sub, setSub] = React.useState<GravitySub>('y')
   return (
     <div className="gv-gravity-controls">
-      <SubTabs label="Gravity">
-        <SubTab label="X Axis" active={sub === 'x'} onSelect={() => setSub('x')} />
-        <SubTab label="Y Axis" active={sub === 'y'} onSelect={() => setSub('y')}
-          leading={<ForceSwitch label="Radial layout: Y as distance from the centre" enabled={params.radial} onToggle={v => onRelayout({ radial: v })} />} />
-        <SubTab label="Topological" active={sub === 'topological'} onSelect={() => setSub('topological')} />
+      <SubTabs label={s.tabGravity}>
+        <SubTab label={s.gravityX} active={sub === 'x'} onSelect={() => setSub('x')} />
+        <SubTab label={s.gravityY} active={sub === 'y'} onSelect={() => setSub('y')}
+          leading={<ForceSwitch label={s.gravityRadial} enabled={params.radial} onToggle={v => onRelayout({ radial: v })} />} />
+        <SubTab label={s.gravityTopological} active={sub === 'topological'} onSelect={() => setSub('topological')} />
       </SubTabs>
 
       <SubTabBodies>
@@ -64,7 +66,7 @@ export function GravityControls({ params, resolved, axes, onParamChange, onRelay
             <Equation>{<>F = <FormulaValue id="topoStrength">strength</FormulaValue> × depth<sup><FormulaValue id="topoExp">exp</FormulaValue></sup> × d</>}</Equation>
             <TopologicalCurve exp={params.gravityTopologicalExp} />
             <div className="gv-gravity-slider-row">
-              <label className="gv-graph-control-slider-label">strength</label>
+              <label className="gv-graph-control-slider-label">{s.topoStrength}</label>
               <Slider
                 min={0} max={2} step={0.02}
                 value={params.gravityTopological}
@@ -73,7 +75,7 @@ export function GravityControls({ params, resolved, axes, onParamChange, onRelay
               />
             </div>
             <div className="gv-gravity-slider-row">
-              <label className="gv-graph-control-slider-label">exp</label>
+              <label className="gv-graph-control-slider-label">{s.exp}</label>
               <Slider
                 min={1} max={6} step={0.1}
                 value={params.gravityTopologicalExp}
@@ -107,6 +109,7 @@ const TC_H = 96
 const TC_PAD = 8
 const TC_PAD_L = 16 // extra room on the left for the rotated y-axis label
 function TopologicalCurve({ exp }: { exp: number }) {
+  const strings = useStrings()
   const x0 = TC_PAD_L
   const x1 = TC_W - TC_PAD
   const y0 = TC_PAD
@@ -119,11 +122,11 @@ function TopologicalCurve({ exp }: { exp: number }) {
     return `${(x0 + s * (x1 - x0)).toFixed(1)},${(y1 - w * (y1 - y0)).toFixed(1)}`
   }).join(' ')
   return (
-    <svg className="gv-gravity-topo-curve" viewBox={`0 0 ${TC_W} ${TC_H}`} role="img" aria-label="Depth-to-pull contrast curve">
+    <svg className="gv-gravity-topo-curve" viewBox={`0 0 ${TC_W} ${TC_H}`} role="img" aria-label={strings.topoCurve}>
       <rect x={x0} y={y0} width={x1 - x0} height={y1 - y0} className="gv-spring-curve-frame" />
       <polyline points={points} className="gv-gravity-topo-curve-line" />
-      <text x={(x0 + x1) / 2} y={TC_H - 1} textAnchor="middle" className="gv-gravity-topo-curve-axis">depth</text>
-      <text x={5} y={yMid} textAnchor="middle" className="gv-gravity-topo-curve-axis" transform={`rotate(-90 5 ${yMid})`}>pull</text>
+      <text x={(x0 + x1) / 2} y={TC_H - 1} textAnchor="middle" className="gv-gravity-topo-curve-axis">{strings.topoDepth}</text>
+      <text x={5} y={yMid} textAnchor="middle" className="gv-gravity-topo-curve-axis" transform={`rotate(-90 5 ${yMid})`}>{strings.topoPull}</text>
     </svg>
   )
 }

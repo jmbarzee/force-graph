@@ -12,6 +12,7 @@ import type { ResolvedPhysics } from '../graph/forces'
 
 import { useTaxonomy } from './graph-view/useTaxonomy'
 import { useFill } from './graph-view/useFill'
+import { useStrings } from './graph-view/strings'
 import { bucketColor } from './controls/bucketColor'
 import { alikeShift, laddersOn, rowsOf } from './controls/ladders'
 import { LadderToggles, useCollapsed } from './controls/LadderToggles'
@@ -50,6 +51,7 @@ interface ChargeControlProps {
 // A ladder's rungs are joined by a chain; collapsed, they are one stacked
 // token at their centroid, and dragging it shifts every rung alike.
 export function ChargeMap({ params, resolved, present, onParamChange, hoveredBucket, onHoverBucket }: ChargeControlProps) {
+  const s = useStrings()
   const taxonomy = useTaxonomy()
   const fill = useFill(taxonomy)
   const { push } = resolved
@@ -64,7 +66,7 @@ export function ChargeMap({ params, resolved, present, onParamChange, hoveredBuc
     const b = shown.find(s => s.id === id)!
     return {
       id, ...at(id), colorA: color(id), outline: 'solid', label: b.abbreviation,
-      tooltip: `${b.label} repulsion charge & core radius`,
+      tooltip: s.chargeToken(b.label),
     }
   }
   const tokens: MapToken[] = rows.flatMap((row): MapToken[] => {
@@ -77,7 +79,7 @@ export function ChargeMap({ params, resolved, present, onParamChange, hoveredBuc
       x: points.reduce((sum, p) => sum + p.x, 0) / points.length,
       y: points.reduce((sum, p) => sum + p.y, 0) / points.length,
       colorA: color(rungs[0]), outline: 'solid', stacked: true, label: id,
-      tooltip: `The ${id} ladder: dragging moves every rung alike`,
+      tooltip: s.ladderToken(id),
     }]
   })
   const chains = rows.flatMap(row => (row.kind === 'ladder' && !row.collapsed ? [row.ladder.rungs] : []))
@@ -106,23 +108,23 @@ export function ChargeMap({ params, resolved, present, onParamChange, hoveredBuc
     <ForceMap2D
       tokens={tokens}
       chains={chains}
-      xAxis={{ min: CORE_RADIUS_MIN_AXIS, max: CORE_RADIUS_MAX_AXIS, step: CORE_RADIUS_STEP, label: 'core radius' }}
-      yAxis={{ min: CHARGE_MAG_MIN, max: CHARGE_MAG_MAX, step: CHARGE_MAG_STEP, label: 'charge' }}
+      xAxis={{ min: CORE_RADIUS_MIN_AXIS, max: CORE_RADIUS_MAX_AXIS, step: CORE_RADIUS_STEP, label: s.chargeRadius }}
+      yAxis={{ min: CHARGE_MAG_MIN, max: CHARGE_MAG_MAX, step: CHARGE_MAG_STEP, label: s.chargeCharge }}
       onDrag={handleDrag}
       hoveredId={hoveredBucket}
       // A collapsed ladder stands for several buckets; hovering it links none.
       onHover={id => onHoverBucket(id !== null && collapsedLadder(id) ? null : id)}
-      ariaLabel="Charge map: core radius versus charge magnitude"
+      ariaLabel={s.chargeMap}
       xSlider={{
         value: params.coreRadiusMultiplier, min: 0.1, max: 3, step: 0.05,
         onChange: v => onParamChange({ coreRadiusMultiplier: v }),
-        title: 'Scale every type’s core radius', ariaLabel: 'Scale all core radius',
+        title: s.chargeScaleRadiusTitle, ariaLabel: s.chargeScaleRadius,
         popId: 'coreRadiusMultiplier',
       }}
       ySlider={{
         value: params.pushMultiplier, min: 0, max: 3, step: 0.1,
         onChange: v => onParamChange({ pushMultiplier: v }),
-        title: 'Scale every type’s charge', ariaLabel: 'Scale all charge',
+        title: s.chargeScaleChargeTitle, ariaLabel: s.chargeScaleCharge,
         popId: 'pushMultiplier',
       }}
     />
@@ -137,6 +139,7 @@ export function ChargeMap({ params, resolved, present, onParamChange, hoveredBuc
 // radius marked on the distance axis. The global `exp` (chargeExponent) is the
 // slider beneath.
 export function ChargeCurves({ params, resolved, present, onParamChange, hoveredBucket, onHoverBucket }: ChargeControlProps) {
+  const s = useStrings()
   const taxonomy = useTaxonomy()
   const fill = useFill(taxonomy)
   const { push } = resolved
@@ -188,13 +191,11 @@ export function ChargeCurves({ params, resolved, present, onParamChange, hovered
       xMax={dMax}
       hoveredId={hoveredBucket}
       onHover={onHoverBucket}
-      xLabel="distance"
-      yLabel="force"
-      ariaLabel="Charge falloff curves"
+      ariaLabel={s.chargeCurves}
       exp={{
         value: exp, min: 0.5, max: 1.0, step: 0.05,
         onChange: v => onParamChange({ chargeExponent: v }),
-        title: 'Power of (d² + r²) in the charge falloff. 1 = inverse-square; higher = sharper drop-off.',
+        title: s.chargeExpTitle,
         popId: 'chargeExponent',
       }}
     />

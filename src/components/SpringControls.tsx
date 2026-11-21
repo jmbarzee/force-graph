@@ -16,6 +16,7 @@ import type { Fill } from '../graph/coloring'
 
 import { useTaxonomy } from './graph-view/useTaxonomy'
 import { useFill } from './graph-view/useFill'
+import { useStrings } from './graph-view/strings'
 import { NEUTRAL_BUCKET_COLOR, bucketColor } from './controls/bucketColor'
 import { ForceMap2D, ForceCurves, CURVE_W, CURVE_H, CURVE_SAMPLES } from './ForceMap'
 import type { MapToken, CurveItem } from './ForceMap'
@@ -63,6 +64,7 @@ interface SpringControlProps {
 // x = rest length, y = stiffness (k). Each edge category is a draggable
 // split-colour token; dragging sets both rest and k at once.
 export function SpringMap({ params, resolved, present, onParamChange, hoveredEdge, onHoverEdge }: SpringControlProps) {
+  const s = useStrings()
   const taxonomy = useTaxonomy()
   const fill = useFill(taxonomy)
   const { spring } = resolved
@@ -89,22 +91,22 @@ export function SpringMap({ params, resolved, present, onParamChange, hoveredEdg
   return (
     <ForceMap2D
       tokens={tokens}
-      xAxis={{ min: EDGE_REST_MIN, max: EDGE_REST_MAX, step: EDGE_REST_STEP, label: 'length' }}
-      yAxis={{ min: EDGE_K_MIN, max: EDGE_K_MAX, step: EDGE_K_STEP, label: 'stiffness' }}
+      xAxis={{ min: EDGE_REST_MIN, max: EDGE_REST_MAX, step: EDGE_REST_STEP, label: s.springLength }}
+      yAxis={{ min: EDGE_K_MIN, max: EDGE_K_MAX, step: EDGE_K_STEP, label: s.springStiffness }}
       onDrag={handleDrag}
       hoveredId={hoveredEdge}
       onHover={onHoverEdge}
-      ariaLabel="Spring map: rest length versus stiffness"
+      ariaLabel={s.springMap}
       xSlider={{
         value: params.distanceMultiplier, min: 0.05, max: 3, step: 0.05,
         onChange: v => onParamChange({ distanceMultiplier: v }),
-        title: 'Scale every spring’s rest length', ariaLabel: 'Scale all length',
+        title: s.springScaleLengthTitle, ariaLabel: s.springScaleLength,
         popId: 'distanceMultiplier',
       }}
       ySlider={{
         value: params.pullMultiplier, min: 0, max: 3, step: 0.1,
         onChange: v => onParamChange({ pullMultiplier: v }),
-        title: 'Scale every spring’s stiffness', ariaLabel: 'Scale all stiffness',
+        title: s.springScaleStiffnessTitle, ariaLabel: s.springScaleStiffness,
         popId: 'pullMultiplier',
       }}
     />
@@ -128,6 +130,7 @@ function springResponse(d: number, kEff: number, restEff: number, exp: number): 
 }
 
 export function SpringCurves({ params, resolved, present, onParamChange, hoveredEdge, onHoverEdge }: SpringControlProps) {
+  const s = useStrings()
   const taxonomy = useTaxonomy()
   const fill = useFill(taxonomy)
   const { spring } = resolved
@@ -178,13 +181,11 @@ export function SpringCurves({ params, resolved, present, onParamChange, hovered
       baselineY={ZERO_Y}
       hoveredId={hoveredEdge}
       onHover={onHoverEdge}
-      xLabel="distance"
-      yLabel="force"
-      ariaLabel="Spring force response curves"
+      ariaLabel={s.springCurves}
       exp={{
         value: exp, min: 0.5, max: 3, step: 0.1,
         onChange: v => onParamChange({ linkExponent: v }),
-        title: 'Power of displacement in the spring force. 1 = linear (Hooke); higher = softer near rest, stiffer far out.',
+        title: s.springExpTitle,
         popId: 'linkExponent',
       }}
     />

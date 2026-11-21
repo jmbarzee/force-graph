@@ -109,6 +109,13 @@ it('names a parent cycle and draws past it with every node hidden', async () => 
   expect(view.el.textContent).toContain('parent-cycle')
 })
 
+it("renders a host's strings over the defaults, in the pane and in its bar", async () => {
+  const view = await mount({ strings: { counts: (nodes, edges) => `${nodes} Knoten, ${edges} Kanten`, searchTitle: key => `Suchen (${key})` } })
+  expect(view.el.querySelector('.gv-graph-count')!.textContent).toBe('2 Knoten, 0 Kanten')
+  expect(view.el.querySelector('.gv-graph-toolbar-btn')!.textContent).toBe('Fit')
+  expect(view.el.querySelector('.gv-header-search-toggle')!.getAttribute('title')).toBe('Suchen (/)')
+})
+
 // `red` holds n0 alone and shares n1 with `blue`.
 const groups: NodeGroup[] = [{ id: 'red', nodeIds: new Set(['n0', 'n1']) }, { id: 'blue', nodeIds: new Set(['n1']) }]
 

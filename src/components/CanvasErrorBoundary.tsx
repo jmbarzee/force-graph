@@ -12,8 +12,8 @@ import React from 'react'
 
 interface CanvasErrorBoundaryProps {
   children: React.ReactNode
-  /** What the fallback says failed; the canvas by default. */
-  what?: string
+  /** The fallback's line. */
+  failed: string
 }
 
 interface CanvasErrorBoundaryState {
@@ -36,14 +36,14 @@ export class CanvasErrorBoundary extends React.Component<
   componentDidCatch(error: Error, info: React.ErrorInfo): void {
     // Surface the failure to the console for debugging; the fallback UI keeps
     // the rest of the app usable.
-    console.error(`${this.props.what ?? 'graph canvas'} render/draw error:`, error, info.componentStack)
+    console.error(error, info.componentStack)
   }
 
   render(): React.ReactNode {
     if (this.state.error) {
       return (
         <div className="gv-graph-canvas-error" role="alert">
-          <p>The {this.props.what ?? 'graph canvas'} failed to render.</p>
+          <p>{this.props.failed}</p>
           <p className="gv-graph-canvas-error-detail">{this.state.error.message}</p>
         </div>
       )

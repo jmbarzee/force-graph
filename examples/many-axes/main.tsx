@@ -66,6 +66,7 @@ function App() {
         taxonomy={taxonomy}
         coloring={BY_TEAM}
         groups={groups}
+        strings={{ counts: (nodes, edges) => `${nodes} Knoten, ${edges} Kanten` }}
         legend={(channels, control) => (
           <ColorLegend channels={channels} control={control} titles={{ fill: 'Team', glow: axis }}>
             <select value={axis} onChange={e => setAxis(e.target.value)}>

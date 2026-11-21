@@ -135,7 +135,9 @@ At the bottom, out of the bar's way:
   and the frame rate while the simulation runs;
 - **bottom right** — the control panel.
 
-`chrome` turns each part off.
+`chrome` turns each part off. Every word the pane and its bar render is one
+of `strings`, over the English `DEFAULT_STRINGS`; the control panel's
+equations are notation, and stay.
 
 ## The control panel
 

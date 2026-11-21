@@ -7,7 +7,8 @@ one axis, chosen by a picker the host puts inside the `ColorLegend`: thirty
 fill keys and thirty glow keys, which scroll under the picker. Every axis is
 past the push/pull ceiling, so the taxonomy folds the regions into thirds, a
 mapping the push/pull axis dropdown offers. The nodes fill by Team, whose chips and
-the hover box wear the same colours.
+the hover box wear the same colours. The counts under the canvas are in
+German, one of the pane's `strings`.
 
 ## Run
 

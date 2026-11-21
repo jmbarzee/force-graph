@@ -20,6 +20,7 @@ import type { Span } from './controls/Curve'
 import type { AxisOption, LayoutAxisOption } from '../graph/simulation'
 import type { AxisMapping } from '../graph/axis'
 import type { PresetMenu } from './graph-view/usePresets'
+import { useStrings } from './graph-view/strings'
 
 export type ForceSection = 'push' | 'pull' | 'gravity' | 'dynamics' | null
 
@@ -31,10 +32,10 @@ export type ForceSection = 'push' | 'pull' | 'gravity' | 'dynamics' | null
 // dynamics sub-section driving the 'dynamics' preview.
 type ControlTab = 'forces' | 'gravity' | 'misc'
 
-const CONTROL_TABS: { id: ControlTab; label: string }[] = [
-  { id: 'forces', label: 'Push/Pull' },
-  { id: 'gravity', label: 'Gravity' },
-  { id: 'misc', label: 'Misc' },
+const CONTROL_TABS: { id: ControlTab; label: 'tabPushPull' | 'tabGravity' | 'tabMisc' }[] = [
+  { id: 'forces', label: 'tabPushPull' },
+  { id: 'gravity', label: 'tabGravity' },
+  { id: 'misc', label: 'tabMisc' },
 ]
 
 export type { PresentSets } from './graph-view/present'
@@ -87,13 +88,13 @@ type NumericForceKey = {
 
 // Shared shape for a labelled range row. Key types differ per param family
 // (force params vs. node-scale params), so the key lives on the extending
-// interfaces and SliderRow itself only needs the range/label/tooltip.
+// interfaces and SliderRow itself only needs the range and its words.
 interface RangeDef {
-  label: string
+  /** Its label's key in the strings; its tooltip's is this with `Title`. */
+  text: 'friction' | 'cooling' | 'threshold' | 'size' | 'growCap' | 'shrinkFloor'
   min: number
   max: number
   step: number
-  tooltip: string
 }
 
 interface SliderDef extends RangeDef {
@@ -116,12 +117,9 @@ interface NodeScaleSliderDef extends RangeDef {
 // same per-axis surface, Y carrying the Radial switch) and Topological. Center
 // gravity is the unexplained baseline.
 
-const FRICTION: SliderDef = { key: 'velocityDecay', label: 'friction', min: 0.05, max: 0.95, step: 0.05,
-  tooltip: 'Fraction of velocity kept per tick. Higher = coasts longer' }
-const COOLING: SliderDef = { key: 'alphaDecay', label: 'cooling', min: 0.0005, max: 0.02, step: 0.0005,
-  tooltip: 'Energy lost per tick. Higher = settles faster' }
-const THRESHOLD: SliderDef = { key: 'alphaMin', label: 'threshold', min: 0, max: 0.005, step: 0.0001,
-  tooltip: 'Energy level below which simulation pauses' }
+const FRICTION: SliderDef = { key: 'velocityDecay', text: 'friction', min: 0.05, max: 0.95, step: 0.05 }
+const COOLING: SliderDef = { key: 'alphaDecay', text: 'cooling', min: 0.0005, max: 0.02, step: 0.0005 }
+const THRESHOLD: SliderDef = { key: 'alphaMin', text: 'threshold', min: 0, max: 0.005, step: 0.0001 }
 
 // The stop and α's run follow Simulation.tick.
 const TICKS: Span = [10, 4000]
@@ -137,12 +135,9 @@ const DYNAMICS_EQUATION = (
   </>
 )
 
-const SIZE: NodeScaleSliderDef = { key: 'baseMul', label: 'size', min: 0.3, max: 2.0, step: 0.05,
-  tooltip: 'Overall node + label size. 1 = default.' }
-const GROW_CAP: NodeScaleSliderDef = { key: 'maxZoomMul', label: 'grow cap', min: 0.5, max: 3.0, step: 0.05,
-  tooltip: 'Zoom past which nodes stop growing. Lower = nodes start shrinking sooner as you zoom out.' }
-const SHRINK_FLOOR: NodeScaleSliderDef = { key: 'minZoomMul', label: 'shrink floor', min: 0.1, max: 1.0, step: 0.05,
-  tooltip: 'Smallest nodes may get when zoomed all the way out.' }
+const SIZE: NodeScaleSliderDef = { key: 'baseMul', text: 'size', min: 0.3, max: 2.0, step: 0.05 }
+const GROW_CAP: NodeScaleSliderDef = { key: 'maxZoomMul', text: 'growCap', min: 0.5, max: 3.0, step: 0.05 }
+const SHRINK_FLOOR: NodeScaleSliderDef = { key: 'minZoomMul', text: 'shrinkFloor', min: 0.1, max: 1.0, step: 0.05 }
 
 // Log axes: zoom a decade either side of 1, past every floor and cap, and
 // scale across every value the sliders reach. On them the clamp's three runs are
@@ -164,6 +159,7 @@ export function GraphControlPanel({
   onActivePushBucket, onActiveGravityBucket, onActivePullEdge,
   nodeScale, onNodeScaleChange, presets, onPreset,
 }: GraphControlPanelProps) {
+  const s = useStrings()
   const [open, setOpen] = React.useState(false)
   const [activeTab, setActiveTab] = React.useState<ControlTab>('forces')
   // Links the spring map and the force-curve viz: hovering a token in one
@@ -208,9 +204,9 @@ export function GraphControlPanel({
       <button
         className="gv-graph-control-panel-toggle"
         onClick={() => setOpen(!open)}
-        title="Toggle control panel"
+        title={s.controlsTitle}
       >
-        {open ? '▼ Controls' : '▶ Controls'}
+        {open ? '▼' : '▶'} {s.controls}
       </button>
 
       {open && (
@@ -229,7 +225,7 @@ export function GraphControlPanel({
                 className={`gv-graph-control-tab${activeTab === t.id ? ' active' : ''}`}
                 onClick={() => setActiveTab(t.id)}
               >
-                {t.label}
+                {s[t.label]}
               </button>
             ))}
           </div>
@@ -296,19 +292,20 @@ export function GraphControlPanel({
 
 /** The preset row: every preset, one this taxonomy refuses listed disabled with why, and `custom` while the tuning is none of them. No presets, no row. */
 export function PresetRow({ menu, onPreset }: { menu: PresetMenu; onPreset: (index: number) => void }) {
+  const s = useStrings()
   const id = React.useId()
   if (menu.choices.length === 0) return null
   return (
     <div className="gv-axis-row gv-preset-row">
-      <label className="gv-axis-label" htmlFor={id}>preset</label>
+      <label className="gv-axis-label" htmlFor={id}>{s.preset}</label>
       <select
         id={id}
         className="gv-axis-select"
         value={menu.selected}
-        title="A named tuning: choosing one carries every control to its values"
+        title={s.presetTitle}
         onChange={e => onPreset(Number(e.target.value))}
       >
-        {menu.selected < 0 && <option value={-1} disabled>custom</option>}
+        {menu.selected < 0 && <option value={-1} disabled>{s.presetCustom}</option>}
         {menu.choices.map((c, i) => 'reason' in c
           ? <option key={i} value={i} disabled title={c.reason}>{`${c.label} — ${c.reason}`}</option>
           : <option key={i} value={i}>{c.label}</option>)}
@@ -343,16 +340,17 @@ export function MiscControls({ params, nodeScale, onParamChange, onNodeScaleChan
   // Log-spaced ticks from the axis's start to the stop, where α = threshold.
   const ticks = Array.from({ length: TICK_SAMPLES + 1 }, (_, i) => TICKS[0] * (stop / TICKS[0]) ** (i / TICK_SAMPLES))
   const { minZoomMul: floor, maxZoomMul: cap } = nodeScale
+  const s = useStrings()
   return <>
     <div className="gv-graph-control-subsection">
-      <div className="gv-graph-control-subsection-title">Dynamics</div>
+      <div className="gv-graph-control-subsection-title">{s.dynamics}</div>
       <EquationSection subtitle="" equation={DYNAMICS_EQUATION} onHover={h => onActiveSection(h ? 'dynamics' : null)}>
         <Curve
           points={ticks.map(t => [t, Math.max(1 - cooling * t, threshold)] as const)}
           x={TICKS} y={ALPHA}
-          marks={[{ x: stop, label: `${Math.round(stop)} ticks` }]}
-          xLabel="ticks" yLabel="α"
-          ariaLabel="Energy α against ticks, to the tick the simulation stops at"
+          marks={[{ x: stop, label: s.dynamicsStop(Math.round(stop)) }]}
+          xLabel={s.dynamicsTicks} yLabel="α"
+          ariaLabel={s.dynamicsCurve}
         />
         {[FRICTION, COOLING, THRESHOLD].map(s => (
           <SliderRow key={s.key} def={s} value={params[s.key]} onChange={v => onParamChange({ [s.key]: v })} />
@@ -360,14 +358,14 @@ export function MiscControls({ params, nodeScale, onParamChange, onNodeScaleChan
       </EquationSection>
     </div>
     <div className="gv-graph-control-subsection">
-      <div className="gv-graph-control-subsection-title">Node scaling</div>
+      <div className="gv-graph-control-subsection-title">{s.nodeScaling}</div>
       <EquationSection subtitle="" equation={NODE_SCALE_EQUATION} onHover={() => {}}>
         <Curve
           points={[ZOOM[0], floor, cap, ZOOM[1]].map(z => [z, nodeSizeMul(z, nodeScale)] as const)}
           x={ZOOM} y={SCALE}
           marks={[{ x: floor }, { x: cap }]}
-          xLabel="zoom" yLabel="scale"
-          ariaLabel="Node scale against zoom: flat below the shrink floor and above the grow cap"
+          xLabel={s.nodeScalingZoom} yLabel={s.nodeScalingScale}
+          ariaLabel={s.nodeScalingCurve}
         />
         {[SIZE, GROW_CAP, SHRINK_FLOOR].map(s => (
           <SliderRow key={s.key} def={s} value={nodeScale[s.key]} onChange={v => onNodeScaleChange({ [s.key]: v })} />
@@ -382,10 +380,11 @@ function SliderRow({ def, value, onChange }: {
   value: number
   onChange: (v: number) => void
 }) {
+  const s = useStrings()
   const display = def.step < 1 ? String(value) : String(Math.round(value))
   return (
-    <div className="gv-graph-control-slider" title={def.tooltip}>
-      <label className="gv-graph-control-slider-label">{def.label}</label>
+    <div className="gv-graph-control-slider" title={s[`${def.text}Title`]}>
+      <label className="gv-graph-control-slider-label">{s[def.text]}</label>
       <Slider min={def.min} max={def.max} step={def.step} value={value} onChange={onChange} popId={def.key} />
       <span className="gv-graph-control-slider-value">{display}</span>
     </div>

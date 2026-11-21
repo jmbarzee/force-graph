@@ -5,6 +5,7 @@ import React from 'react'
 import './Scrubber.css'
 import type { TimeWindow } from '../graph/model'
 import { useLatest } from './graph-view/useControllable'
+import { useStrings } from './graph-view/strings'
 
 /** How long play takes from the playhead to the window's end. */
 const PLAY_MS = 10_000
@@ -18,6 +19,7 @@ interface ScrubberProps {
 }
 
 export function Scrubber({ window: span, playhead, onPlayheadChange }: ScrubberProps) {
+  const s = useStrings()
   const [playing, setPlaying] = React.useState(false)
   const latest = useLatest({ playhead, onPlayheadChange })
   const end = span.buckets - 1
@@ -55,8 +57,8 @@ export function Scrubber({ window: span, playhead, onPlayheadChange }: ScrubberP
       <button
         className="gv-scrubber-btn"
         onClick={() => setPlaying(p => !p)}
-        aria-label={playing ? 'Pause playback' : 'Play the window'}
-        title={playing ? 'Pause playback' : 'Play the window'}
+        aria-label={playing ? s.scrubberPause : s.scrubberPlay}
+        title={playing ? s.scrubberPause : s.scrubberPlay}
       >
         <svg width="12" height="12" viewBox="0 0 12 12" fill="currentColor" aria-hidden="true">
           {playing ? <path d="M2 1h3v10H2zM7 1h3v10H7z" /> : <path d="M2 1l9 5-9 5z" />}
@@ -70,13 +72,13 @@ export function Scrubber({ window: span, playhead, onPlayheadChange }: ScrubberP
         step="any"
         value={playhead ?? 0}
         onChange={e => seek(Number(e.target.value))}
-        aria-label="Playhead"
+        aria-label={s.scrubberPlayhead}
       />
       <button
         className={`gv-scrubber-btn${playhead === null ? ' active' : ''}`}
         onClick={() => seek(null)}
-        aria-label="Whole window"
-        title="Whole window"
+        aria-label={s.scrubberWhole}
+        title={s.scrubberWhole}
       >
         <svg width="12" height="12" viewBox="0 0 12 12" fill="none" stroke="currentColor" strokeWidth="1.5" aria-hidden="true">
           <path d="M1 2v8M11 2v8M3 6h6" />
