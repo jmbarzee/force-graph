@@ -1,4 +1,4 @@
-import { describe, expect, it } from 'vitest'
+import { describe, expect, it, vi } from 'vitest'
 import { ABSENT_EDGE_PHYSICS, layoutFrame, resolvePhysics, resolveSprings, springFor } from './forces'
 import { identityMapping } from './axis'
 import { defaultParamsFor, pairTuning, withSpringOverride } from './simulation'
@@ -82,6 +82,32 @@ describe('layoutFrame', () => {
     }])
     for (const node of nodes) expect(frame.rest('y', node)).toEqual({ lo: 0, hi: 0 })
     expect(frame.ringOf(nodes[0]!)).toBe(0)
+  })
+
+  describe('with scalars on both axes', () => {
+    const span = { zero: -100, one: 100 }
+    const frameOnBoth = (x: Scalar, y: Scalar) => {
+      const taxonomy = createTaxonomy({ styleAxis: 'kind', values: [], scalars: x === y ? [x] : [x, y] })
+      return layoutFrame(graph, resolvePhysics({ ...defaultParamsFor(taxonomy), bandX: { scalar: x.id, span }, bandY: { scalar: y.id, span } }, taxonomy))
+    }
+    const said = (code: string, scalar: string, nodeId?: string) => ({ code, ...(nodeId && { nodeId }), message: expect.stringContaining(`scalar "${scalar}"`) })
+
+    it('computes one scalar once, and reports each refusal once', () => {
+      const compute = vi.fn(answering(NaN))
+      const rank = { id: 'rank', compute }
+      expect(frameOnBoth(rank, rank).diagnostics).toMatchObject([said('scalar-answer-refused', 'rank', 'b')])
+      expect(compute).toHaveBeenCalledTimes(1)
+    })
+
+    it('reports one scalar\'s throw once', () => {
+      const rank = { id: 'rank', compute: () => { throw new Error('no rank') } }
+      expect(frameOnBoth(rank, rank).diagnostics).toMatchObject([said('scalar-compute-threw', 'rank')])
+    })
+
+    it('reports each of two scalars\' refusals', () => {
+      const frame = frameOnBoth({ id: 'rank', compute: answering(NaN) }, { id: 'age', compute: answering(NaN) })
+      expect(frame.diagnostics).toMatchObject([said('scalar-answer-refused', 'rank', 'b'), said('scalar-answer-refused', 'age', 'b')])
+    })
   })
 
   it('says nothing of answers within bounds', () => {

@@ -348,7 +348,13 @@ export function layoutFrame(graph: ReadableGraph, resolved: ResolvedPhysics): La
   const all = [...graph.nodes]
   const centerFor = (a: ResolvedBandAxis) => (isScalarAxis(a) ? 0 : medianBandCenter(all, a))
   const diagnostics: GraphDiagnostic[] = []
-  const scoresFor = (a: ResolvedBandAxis) => (isScalarAxis(a) ? checkedScores(a.scalar, graph, diagnostics) : undefined)
+  const checked = new Map<Scalar, Map<string, number>>()
+  const scoresFor = (a: ResolvedBandAxis) => {
+    if (!isScalarAxis(a)) return undefined
+    let scores = checked.get(a.scalar)
+    if (!scores) checked.set(a.scalar, scores = checkedScores(a.scalar, graph, diagnostics))
+    return scores
+  }
   const centerX = centerFor(resolved.bandX)
   const centerY = centerFor(resolved.bandY)
   const scoresX = scoresFor(resolved.bandX)
