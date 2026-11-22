@@ -62,9 +62,11 @@ export function useViewport(drawn: React.RefObject<readonly SimNode[]>): Viewpor
   }, [])
   const apply = React.useCallback((request: FrameRequest): boolean => {
     const size = measure()
-    if (!size?.width || !size.height) return false
+    const nodes = drawn.current ?? []
+    const ids = new Set(request.ids)
+    if (!size?.width || !size.height || !nodes.some(n => ids.has(n.id))) return false
     const area = { ...size, overlay: overlayHeightRef.current }
-    setViewport(vp => frameView(vp, request, drawn.current ?? [], area))
+    setViewport(vp => frameView(vp, request, nodes, area))
     return true
   }, [measure, drawn, overlayHeightRef])
 
@@ -76,11 +78,13 @@ export function useViewport(drawn: React.RefObject<readonly SimNode[]>): Viewpor
       const prev = sizeRef.current
       const size = measure()
       if (size) setViewport(vp => followResize(vp, prev, size))
-      queue.measured()
+      queue.retry()
     })
     ro.observe(container)
     return () => ro.disconnect()
   }, [measure, queue])
+  // Each commit may draw what a waiting warm request names.
+  React.useEffect(() => { queue.retry() })
   const moveViewport = React.useCallback((action: React.SetStateAction<Viewport>) => {
     queue.release()
     setViewport(action)

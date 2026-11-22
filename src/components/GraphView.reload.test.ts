@@ -111,6 +111,15 @@ it('frames a reload that opens at rest, in its one tick', async () => {
   for (const [id, p] of view.ref.current!.getPositions()) expect(Math.hypot(p.x - kept.get(id)!.x, p.y - kept.get(id)!.y)).toBeLessThan(0.01)
 })
 
+for (const strict of [false, true]) {
+  it(`frames a reload that opens at rest when its one tick beats the render${strict ? ', under StrictMode' : ''}`, async () => {
+    window.requestAnimationFrame = cb => { cb(performance.now()); return 0 }
+    const view = React.createElement(GraphView, { graph: first, taxonomy, defaultPositions: kept })
+    await act(async () => { createRoot(document.createElement('div')).render(strict ? React.createElement(React.StrictMode, null, view) : view) })
+    expect(viewport).not.toBe(DEFAULT_VIEWPORT)
+  })
+}
+
 it('frames a reload that opens at rest when the pane measures after its one tick', async () => {
   const resized: (() => void)[] = []
   window.ResizeObserver = class Observer { constructor(cb: ResizeObserverCallback) { resized.push(() => cb([], this)) } observe() {} unobserve() {} disconnect() {} }
