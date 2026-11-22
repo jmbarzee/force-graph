@@ -20,8 +20,8 @@ import type { SimNode } from '../../graph/simulation'
  * `released` runs then, unless for a newer request. A release, or a newer
  * request, also drops a waiting `hold` request, which then never acts, but a
  * `'drawn'` request leaves a waiting `'next'` one, which acts after it. A
- * release keeps a `'drawn'` request still waiting on a layout cooled below
- * alpha 0.3, as a settled one is: it frames once, when it can.
+ * user's release drops any waiting `'drawn'` request, and a settled layout
+ * keeps one: it frames once, when it can.
  */
 export interface FrameRequest {
   ids: Iterable<string>
@@ -39,7 +39,6 @@ export interface FrameRequest {
  */
 export function frameQueue(apply: (request: FrameRequest) => boolean) {
   let pending: FrameRequest | undefined, next: FrameRequest | undefined, held: FrameRequest | undefined
-  let cooled = false
   const act = (request: FrameRequest) => {
     held = request.hold ? request : undefined
   }
@@ -47,6 +46,12 @@ export function frameQueue(apply: (request: FrameRequest) => boolean) {
     if (pending?.hold) pending = undefined
     if (next?.hold) next = undefined
     held = undefined
+  }
+  const release = () => {
+    const released = held?.released
+    drop()
+    pending = undefined
+    released?.()
   }
   const land = () => {
     if (!pending || !apply(pending)) return false
@@ -60,12 +65,11 @@ export function frameQueue(apply: (request: FrameRequest) => boolean) {
       const behind = request.when === 'drawn' ? next : undefined
       drop()
       next ??= behind
-      if (request.when === 'drawn') { pending = request; cooled = false }
+      if (request.when === 'drawn') pending = request
       else if (request.when === 'next') next = request
       else { apply(request); act(request) }
     },
-    tick(alpha: number) {
-      cooled = alpha < 0.3
+    tick() {
       if (held) apply(held)
       if (pending && !land()) return
       if (next) {
@@ -75,16 +79,12 @@ export function frameQueue(apply: (request: FrameRequest) => boolean) {
         act(request)
       }
     },
-    // The pane measured or a node drew: a drawn request waiting on them acts now.
-    retry() {
-      land()
-    },
-    release() {
-      const released = held?.released
-      const waiting = cooled && pending ? { ...pending, hold: false } : undefined
-      drop()
-      pending ??= waiting
-      released?.()
+    retry: land,
+    release,
+    settle() {
+      const waiting = pending && { ...pending, hold: false }
+      release()
+      pending = waiting
     },
   }
 }

@@ -518,7 +518,7 @@ const GraphViewBody = React.forwardRef<GraphViewHandle, GraphViewProps>(function
   // Camera (viewport transform, container and overlay refs, every framing),
   // framing the visible nodes, set below once they are derived.
   const visibleNodesRef = React.useRef<SimNode[]>([])
-  const { viewport, moveViewport, containerRef, overlayRef, overlayHeight, requestFrame, tickFrame, releaseFrame } = useViewport(visibleNodesRef)
+  const { viewport, moveViewport, containerRef, overlayRef, overlayHeight, requestFrame, tickFrame, releaseFrame, settleFrame } = useViewport(visibleNodesRef)
   // The simulation instance + its handlers are owned by useSimulation, and the
   // RAF loop + fps by useSimulationLoop, both called below once `graph` and the
   // visible subgraph are available.
@@ -859,7 +859,7 @@ const GraphViewBody = React.forwardRef<GraphViewHandle, GraphViewProps>(function
     visibleIds, downstreamScores,
     filter, axes: filterAxes, groupsOf,
     hoveredNodeId,
-    requestFrame, tickFrame, releaseFrame, taxonomy,
+    requestFrame, tickFrame, settleFrame, taxonomy,
   })
 
   const { hover: handleHoverNode, hold: holdNodeHover } = useHoverGrace(setHoveredNodeId)

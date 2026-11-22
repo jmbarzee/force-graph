@@ -19,9 +19,10 @@ export interface ViewportController {
   overlayRef: React.RefObject<HTMLDivElement>
   overlayHeight: number
   requestFrame: (request: FrameRequest) => void
-  // Frame what `requestFrame` left waiting or holding, as the layout's alpha allows; the loop calls it each tick.
-  tickFrame: (alpha: number) => void
+  // Frame what `requestFrame` left waiting or holding; the loop calls it each tick.
+  tickFrame: () => void
   releaseFrame: () => void
+  settleFrame: () => void
 }
 
 /** The camera, framing the nodes `drawn` holds. */
@@ -61,10 +62,11 @@ export function useViewport(drawn: React.RefObject<readonly SimNode[]>): Viewpor
     return { width, height }
   }, [])
   const apply = React.useCallback((request: FrameRequest): boolean => {
-    const size = measure()
     const nodes = drawn.current ?? []
     const ids = new Set(request.ids)
-    if (!size?.width || !size.height || !nodes.some(n => ids.has(n.id))) return false
+    if (!nodes.some(n => ids.has(n.id))) return false
+    const size = measure()
+    if (!size?.width || !size.height) return false
     const area = { ...size, overlay: overlayHeightRef.current }
     setViewport(vp => frameView(vp, request, nodes, area))
     return true
@@ -90,5 +92,5 @@ export function useViewport(drawn: React.RefObject<readonly SimNode[]>): Viewpor
     setViewport(action)
   }, [queue])
 
-  return { viewport, moveViewport, containerRef, overlayRef, overlayHeight, requestFrame: queue.request, tickFrame: queue.tick, releaseFrame: queue.release }
+  return { viewport, moveViewport, containerRef, overlayRef, overlayHeight, requestFrame: queue.request, tickFrame: queue.tick, releaseFrame: queue.release, settleFrame: queue.settle }
 }
