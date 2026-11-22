@@ -4,7 +4,9 @@
 // carries for the resolved theme, and a colour normaliser for the canvas,
 // which cannot throw and so reads only the forms the taxonomy admits.
 
+import type React from 'react'
 import type { AxisValue } from './axis'
+import type { Fill } from './coloring'
 import type { Taxonomy } from './taxonomy'
 
 /** The two themes every colour is declared in. */
@@ -22,15 +24,29 @@ export interface ColorPair {
 
 /** A value's colour in both themes — declared together, so no half can go missing. */
 export interface ThemedColor {
+  /** The fill and border in the light theme. */
   readonly light: ColorPair
+  /** The fill and border in the dark theme. */
   readonly dark: ColorPair
 }
 
-/** How an edge type is stroked: its colour per theme, base alpha, dash pattern and width. */
+/** One colour per theme: hex, `rgb()` or `hsl()` in each. */
+export interface ThemedHue {
+  /** The colour in the light theme. */
+  readonly light: string
+  /** The colour in the dark theme. */
+  readonly dark: string
+}
+
+/** How an edge type is stroked. */
 export interface EdgeStroke {
-  readonly color: { readonly light: string; readonly dark: string }
+  /** The stroke's colour per theme. */
+  readonly color: ThemedHue
+  /** The stroke's base opacity, 0 to 1. */
   readonly alpha: number
+  /** The canvas dash pattern; empty is solid. */
   readonly dash: readonly number[]
+  /** The stroke's width. */
   readonly width: number
 }
 
@@ -49,18 +65,62 @@ export function cssSuffix(value: AxisValue): string {
 
 /**
  * The inline custom properties a pane carries for one theme: every style
- * value's fill and border. Set on the pane's root, they are what tokens, chip
- * tints and typed rows read, and they follow the resolved theme by being
- * recomputed, not overridden.
+ * value's fill and border, under its fill's keys. Set on the pane's root,
+ * they follow the resolved theme by being recomputed, not overridden.
  */
-export function schemeVars(taxonomy: Taxonomy, theme: Theme): Record<string, string> {
+export function schemeVars(taxonomy: Taxonomy, theme: Theme): React.CSSProperties {
   const vars: Record<string, string> = {}
-  for (const key of taxonomy.styleValues) {
+  for (const key of taxonomy.styleValues()) {
     const c = taxonomy.styleOf(key).color[theme]
     vars[taxonomy.colorVar(key)] = c.fill
     vars[`${taxonomy.colorVar(key)}-border`] = c.border
   }
   return vars
+}
+
+/** The fill's keys under the names it gives them, for one theme: a pane's `--gv-node-*` follows its fill. */
+export function keyVars(fill: Fill, theme: Theme): React.CSSProperties {
+  const vars: Record<string, string> = {}
+  for (const { color, cssVar } of fill.keys.values()) {
+    vars[cssVar] = color[theme].fill
+    vars[`${cssVar}-border`] = color[theme].border
+  }
+  return vars
+}
+
+/**
+ * The cycling palette a key with no colour of its own takes a slot in. Keys
+ * are told apart by a legend, so the ten hues only separate the handful shown
+ * at once; the light half is each hue a few stops deeper, to read on a pale
+ * canvas.
+ */
+export const PALETTE: readonly ThemedHue[] = [
+  { light: '#0F766E', dark: '#2DD4BF' }, // teal
+  { light: '#B45309', dark: '#F59E0B' }, // amber
+  { light: '#6D28D9', dark: '#A78BFA' }, // violet
+  { light: '#BE185D', dark: '#F472B6' }, // rose
+  { light: '#047857', dark: '#34D399' }, // green
+  { light: '#1D4ED8', dark: '#60A5FA' }, // blue
+  { light: '#C2410C', dark: '#FB923C' }, // orange
+  { light: '#4D7C0F', dark: '#A3E635' }, // lime
+  { light: '#0E7490', dark: '#22D3EE' }, // cyan
+  { light: '#A21CAF', dark: '#E879F9' }, // fuchsia
+]
+
+/** A key's hue: a string serves both themes; absent, the palette's at `slot`. */
+export function hueOf(color: string | ThemedHue | undefined, slot: number): ThemedHue {
+  if (color === undefined) return PALETTE[slot % PALETTE.length]
+  return typeof color === 'string' ? { light: color, dark: color } : color
+}
+
+/** A hue as a body's fill, with a border of its RGB × 0.6. */
+export function pairOf(hue: ThemedHue): ThemedColor {
+  const border = (color: string): string =>
+    `#${(rgbOf(color) ?? NEUTRAL).map(c => Math.round(c * 0.6).toString(16).padStart(2, '0')).join('')}`
+  return {
+    light: { fill: hue.light, border: border(hue.light) },
+    dark: { fill: hue.dark, border: border(hue.dark) },
+  }
 }
 
 const HEX3 = /^#([0-9a-f])([0-9a-f])([0-9a-f])$/i
@@ -102,8 +162,9 @@ export function rgbOf(color: string): readonly [number, number, number] | undefi
   return undefined
 }
 
-/** Whether a colour is one every reader parses: hex, `rgb()` or `hsl()`. */
-export const isSchemeColor = (color: string): boolean => rgbOf(color) !== undefined
+/** Whether a colour, or each half of a hue, is one every reader parses: hex, `rgb()` or `hsl()`. */
+export const isSchemeColor = (color: string | ThemedHue): boolean =>
+  typeof color === 'string' ? rgbOf(color) !== undefined : isSchemeColor(color.light) && isSchemeColor(color.dark)
 
 const NEUTRAL: readonly [number, number, number] = [148, 163, 184]
 const REFUSED = new Set<string>()
@@ -128,26 +189,3 @@ export function withAlpha(color: string, alpha: number): string {
   return `rgba(${rgb[0]}, ${rgb[1]}, ${rgb[2]}, ${alpha})`
 }
 
-/**
- * A stylesheet for a host's own CSS: every style value's fill and border on
- * `:root`, and the dark values that differ under `darkSelector` — by default
- * `[data-theme="dark"]`, the attribute the pane carries on its own root; a
- * host that marks its theme another way names its own selector. The pane
- * does not read this — it carries `schemeVars` inline — so a host that
- * styles nothing of its own by node value never needs it.
- */
-export function schemeStylesheet(taxonomy: Taxonomy, darkSelector = '[data-theme="dark"]'): string {
-  const lightVars: string[] = []
-  const darkVars: string[] = []
-  for (const key of taxonomy.styleValues) {
-    const { light, dark } = taxonomy.styleOf(key).color
-    const v = taxonomy.colorVar(key)
-    lightVars.push(`  ${v}: ${light.fill};`)
-    lightVars.push(`  ${v}-border: ${light.border};`)
-    if (dark.fill !== light.fill) darkVars.push(`  ${v}: ${dark.fill};`)
-    if (dark.border !== light.border) darkVars.push(`  ${v}-border: ${dark.border};`)
-  }
-  const parts: string[] = [`:root {\n${lightVars.join('\n')}\n}`]
-  if (darkVars.length > 0) parts.push(`${darkSelector} {\n${darkVars.join('\n')}\n}`)
-  return parts.join('\n')
-}

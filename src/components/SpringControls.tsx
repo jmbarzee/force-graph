@@ -11,9 +11,13 @@ import type { ForceParams } from '../graph/simulation'
 import { withSpringOverride } from '../graph/simulation'
 import type { ResolvedPhysics } from '../graph/forces'
 import type { EdgeCategoryDescription } from '../graph/forces'
+import type { AxisMapping, AxisValue } from '../graph/axis'
+import type { Fill } from '../graph/coloring'
 
 import { useTaxonomy } from './graph-view/useTaxonomy'
-import { bucketColor } from './controls/bucketColor'
+import { useFill } from './graph-view/useFill'
+import { useStrings } from './graph-view/strings'
+import { NEUTRAL_BUCKET_COLOR, bucketColor } from './controls/bucketColor'
 import { ForceMap2D, ForceCurves, CURVE_W, CURVE_H, CURVE_SAMPLES } from './ForceMap'
 import type { MapToken, CurveItem } from './ForceMap'
 
@@ -27,6 +31,10 @@ export const EDGE_REST_MAX = 1000
 export const EDGE_REST_STEP = 10
 
 const clamp = (v: number, lo: number, hi: number) => Math.max(lo, Math.min(hi, v))
+
+/** One half of a split-colour token: its value's colour, or the neutral "any" for an end the type leaves out. */
+const swatchColor = (fill: Fill, mapping: AxisMapping, value: AxisValue | null): string =>
+  value === null ? NEUTRAL_BUCKET_COLOR : bucketColor(fill, mapping, value)
 
 /** One token per category present in the graph, in first-seen order; ids the table cannot describe are skipped. */
 function describedCategories(spring: ResolvedPhysics['spring'], present: ReadonlySet<string>): EdgeCategoryDescription[] {
@@ -56,7 +64,9 @@ interface SpringControlProps {
 // x = rest length, y = stiffness (k). Each edge category is a draggable
 // split-colour token; dragging sets both rest and k at once.
 export function SpringMap({ params, resolved, present, onParamChange, hoveredEdge, onHoverEdge }: SpringControlProps) {
+  const s = useStrings()
   const taxonomy = useTaxonomy()
+  const fill = useFill(taxonomy)
   const { spring } = resolved
   const shown = describedCategories(spring, present)
   const tokens: MapToken[] = shown.map(c => {
@@ -65,8 +75,8 @@ export function SpringMap({ params, resolved, present, onParamChange, hoveredEdg
       id: c.id,
       x: ph.distance,
       y: ph.strength,
-      colorA: bucketColor(taxonomy, spring.mapping, c.sourceValue),
-      colorB: bucketColor(taxonomy, spring.mapping, c.targetValue),
+      colorA: swatchColor(fill, spring.mapping, c.swatch[0]),
+      colorB: swatchColor(fill, spring.mapping, c.swatch[1]),
       outline: c.relation === 'containment' ? 'dashed' : 'solid',
       label: c.label,
       tooltip: c.tooltip,
@@ -81,22 +91,22 @@ export function SpringMap({ params, resolved, present, onParamChange, hoveredEdg
   return (
     <ForceMap2D
       tokens={tokens}
-      xAxis={{ min: EDGE_REST_MIN, max: EDGE_REST_MAX, step: EDGE_REST_STEP, label: 'length' }}
-      yAxis={{ min: EDGE_K_MIN, max: EDGE_K_MAX, step: EDGE_K_STEP, label: 'stiffness' }}
+      xAxis={{ min: EDGE_REST_MIN, max: EDGE_REST_MAX, step: EDGE_REST_STEP, label: s.springLength }}
+      yAxis={{ min: EDGE_K_MIN, max: EDGE_K_MAX, step: EDGE_K_STEP, label: s.springStiffness }}
       onDrag={handleDrag}
       hoveredId={hoveredEdge}
       onHover={onHoverEdge}
-      ariaLabel="Spring map: rest length versus stiffness"
+      ariaLabel={s.springMap}
       xSlider={{
         value: params.distanceMultiplier, min: 0.05, max: 3, step: 0.05,
         onChange: v => onParamChange({ distanceMultiplier: v }),
-        title: 'Scale every spring’s rest length', ariaLabel: 'Scale all length',
+        title: s.springScaleLengthTitle, ariaLabel: s.springScaleLength,
         popId: 'distanceMultiplier',
       }}
       ySlider={{
         value: params.pullMultiplier, min: 0, max: 3, step: 0.1,
         onChange: v => onParamChange({ pullMultiplier: v }),
-        title: 'Scale every spring’s stiffness', ariaLabel: 'Scale all stiffness',
+        title: s.springScaleStiffnessTitle, ariaLabel: s.springScaleStiffness,
         popId: 'pullMultiplier',
       }}
     />
@@ -120,7 +130,9 @@ function springResponse(d: number, kEff: number, restEff: number, exp: number): 
 }
 
 export function SpringCurves({ params, resolved, present, onParamChange, hoveredEdge, onHoverEdge }: SpringControlProps) {
+  const s = useStrings()
   const taxonomy = useTaxonomy()
+  const fill = useFill(taxonomy)
   const { spring } = resolved
   const shown = React.useMemo(() => describedCategories(spring, present), [spring, present])
   const pull = params.pullMultiplier
@@ -155,16 +167,12 @@ export function SpringCurves({ params, resolved, present, onParamChange, hovered
 
     const built = sampled.map(({ edge, restEff, pts }) => ({
       id: edge.id,
-      color: bucketColor(taxonomy, spring.mapping, edge.sourceValue),
+      color: swatchColor(fill, spring.mapping, edge.swatch[0]),
       markerX: xFor(restEff),
       points: pts.map(p => `${xFor(p.d).toFixed(1)},${yFor(p.v).toFixed(1)}`).join(' '),
     }))
     return { curves: built, dMax }
-    // `taxonomy` belongs here: the body reads it for the split-colour tokens.
-    // Its sibling ChargeCurves already listed it, and the asymmetry was the bug
-    // — a taxonomy swap left these curves drawn in the previous taxonomy's
-    // colours, on its edge set, with no error.
-  }, [spring, shown, pull, dist, exp, taxonomy])
+  }, [spring, shown, pull, dist, exp, fill])
 
   return (
     <ForceCurves
@@ -173,13 +181,11 @@ export function SpringCurves({ params, resolved, present, onParamChange, hovered
       baselineY={ZERO_Y}
       hoveredId={hoveredEdge}
       onHover={onHoverEdge}
-      xLabel="distance"
-      yLabel="force"
-      ariaLabel="Spring force response curves"
+      ariaLabel={s.springCurves}
       exp={{
         value: exp, min: 0.5, max: 3, step: 0.1,
         onChange: v => onParamChange({ linkExponent: v }),
-        title: 'Power of displacement in the spring force. 1 = linear (Hooke); higher = softer near rest, stiffer far out.',
+        title: s.springExpTitle,
         popId: 'linkExponent',
       }}
     />

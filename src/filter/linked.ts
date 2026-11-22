@@ -7,22 +7,24 @@ import type { Taxonomy } from '../graph/taxonomy'
 import { reconcileFilter } from './reconcile'
 import type { AxisLocks, FilterState, ReconcileResult, ViewTransition } from './types'
 
-/** One view's share of the linked state: what it filters on, what it holds against adoption, and what the last focus into it overrode. */
+/** One view's share of the linked state. */
 export interface LinkedViewState {
+  /** The view's choices. */
   filter: FilterState
+  /** The axes the view holds against adoption. */
   locks: AxisLocks
   /** The axes this view shows, in order — the ones a switch reconciles. */
   axes: readonly AxisId[]
-  /** The locks the last switch into this view overrode: a focus's, a new set per focus so a bar flashes them once; a manual switch overrides none and clears it. */
-  overriddenLocks: ReadonlySet<AxisId>
+  /** The locks the last switch into this view overrode, under a key each change of them bumps: a bar flashes the locks once per key; a manual switch overrides none. */
+  overriddenLocks: { axes: ReadonlySet<AxisId>; key: number }
 }
 
-/** The one empty set every view starts from, so an unchanged state keeps its identity. */
-export const NO_LOCKS: ReadonlySet<AxisId> = new Set()
+/** The overrides every view starts from. */
+export const NO_OVERRIDES: LinkedViewState['overriddenLocks'] = { axes: new Set(), key: 0 }
 
 /**
  * Switch to `to` from `from`: on a manual switch `to` adopts `from`'s
- * selections on the axes it shows, except where locked; on a focus `to`
+ * choices on the axes it shows, except where locked; on a focus `to`
  * widens just enough to show the target — to the whole chip holding its
  * value when `graph` is given — overriding locks (recorded). The same state
  * object comes back when nothing changed.
@@ -45,8 +47,8 @@ export function linkedSwitch<V extends string>(
     axes: dest.axes,
     graph,
   })
-  const overridden: ReadonlySet<AxisId> = result.overriddenLocks.size > 0 ? result.overriddenLocks : NO_LOCKS
-  const sameLocks = overridden === dest.overriddenLocks || (overridden.size === 0 && dest.overriddenLocks.size === 0)
-  if (result.filter === dest.filter && sameLocks) return { state, result }
+  const prev = dest.overriddenLocks
+  const overridden = result.overriddenLocks.size === 0 && prev.axes.size === 0 ? prev : { axes: result.overriddenLocks, key: prev.key + 1 }
+  if (result.filter === dest.filter && overridden === prev) return { state, result }
   return { state: { ...state, [to]: { ...dest, filter: result.filter, overriddenLocks: overridden } }, result }
 }

@@ -3,7 +3,7 @@
 // switch, and how far it widens to reveal a focus target. Pure: the
 // destination's filter, locks and axes, the source's filter, the transition
 // and the taxonomy in; the new filter and the locks it had to override out.
-// What differs per axis — what an empty selection means, how far a focus
+// What differs per axis — what an empty choice means, how far a focus
 // widens — is each descriptor's declared policy, read here, never assumed
 // uniform: a shared rule would hide the whole graph on a focus into a
 // narrowing axis.
@@ -16,17 +16,22 @@ import type {
   FocusTarget,
 } from './types'
 import {
+  GROUPS,
   filterStatesEqual,
+  isEmptyChosen,
   lockedFor,
-  selectionFor,
-  withSelection,
+  passesGroups,
+  chosenOn,
+  selects,
+  withChosen,
+  withValues,
 } from './types'
 import type { AxisId, AxisValue, ResolvedAxisDescriptor } from '../graph/axis'
 import { valuesOn } from '../graph/axis'
 import type { Graph } from '../graph/model'
 import type { Taxonomy } from '../graph/taxonomy'
 
-/** What a reconciliation reads: the destination view's filter, locks and the axes it shows, the source view's filter, the transition, and the graph when a focus should widen by whole chips. */
+/** What a reconciliation reads. */
 export interface ReconcileInput {
   /** The view being switched to: its filter as it stands. */
   destination: FilterState
@@ -34,20 +39,21 @@ export interface ReconcileInput {
   source: FilterState
   /** The destination's locks. */
   locks: AxisLocks
+  /** A manual switch, or a focus and its target. */
   transition: ViewTransition
   /** Resolves the axes' policies. */
   taxonomy: Pick<Taxonomy, 'axisFor'>
   /**
    * The axes the destination view SHOWS, by id — not every declared axis:
    * an axis the user removed from the bar is not filtering there, and
-   * adopting a selection on it would revive what they reset. One the
+   * adopting a choice on it would revive what they reset. One the
    * taxonomy does not declare is skipped.
    */
   axes: readonly AxisId[]
   /**
    * The graph the destination shows. Given, a focus widens to the WHOLE
    * chip holding the target's value — the bar toggles a chip as a unit, so
-   * a selection that split one would read as on with half its nodes hidden,
+   * a choice that split one would read as on with half its nodes hidden,
    * and the first click would turn the chip off. Absent, the value alone.
    */
   graph?: Pick<Graph, 'nodes'>
@@ -55,7 +61,8 @@ export interface ReconcileInput {
 
 /**
  * The destination view's filter after a switch: on a manual switch it adopts
- * the source's selections on the axes it shows, except where locked; on a
+ * the source's choices on the axes it shows, except where locked, and
+ * keeps its own `GROUPS` — groups are one pane's; on a
  * focus it widens just enough to show the target, overriding locks, which
  * come back in `overriddenLocks` for the bar to flash. The same filter object
  * comes back when nothing changed.
@@ -71,9 +78,9 @@ export function reconcileFilter({ destination, source, locks, transition, taxono
 }
 
 /**
- * manual: per axis, keep the destination's selection where locked, otherwise
+ * manual: per axis, keep the destination's choice where locked, otherwise
  * adopt the source's. Locks are never overridden here, so nothing flashes.
- * Built with `withSelection`, so an axis whose content did not change keeps
+ * Built with `withChosen`, so an axis whose content did not change keeps
  * its Set: the view reads a kept identity as "unchanged" and neither reheats
  * nor refits for it.
  */
@@ -86,7 +93,7 @@ function reconcileManual(
   let next = destFilter
   for (const axis of axes) {
     if (lockedFor(destLocks, axis.id)) continue
-    next = withSelection(next, axis.id, selectionFor(sourceFilter, axis.id))
+    next = withChosen(next, axis.id, chosenOn(sourceFilter, axis.id))
   }
   return { filter: next, overriddenLocks: new Set<AxisId>() }
 }
@@ -94,10 +101,11 @@ function reconcileManual(
 /**
  * focus: widen the destination just enough to show the target. Per axis, by
  * the descriptor's `widens`: `always` adds the target's value; `whenActive`
- * adds it only while a selection is active — on a narrowing axis an empty
- * selection already shows everything, and adding the first value would
+ * adds it only while a choice is active — on a narrowing axis an empty
+ * choice already shows everything, and adding the first value would
  * narrow to it. With the graph given, the whole chip holding the value is
- * added, as far as the graph presents it. Locks are not changed; each locked
+ * added, as far as the graph presents it. A target the group filter hides
+ * turns every group it belongs to on. Locks are not changed; each locked
  * axis that had to widen is reported, so the destination's bar can flash it.
  */
 function reconcileFocus(
@@ -114,13 +122,15 @@ function reconcileFocus(
     const value = target.values[axis.id]
     if (value === undefined) continue
 
-    const current = selectionFor(destFilter, axis.id)
-    if (current.has(value)) continue
-    if (axis.widens === 'whenActive' && current.size === 0) continue
+    const current = chosenOn(destFilter, axis.id)
+    if (selects(current, value)) continue
+    if (axis.widens === 'whenActive' && isEmptyChosen(current)) continue
 
-    next = withSelection(next, axis.id, new Set([...current, ...chipValues(axis, value, graph)]))
+    next = withChosen(next, axis.id, withValues(current, chipValues(axis, value, graph), true))
     if (lockedFor(destLocks, axis.id)) overridden.add(axis.id)
   }
+  const groups = target.groups ?? []
+  if (!passesGroups(destFilter, groups)) next = withChosen(next, GROUPS, withValues(chosenOn(destFilter, GROUPS), groups, true))
 
   return {
     filter: filterStatesEqual(next, destFilter) ? destFilter : next,

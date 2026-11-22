@@ -13,6 +13,8 @@ import type { SimNode } from '../../graph/simulation'
 import type { GraphEdge, GraphNode } from '../../graph/model'
 import { highlightOf } from '../../graph/highlight'
 import type { Taxonomy } from '../../graph/taxonomy'
+import { listEqual } from '../../filter/types'
+import { ancestry } from './tabOrder'
 
 import type { ForceSection } from '../GraphControlPanel'
 import type { GravityHover } from '../GravityControls'
@@ -20,10 +22,9 @@ import type { GravityHover } from '../GravityControls'
 export interface HighlightController {
   hoveredNodeId: string | null
   setHoveredNodeId: React.Dispatch<React.SetStateAction<string | null>>
-  focusedIndex: number
-  setFocusedIndex: React.Dispatch<React.SetStateAction<number>>
   shiftHeld: boolean
   focusedNodeId: string | null
+  moveFocus: (id: string) => void
   highlightedNodes: Set<string> | null
   highlightedEdges: Set<string> | null
   activeSection: ForceSection
@@ -40,18 +41,21 @@ export function useHighlight(
   visibleNodes: SimNode[],
   visibleEdges: GraphEdge[],
   visibleIds: Set<string>,
+  undirected: ReadonlySet<string>,
   getNode: (id: string) => SimNode | undefined,
-  // Changes whenever the underlying graph is rebuilt; clears the hover and
-  // the keyboard focus so a stale id never lingers across graphs.
+  // Changes whenever the underlying graph is rebuilt; clears the hover so a
+  // stale id never lingers across graphs.
   resetKey: unknown,
   taxonomy: Taxonomy,
-  /** The selected node — the view's own or the host's — which the highlight walks from when nothing is hovered. */
-  selectedNodeId: string | null,
+  /** The selected nodes — the view's own or the host's — which the highlight walks from when nothing is hovered. */
+  selectedIds: ReadonlySet<string>,
   /** The host's nodes by id: what the taxonomy's `highlight` hook is handed, never the simulation's copies. */
   hostIndex: ReadonlyMap<string, GraphNode>,
 ): HighlightController {
   const [hoveredNodeId, setHoveredNodeId] = React.useState<string | null>(null)
-  const [focusedIndex, setFocusedIndex] = React.useState(-1)
+  // The focus with its containers as they were when it was set: a filter or a
+  // reload that stops drawing it moves it to the nearest one still drawn.
+  const [focusPath, setFocusPath] = React.useState<readonly string[]>([])
   const [shiftHeld, setShiftHeld] = React.useState(false)
 
   // Force-field preview (hover-driven; no persistent toggle).
@@ -60,11 +64,7 @@ export function useHighlight(
   const [activeGravityBucket, setActiveGravityBucket] = React.useState<GravityHover | null>(null)
   const [activePullEdge, setActivePullEdge] = React.useState<string | null>(null)
 
-  // Reset hover and keyboard focus when the graph is rebuilt.
-  React.useEffect(() => {
-    setHoveredNodeId(null)
-    setFocusedIndex(-1)
-  }, [resetKey])
+  React.useEffect(() => setHoveredNodeId(null), [resetKey])
 
   // Shift key tracking — drives upstream vs downstream highlight direction.
   React.useEffect(() => {
@@ -75,39 +75,37 @@ export function useHighlight(
     return () => { window.removeEventListener('keydown', down); window.removeEventListener('keyup', up) }
   }, [])
 
-  const focusedNodeId = focusedIndex >= 0 && focusedIndex < visibleNodes.length
-    ? visibleNodes[focusedIndex].id
-    : null
+  const focusedNodeId = focusPath.find(id => visibleIds.has(id)) ?? null
+  const moveFocus = React.useCallback((id: string) => setFocusPath(ancestry(id, getNode)), [getNode])
+  React.useEffect(() => setFocusPath(path => {
+    const next = focusedNodeId === null ? [] : ancestry(focusedNodeId, getNode)
+    return listEqual(next, path) ? path : next
+  }), [focusedNodeId, visibleIds, getNode])
 
-  // Transitive dependency highlighting: a directional walk from the active
-  // node, which the host may widen or replace through its taxonomy —
-  // a value that relates to others by its own metadata says so there, not
-  // here. Sister copies are intentionally NOT added (the canvas draws their
-  // duplicate halo separately).
+  // Sister copies are not added: the canvas halos them.
   const { highlightedNodes, highlightedEdges } = React.useMemo(() => {
-    const activeId = hoveredNodeId ?? selectedNodeId
-    if (!activeId || !visibleIds.has(activeId)) {
+    // The host's hook sees the host's own nodes: the active ones, the visible
+    // ones and any it looks up — the simulation's copies stay the view's.
+    const hostNode = (id: string) => hostIndex.get(id) ?? getNode(id)
+    const active = [...(hoveredNodeId === null ? selectedIds : [hoveredNodeId])]
+      .filter(id => visibleIds.has(id))
+      .flatMap(id => hostNode(id) ?? [])
+    if (active.length === 0) {
       return { highlightedNodes: null as Set<string> | null, highlightedEdges: null as Set<string> | null }
     }
     const direction = shiftHeld ? 'upstream' as const : 'downstream' as const
-    const activeNode = getNode(activeId)
-    if (!activeNode) return { highlightedNodes: null as Set<string> | null, highlightedEdges: null as Set<string> | null }
-    // The host's hook sees the host's own nodes: the active one, the visible
-    // ones and any it looks up — the simulation's copies stay the view's.
-    const hostNode = (id: string) => hostIndex.get(id)
-    const { nodes, edges } = highlightOf(taxonomy, hostNode(activeId) ?? activeNode, direction, {
-      visibleNodes: visibleNodes.map(n => hostNode(n.id) ?? n),
+    const { nodes, edges } = highlightOf(taxonomy, active, direction, {
+      visibleNodes: visibleNodes.map(n => hostIndex.get(n.id) ?? n),
       visibleEdges, visibleIds,
-      getNode: id => hostNode(id) ?? getNode(id),
-    })
+      getNode: hostNode,
+    }, undirected)
     return { highlightedNodes: nodes, highlightedEdges: edges }
-  }, [hoveredNodeId, selectedNodeId, shiftHeld, visibleEdges, visibleIds, visibleNodes, getNode, taxonomy, hostIndex])
+  }, [hoveredNodeId, selectedIds, shiftHeld, visibleEdges, visibleIds, undirected, visibleNodes, getNode, taxonomy, hostIndex])
 
   return {
     hoveredNodeId, setHoveredNodeId,
-    focusedIndex, setFocusedIndex,
     shiftHeld,
-    focusedNodeId,
+    focusedNodeId, moveFocus,
     highlightedNodes, highlightedEdges,
     activeSection, setActiveSection,
     activePushBucket, setActivePushBucket,

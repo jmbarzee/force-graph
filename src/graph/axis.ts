@@ -5,13 +5,17 @@
 // across axes: that is what keeps the model explainable, and it is why nothing
 // here offers a way to combine two axes.
 //
-// **Values are strings, and that is load-bearing rather than lazy.** Selections
+// **Values are strings, and that is load-bearing rather than lazy.** Choices
 // end up as `Set` and `Map` keys in the force kernels, and a `Set` deduplicates
 // by value for a string and by *identity* for an object. A composite value —
 // an object, a tuple, a freshly-built key — silently degenerates to one entry
 // per node, which shifts the band stack and produces no type error and no
 // crash. Anything that would be composite has to be interned to a stable string
 // before it reaches this type; `internValue` is that step.
+
+import type { FilterState } from '../filter/types'
+import { passesDescriptors } from '../filter/types'
+import type { Taxonomy } from './taxonomy'
 
 /** A named axis of node identity, e.g. the type axis or the source-file axis. */
 export type AxisId = string
@@ -28,7 +32,7 @@ export type AxisValues = Readonly<Record<AxisId, AxisValue>>
 /**
  * Fold anything into a stable value key.
  *
- * Composite selections are the trap this exists for. Passing an array or an
+ * Composite choices are the trap this exists for. Passing an array or an
  * object gives a deterministic string rather than a new object each call, so a
  * `Set` of these deduplicates the way the caller expects.
  */
@@ -36,13 +40,20 @@ export function internValue(parts: string | readonly string[]): AxisValue {
   return typeof parts === 'string' ? parts : parts.join('\u0000')
 }
 
-/** One button in a filter bar: a label, an optional glyph, and the values it toggles. */
+/** One button in a filter bar. */
 export interface FilterChip {
+  /** Unique among the axis's chips. */
   id: string
+  /** The chip's text. */
   label: string
+  /** A glyph drawn before the label. */
   icon?: string
-  /** A style value whose colour this chip wears, in the pane's theme; none means neutral. */
-  tint?: AxisValue
+  /**
+   * A key of the view's fill whose colour this chip wears, in the pane's
+   * theme. Absent, a one-value chip on the axis the fill follows wears its
+   * value's key, and any other chip is neutral.
+   */
+  tint?: string
   /**
    * Hover text, when the label alone is not enough to identify the chip.
    *
@@ -62,9 +73,11 @@ export interface FilterChip {
  * descriptor) can supply one too and share the identity-mapping builder.
  */
 export interface AxisNamer {
+  /** The axis named. */
   id: AxisId
   /** Human label for the axis itself, e.g. for a dropdown or a chip group. */
   label: string
+  /** A value's display name. */
   labelFor(value: AxisValue): string
   /** One or two characters for a token. */
   abbreviationFor(value: AxisValue): string
@@ -84,19 +97,19 @@ export interface ReheatPolicy {
 
 /**
  * One filter axis, as a host declares it: its id, its label, and what an
- * empty selection on it means. Everything else is policy with a default that
+ * empty choice on it means. Everything else is policy with a default that
  * follows from `emptyMeans`, because the two kinds of axis want opposite
  * answers to each question:
  *
  *   - an **allow-list** (`emptyMeans: 'none'`): a node with no value is
- *     hidden, a focus always expands the selection, a change reseeds the
+ *     hidden, a focus always expands the choice, a change reseeds the
  *     revealed nodes at their ancestors, refits the camera and reheats to
- *     0.5, and the initial selection is every value;
+ *     0.5, and the initial choice is every value;
  *   - a **narrowing** axis (`emptyMeans: 'all'`): a node with no value stays
- *     visible, a focus expands only an already-active selection (adding the
+ *     visible, a focus expands only an already-active choice (adding the
  *     first value would narrow everything to one thing — the opposite of
  *     focus), a change reheats to 0.3 in place and keeps the user's pan and
- *     zoom, and the initial selection is empty.
+ *     zoom, and the initial choice is empty.
  *
  * **It does not carry the values.** Those are derived, not declared: the style
  * axis's values come from the taxonomy, and an origin axis's from scanning the
@@ -104,19 +117,20 @@ export interface ReheatPolicy {
  * nothing enforcing agreement, free to drift apart unnoticed.
  */
 export interface AxisDescriptor {
+  /** The axis a node's `values` are keyed by. */
   id: AxisId
   /** Human label for the axis itself, e.g. for a dropdown or a chip group. Default: the id. */
   label?: string
   /**
-   * What an EMPTY selection on this axis means: `none` hides everything (the
+   * What an EMPTY choice on this axis means: `none` hides everything (the
    * chips are an allow-list), `all` shows everything (the chips narrow).
    */
   emptyMeans: 'all' | 'none'
-  /** What happens to a node carrying NO value on this axis while a selection is active. */
+  /** What happens to a node carrying NO value on this axis while a choice is active. */
   absentMeans?: 'visible' | 'hidden'
   /**
    * How a focus widens this axis to reveal its target: `always` adds the
-   * target's value; `whenActive` adds it only while a selection is active
+   * target's value; `whenActive` adds it only while a choice is active
    * (on a narrowing axis, adding the first value would narrow everything to
    * that one value — the opposite of a reveal). Default: `always` on an
    * allow-list, `whenActive` on a narrowing axis.
@@ -134,71 +148,114 @@ export interface AxisDescriptor {
    * value: a chip may cover several values. Takes the available values
    * rather than reading a declared list, because an axis's values are
    * derived from the graph. Absent, one chip per value, labelled by
-   * `labelFor` and, on the style axis, wearing the value's icon and tint.
+   * `labelFor` and, on the style axis, wearing the value's icon.
+   * The values arrive in `order`.
    */
   chipsFor?(values: readonly AxisValue[]): readonly FilterChip[]
-  /** A value's display name. Absent: the style's label on the style axis, else the value itself. */
+  /**
+   * The order chips take: listed values first, in this order, the rest after
+   * them in first-encounter order. Default: the taxonomy's `values` order on
+   * the style axis, none elsewhere.
+   */
+  order?: readonly AxisValue[]
+  /** A value's display name, for a value the host's `labels` does not name. Absent: the style's label on the style axis, else the value itself. */
   labelFor?(value: AxisValue): string
-  /** One or two characters for a token. Absent: the style's abbreviation on the style axis, else the first two characters of `labelFor`'s answer. */
+  /** One or two characters for a token. Absent: the style's abbreviation on the style axis, else the first two characters of the value's label. */
   abbreviationFor?(value: AxisValue): string
   /** A chip's hover text, when the label alone does not identify the value (a file's full path under its basename). Absent: none. */
   tooltipFor?(value: AxisValue): string
   /** A value's glyph, drawn on its chip. Absent: the style's icon on the style axis, none elsewhere. */
   iconFor?(value: AxisValue): string
   /**
-   * The values selected when the view first opens, given the values the
+   * The values chosen when the view first opens, given the values the
    * graph presents on this axis. Absent: every value on an allow-list,
    * none on a narrowing axis. `initialFilter` reads it; a host that passes the
    * `defaultFilter` prop has chosen its own start, and this is not consulted.
    */
-  initialSelection?(values: readonly AxisValue[]): readonly AxisValue[]
+  initialChosen?(values: readonly AxisValue[]): readonly AxisValue[]
   /**
    * How the bar draws this axis's chips. `chip` (the default) is a tinted,
    * glyph-led button that reads as a category; `tag` is a quieter, neutral
    * label that reads as an origin — a file, a source, a place — and shows an
-   * "everything included" state when the selection is empty on an
+   * "everything included" state when the choice is empty on an
    * `emptyMeans: 'all'` axis.
    */
   presentation?: 'chip' | 'tag'
 }
 
-/** A filter axis with every policy filled in — what `Taxonomy.filterAxes` carries. */
+/** A filter axis with every policy filled in — what `Taxonomy.filterAxes()` carries. */
 export interface ResolvedAxisDescriptor extends AxisNamer {
+  /** What an empty choice means: `none` hides everything, `all` shows everything. */
   emptyMeans: 'all' | 'none'
+  /** What happens to a node carrying no value on this axis while a choice is active. */
   absentMeans: 'visible' | 'hidden'
   /** How a focus widens this axis to reveal its target. */
   widens: 'always' | 'whenActive'
   /** Whether a change on this axis keeps the user's pan and zoom (a narrowing axis does; an allow-list refits). */
   keepCamera: boolean
+  /** A chip's hover text; absent, none. */
   tooltipFor?(value: AxisValue): string
   /** A value's glyph, or '' for none. */
   iconFor(value: AxisValue): string
+  /** The chips the available values group into. */
   chipsFor(values: readonly AxisValue[]): readonly FilterChip[]
-  initialSelection(values: readonly AxisValue[]): readonly AxisValue[]
+  /** The values chosen when the view first opens, given the values the graph presents. */
+  initialChosen(values: readonly AxisValue[]): readonly AxisValue[]
+  /** How the bar draws the chips: a tinted `chip`, or a neutral `tag`. */
   presentation: 'chip' | 'tag'
 }
 
 /** How the style axis names and adorns its values, for a descriptor's defaults. */
 export interface StyleNamer {
+  /** The style axis: a descriptor on it takes these names by default. */
   axis: AxisId
+  /** The style values, in declaration order. */
+  values: readonly AxisValue[]
+  /** A style value's label. */
   labelFor(value: AxisValue): string
+  /** A style value's abbreviation. */
   abbreviationFor(value: AxisValue): string
+  /** A style value's icon, or '' for none. */
   iconFor(value: AxisValue): string
+}
+
+/** A host's names for values, per axis, passed beside the graph as `labels`. */
+export type AxisLabels = Readonly<Record<AxisId, Readonly<Record<AxisValue, string>>>>
+
+/** `labelFor`, with every value `labels` names on `axis` called by that name. */
+export function labelledBy(labels: AxisLabels | undefined, axis: AxisId, labelFor: (value: AxisValue) => string): (value: AxisValue) => string {
+  const named = labels !== undefined && hasOwn(labels, axis) ? labels[axis] : undefined
+  return named === undefined ? labelFor : value => (hasOwn(named, value) ? named[value] : labelFor(value))
+}
+
+const relabel = new WeakMap<ResolvedAxisDescriptor, (labels: AxisLabels) => ResolvedAxisDescriptor>()
+
+/** The axis as though resolved with `labels`: the values they name on it called by those names. */
+export function labelled(axis: ResolvedAxisDescriptor | undefined, labels: AxisLabels | undefined): ResolvedAxisDescriptor | undefined {
+  return axis === undefined || labels === undefined || !hasOwn(labels, axis.id) ? axis : relabel.get(axis)?.(labels) ?? axis
 }
 
 /**
  * A declared axis with every default filled in. The policies follow from
- * `emptyMeans`; the names follow from the style axis when this is it, and
- * from the value itself otherwise.
+ * `emptyMeans`; the names follow from `labels`, then from the style axis when
+ * this is it, and from the value itself otherwise.
  */
-export function resolveDescriptor(d: AxisDescriptor, style: StyleNamer): ResolvedAxisDescriptor {
+export function resolveDescriptor(d: AxisDescriptor, style: StyleNamer, labels?: AxisLabels): ResolvedAxisDescriptor {
   const allow = d.emptyMeans === 'none'
   const onStyle = d.id === style.axis
-  const labelFor = d.labelFor ?? (onStyle ? style.labelFor : (v: AxisValue) => v)
+  const labelFor = labelledBy(labels, d.id, d.labelFor ?? (onStyle ? style.labelFor : (v: AxisValue) => v))
   const abbreviationFor = d.abbreviationFor ?? (onStyle ? style.abbreviationFor : (v: AxisValue) => labelFor(v).slice(0, 2))
   const keepCamera = d.keepCamera ?? !allow
   const iconFor = d.iconFor ?? (onStyle ? style.iconFor : () => '')
-  return {
+  const order = new Set(d.order ?? (onStyle ? style.values : []))
+  const chipsFor = d.chipsFor ?? (values => values.map(v => ({
+    id: v,
+    label: labelFor(v),
+    icon: iconFor(v) || undefined,
+    tooltip: d.tooltipFor?.(v),
+    values: [v],
+  })))
+  const resolved: ResolvedAxisDescriptor = {
     id: d.id,
     label: d.label ?? d.id,
     emptyMeans: d.emptyMeans,
@@ -209,17 +266,15 @@ export function resolveDescriptor(d: AxisDescriptor, style: StyleNamer): Resolve
     abbreviationFor,
     tooltipFor: d.tooltipFor,
     iconFor,
-    chipsFor: d.chipsFor ?? (values => values.map(v => ({
-      id: v,
-      label: labelFor(v),
-      icon: iconFor(v) || undefined,
-      tint: onStyle ? v : undefined,
-      tooltip: d.tooltipFor?.(v),
-      values: [v],
-    }))),
-    initialSelection: d.initialSelection ?? (values => (allow ? values : [])),
+    chipsFor: values => {
+      const present = new Set(values)
+      return chipsFor([...[...order].filter(v => present.has(v)), ...values.filter(v => !order.has(v))])
+    },
+    initialChosen: d.initialChosen ?? (values => (allow ? values : [])),
     presentation: d.presentation ?? 'chip',
   }
+  relabel.set(resolved, next => resolveDescriptor(d, style, next))
+  return resolved
 }
 
 /** Where a node sits on one axis, or undefined when it carries no value there. */
@@ -234,6 +289,7 @@ export function valueOf(
 
 /** One bucket of a mapping: a named group of source values. */
 export interface MappingBucket {
+  /** Unique within its mapping. */
   id: string
   /** Display name — a tooltip, a column header. */
   label: string
@@ -243,6 +299,7 @@ export interface MappingBucket {
    * answer better.
    */
   abbreviation: string
+  /** The source values the bucket groups. */
   values: readonly AxisValue[]
 }
 
@@ -255,19 +312,38 @@ export interface MappingBucket {
  * existing example is three separate kinds folded into one filter chip.
  */
 export interface AxisMapping {
+  /** Unique among mappings. */
   id: string
+  /** Display name. */
   label: string
+  /** The axis whose values are mapped. */
   axis: AxisId
+  /** The buckets, in order; no value sits in two. */
   buckets: readonly MappingBucket[]
   /** The bucket a value belongs to, or undefined if the mapping omits it. */
   bucketFor(value: AxisValue | undefined): MappingBucket | undefined
+  /** Set on a host's mapping, from `TaxonomySpec.pairMappings`; absent on the view's own, built from an axis's values. */
+  readonly declared?: true
 }
 
-/** What `createAxisMapping` is given: the mapping's id, label, axis and buckets, before the buckets are checked for overlap. */
+/**
+ * The one spelling of a mapping for a control's option value and for "is this
+ * the one in use": a host's by its id, the view's by its axis — one per axis —
+ * so no host id can collide with an axis.
+ */
+export function mappingKey(mapping: AxisMapping): string {
+  return mapping.declared ? `declared:${mapping.id}` : `axis:${mapping.axis}`
+}
+
+/** What `createAxisMapping` is given, before the buckets are checked for overlap. */
 export interface AxisMappingSpec {
+  /** Unique among mappings. */
   id: string
+  /** Display name. */
   label: string
+  /** The axis whose values are mapped. */
   axis: AxisId
+  /** The buckets, in order. */
   buckets: readonly MappingBucket[]
 }
 
@@ -387,20 +463,24 @@ export function valuesOn(
  * badges' numbers when a host does not supply its own reading. The copies of
  * one entity (`copyKey`) count once; a subject with neither key nor id counts
  * as itself. An axis no subject has a value on gets an empty map, never a
- * missing one.
+ * missing one. Given `facets`, a subject counts on an axis only when the
+ * filter's choices on the other axes pass it.
  */
 export function countsOn(
   subjects: Iterable<{ values: AxisValues; id?: string; copyKey?: string }>,
   axes: readonly AxisId[],
+  facets?: { filter: FilterState; taxonomy: Pick<Taxonomy, 'axisFor'> },
 ): ReadonlyMap<AxisId, ReadonlyMap<AxisValue, number>> {
   const counted = new Map<AxisId, Map<AxisValue, Set<string>>>(axes.map(d => [d, new Map()]))
   const out = new Map<AxisId, Map<AxisValue, number>>(axes.map(d => [d, new Map()]))
+  const descriptors = facets ? axes.flatMap(id => facets.taxonomy.axisFor(id) ?? []) : []
   let anonymous = 0
   for (const s of subjects) {
     const key = s.copyKey ?? s.id ?? `\u0000${anonymous++}`
+    const failing = descriptors.filter(x => !passesDescriptors(facets!.filter, [x], axis => s.values[axis])).map(x => x.id)
     for (const d of axes) {
       const v = s.values[d]
-      if (v === undefined) continue
+      if (v === undefined || failing.some(f => f !== d)) continue
       const keys = counted.get(d)!
       let seen = keys.get(v)
       if (!seen) { seen = new Set(); keys.set(v, seen) }

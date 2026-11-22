@@ -8,18 +8,30 @@
 // it to `onDiagnostics`, and draws what remains; a host that wants to refuse a
 // bad graph before mounting calls it itself.
 
+import type { AxisValue } from './axis'
+import type { Fill } from './coloring'
 import type { Graph, GraphEdge, GraphNode } from './model'
-import { nodesById, relationOf } from './model'
+import { nodesById, relationOf, seriesOf, unitWeight, windowOf, withContainmentEdges } from './model'
 import type { Taxonomy } from './taxonomy'
+import { engineOf } from './taxonomy'
 
 /**
  * The defects `validateGraph` names. Errors: a node or edge id used twice,
  * an edge whose endpoint is not in the graph, an unknown relation, a type
  * whose relation is not the edge's, a rule that threw, a parent not in the
- * graph. Warnings: an edge no type claims, a style value the taxonomy does
- * not declare, containment edges that contradict `parentId`, derived
- * containment edges no type claims (`containment-untyped`, from
- * `derivedContainmentDiagnostics`).
+ * graph, a cycle of parents. Warnings: an edge no type claims, an edge
+ * weight outside `[0, 1]` or not finite, a window that is not one, an edge
+ * series that does not read against the window, a style value the taxonomy
+ * does not declare, containment edges that contradict `parentId`,
+ * containment edges derived from `parentId` that no type claims
+ * (`containment-untyped`). The view adds its own, through
+ * `onDiagnostics`: a key a colouring or the groups do not declare
+ * (`key-undeclared`), a key or group colour outside the scheme's forms
+ * (`key-color-invalid`), a chip tint naming no key of the fill
+ * (`tint-undeclared`), a layout scalar's answer not finite or outside
+ * [0, 1] (`scalar-answer-refused`), a layout scalar that threw
+ * (`scalar-compute-threw`), and a selected id the graph does not hold
+ * (`selected-node-missing`).
  */
 export type GraphDiagnosticCode =
   | 'edge-id-duplicate'
@@ -28,19 +40,33 @@ export type GraphDiagnosticCode =
   | 'edge-type-rule-threw'
   | 'edge-type-unclassified'
   | 'edge-type-relation-mismatch'
+  | 'edge-weight-invalid'
+  | 'window-invalid'
+  | 'edge-series-invalid'
   | 'parent-missing'
+  | 'parent-cycle'
   | 'containment-parent-mismatch'
   | 'node-value-undeclared'
   | 'node-id-duplicate'
   | 'containment-untyped'
+  | 'key-undeclared'
+  | 'key-color-invalid'
+  | 'tint-undeclared'
+  | 'scalar-answer-refused'
+  | 'scalar-compute-threw'
+  | 'selected-node-missing'
 
-/** One defect in a host's graph, as data: its severity, its code, a message, and the node or edge it names. */
+/** One defect in a host's graph, as data. */
 export interface GraphDiagnostic {
   /** An error names something the view cannot draw as given; a warning, something it draws but the host should know. */
   severity: 'error' | 'warning'
+  /** Which defect, stable for a host to match on. */
   code: GraphDiagnosticCode
+  /** The defect in words, for a person. */
   message: string
+  /** The node the defect names, if any. */
   nodeId?: string
+  /** The edge the defect names, if any. */
   edgeId?: string
 }
 
@@ -50,16 +76,22 @@ const RELATIONS = new Set(['containment', 'dependency'])
  * Every defect in a host's graph, as data: errors for what the view cannot
  * draw as given (a duplicated node id, a dangling endpoint, an unknown
  * relation, a type whose relation is not the edge's, a parent not in the
- * graph) and warnings for what it draws but the host should know (an
- * unclassified edge, an undeclared style value, containment edges that
- * contradict `parentId`). Pure; the same graph and taxonomy give the same
- * list, in graph order.
+ * graph, a cycle of parents) and warnings for what it draws but the host
+ * should know (an unclassified edge, an invalid weight, window or series,
+ * an undeclared style value, containment edges that contradict `parentId`,
+ * a derived containment edge no type claims). Pure; the same graph and
+ * taxonomy give the same list, in graph order.
  */
 export function validateGraph(graph: Graph, taxonomy: Taxonomy): GraphDiagnostic[] {
   const out: GraphDiagnostic[] = []
-  const declaredTypes = new Map(taxonomy.edgeTypes.map(e => [e.id, e]))
-  const declaredValues = new Set(taxonomy.styleValues)
+  const declaredTypes = new Map(taxonomy.edgeTypes().map(e => [e.id, e]))
+  const declaredValues = new Set(taxonomy.styleValues())
+  const engine = engineOf(taxonomy)
   const byId = nodesById(graph.nodes)
+  const window = windowOf(graph)
+  if (graph.window !== undefined && !window) {
+    out.push({ severity: 'warning', code: 'window-invalid', message: `the graph's window ${JSON.stringify(graph.window)} is not one: it needs finite bounds, since before until, and a positive whole number of buckets; every series is ignored` })
+  }
 
   // Nodes: one per id, a parent that exists, a style value the taxonomy
   // declares.
@@ -73,11 +105,13 @@ export function validateGraph(graph: Graph, taxonomy: Taxonomy): GraphDiagnostic
     if (node.parentId !== undefined && !byId.has(node.parentId)) {
       out.push({ severity: 'error', code: 'parent-missing', nodeId: node.id, message: `node ${JSON.stringify(node.id)} names parent ${JSON.stringify(node.parentId)}, which is not in the graph` })
     }
-    const value = taxonomy.styleValueOf(node)
+    const value = engine.styleValueOf(node)
     if (value !== undefined && !declaredValues.has(value)) {
       out.push({ severity: 'warning', code: 'node-value-undeclared', nodeId: node.id, message: `node ${JSON.stringify(node.id)} sits at ${JSON.stringify(value)} on the style axis, which the taxonomy does not declare; it draws in the fallback style` })
     }
   }
+
+  out.push(...parentCycles(byId))
 
   // Edges: unique ids, both ends present, a known relation, a type (when one
   // classifies) whose relation is the edge's.
@@ -106,9 +140,16 @@ export function validateGraph(graph: Graph, taxonomy: Taxonomy): GraphDiagnostic
       set.add(edge.targetId)
       containers.set(edge.sourceId, set)
     }
+    if (edge.weight !== undefined && unitWeight(edge) !== edge.weight) {
+      out.push({ severity: 'warning', code: 'edge-weight-invalid', edgeId: edge.id, message: `edge ${JSON.stringify(edge.id)} has weight ${String(edge.weight)}, which is not a weight in [0, 1]; the view clamps it, and draws one not finite as no weight` })
+    }
+    if (edge.series !== undefined && !seriesOf(edge, window)) {
+      const why = window ? `one finite count of at least 0 for each of the window's ${window.buckets} buckets` : 'a valid window on the graph'
+      out.push({ severity: 'warning', code: 'edge-series-invalid', edgeId: edge.id, message: `edge ${JSON.stringify(edge.id)} has a series that needs ${why}; it draws as having none` })
+    }
     let typeId: string | undefined
     try {
-      typeId = taxonomy.edgeTypeOf(edge, taxonomy.styleValueOf(src), taxonomy.styleValueOf(tgt))
+      typeId = engine.edgeTypeOf(edge, engine.styleValueOf(src), engine.styleValueOf(tgt))
     } catch (e) {
       out.push({ severity: 'error', code: 'edge-type-rule-threw', edgeId: edge.id, message: `the taxonomy's classifyEdge rule threw on edge ${JSON.stringify(edge.id)}: ${e instanceof Error ? e.message : String(e)}` })
       continue
@@ -116,7 +157,7 @@ export function validateGraph(graph: Graph, taxonomy: Taxonomy): GraphDiagnostic
     const declared = typeId === undefined ? undefined : declaredTypes.get(typeId)
     if (!declared) {
       const said = typeId === undefined ? 'no declared type fits its endpoints and values' : `classifyEdge answered ${JSON.stringify(typeId)}, which edgeTypes does not declare`
-      out.push({ severity: 'warning', code: 'edge-type-unclassified', edgeId: edge.id, message: `edge ${JSON.stringify(edge.id)} has no type: ${said}; it draws in its relation's default stroke and pulls nothing while push and pull key on the style axis` })
+      out.push({ severity: 'warning', code: 'edge-type-unclassified', edgeId: edge.id, message: `edge ${JSON.stringify(edge.id)} has no type: ${said}; it draws in its relation's default stroke and springs with the middling spring` })
       continue
     }
     if (declared.relation !== relation) {
@@ -132,6 +173,42 @@ export function validateGraph(graph: Graph, taxonomy: Taxonomy): GraphDiagnostic
     if (node.parentId !== undefined && viaEdges !== undefined && !viaEdges.has(node.parentId)) {
       out.push({ severity: 'warning', code: 'containment-parent-mismatch', nodeId: node.id, message: `node ${JSON.stringify(node.id)} has containment edges to ${[...viaEdges].map(c => JSON.stringify(c)).join(' and ')} but its parentId is ${JSON.stringify(node.parentId)}` })
     }
+  }
+  out.push(...derivedContainmentDiagnostics(withContainmentEdges(dropInvalid(graph, out)), graph, taxonomy))
+  return out
+}
+
+/**
+ * One error per cycle of `parentId`s, naming its nodes from the first in graph
+ * order, which `dropInvalid` orphans so containment is a tree.
+ */
+function parentCycles(byId: ReadonlyMap<string, GraphNode>): GraphDiagnostic[] {
+  const done = new Set<string>()
+  const onCycle = new Set<string>()
+  for (const start of byId.keys()) {
+    const path: string[] = []
+    const pos = new Map<string, number>()
+    let id: string | undefined = start
+    while (id !== undefined && byId.has(id) && !done.has(id)) {
+      const at = pos.get(id)
+      if (at !== undefined) {
+        for (const c of path.slice(at)) onCycle.add(c)
+        break
+      }
+      pos.set(id, path.length)
+      path.push(id)
+      id = byId.get(id)!.parentId
+    }
+    for (const p of path) done.add(p)
+  }
+  const out: GraphDiagnostic[] = []
+  const named = new Set<string>()
+  for (const first of byId.keys()) {
+    if (!onCycle.has(first) || named.has(first)) continue
+    const cycle = [first]
+    for (let id = byId.get(first)!.parentId!; id !== first; id = byId.get(id)!.parentId!) cycle.push(id)
+    for (const c of cycle) named.add(c)
+    out.push({ severity: 'error', code: 'parent-cycle', nodeId: first, message: `parentId runs in a cycle: ${[...cycle, first].map(c => JSON.stringify(c)).join(' → ')}; the view clears ${JSON.stringify(first)}'s parent` })
   }
   return out
 }
@@ -149,7 +226,7 @@ export function dropInvalid(graph: Graph, diagnostics: readonly GraphDiagnostic[
   for (const d of diagnostics) {
     if (d.severity !== 'error') continue
     if (d.edgeId !== undefined) badEdges.add(d.edgeId)
-    if (d.code === 'parent-missing' && d.nodeId !== undefined) badParents.add(d.nodeId)
+    if ((d.code === 'parent-missing' || d.code === 'parent-cycle') && d.nodeId !== undefined) badParents.add(d.nodeId)
     if (d.code === 'node-id-duplicate' && d.nodeId !== undefined) duplicateNodes.add(d.nodeId)
   }
   if (badEdges.size === 0 && badParents.size === 0 && duplicateNodes.size === 0) return graph
@@ -169,20 +246,20 @@ export function dropInvalid(graph: Graph, diagnostics: readonly GraphDiagnostic[
     kept.add(e.id)
     edges.push(e)
   }
-  return { nodes, edges }
+  return { ...graph, nodes, edges }
 }
 
 /**
- * The one warning the drawn graph adds to the host's: the containment edges
- * the view derived from `parentId` that no declared containment type claims
- * (a dependency type the host's rule answers does not count). They draw in
- * the containment stroke and pull nothing while push and pull key on the
- * style axis; a host that wants them typed declares a containment type
- * between the child's value and the parent's.
+ * The containment edges derived from `parentId` that no declared containment
+ * type claims (a dependency type the host's rule answers does not count). They draw in
+ * the containment stroke and spring with the middling spring; a host that
+ * wants them typed declares a containment type between the child's value and
+ * the parent's.
  */
-export function derivedContainmentDiagnostics(drawn: Graph, host: Graph, taxonomy: Taxonomy): GraphDiagnostic[] {
+function derivedContainmentDiagnostics(drawn: Graph, host: Graph, taxonomy: Taxonomy): GraphDiagnostic[] {
   const listed = new Set<GraphEdge>(host.edges)
   const byId = nodesById(drawn.nodes)
+  const engine = engineOf(taxonomy)
   const untyped: string[] = []
   for (const edge of drawn.edges) {
     if (listed.has(edge) || relationOf(edge) !== 'containment') continue
@@ -190,11 +267,11 @@ export function derivedContainmentDiagnostics(drawn: Graph, host: Graph, taxonom
     const tgt = byId.get(edge.targetId)
     let typeId: string | undefined
     try {
-      typeId = taxonomy.edgeTypeOf(edge, src && taxonomy.styleValueOf(src), tgt && taxonomy.styleValueOf(tgt))
+      typeId = engine.edgeTypeOf(edge, src && engine.styleValueOf(src), tgt && engine.styleValueOf(tgt))
     } catch {
       typeId = undefined
     }
-    const declared = typeId === undefined ? undefined : taxonomy.edgeTypes.find(t => t.id === typeId)
+    const declared = typeId === undefined ? undefined : taxonomy.edgeTypes().find(t => t.id === typeId)
     if (declared === undefined || declared.relation !== 'containment') untyped.push(edge.id)
   }
   if (untyped.length === 0) return []
@@ -204,6 +281,18 @@ export function derivedContainmentDiagnostics(drawn: Graph, host: Graph, taxonom
     severity: 'warning',
     code: 'containment-untyped',
     edgeId: untyped[0],
-    message: `${untyped.length} derived containment edge${one ? '' : 's'} (${shown}${untyped.length > 3 ? ', …' : ''}) ${one ? 'has' : 'have'} no type: no declared containment type runs between the child's value and the parent's; ${one ? 'it draws' : 'they draw'} in the containment stroke and pull${one ? 's' : ''} nothing while push and pull key on the style axis`,
+    message: `${untyped.length} derived containment edge${one ? '' : 's'} (${shown}${untyped.length > 3 ? ', …' : ''}) ${one ? 'has' : 'have'} no type: no declared containment type runs between the child's value and the parent's; ${one ? 'it draws' : 'they draw'} in the containment stroke and spring${one ? 's' : ''} with the middling spring`,
   }]
+}
+
+/** Every chip, over each declared axis's values, whose tint names no key of the fill: once per chip. */
+export function tintDiagnostics(taxonomy: Taxonomy, values: ReadonlyMap<string, readonly AxisValue[]>, fill: Fill): GraphDiagnostic[] {
+  const out: GraphDiagnostic[] = []
+  for (const axis of taxonomy.filterAxes()) {
+    for (const chip of axis.chipsFor(values.get(axis.id) ?? [])) {
+      if (chip.tint === undefined || fill.keys.has(chip.tint)) continue
+      out.push({ severity: 'warning', code: 'tint-undeclared', message: `chip ${JSON.stringify(chip.id)} on ${JSON.stringify(axis.id)} wears ${JSON.stringify(chip.tint)}, which the fill's keys do not declare; it draws neutral` })
+    }
+  }
+  return out
 }

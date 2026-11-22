@@ -1,7 +1,7 @@
 // Force-directed simulation engine.
 
 import type { GraphNode, GraphEdge, Graph } from './model'
-import { nodesById, readableGraph } from './model'
+import { nodesById } from './model'
 import type { EdgeTypeId, SpringPhysics } from './shapes'
 import {
   applyChargeForce,
@@ -10,20 +10,19 @@ import {
   applyTopologicalGravity,
   applyCenterGravity,
   bandAxesActing,
-  layoutFrame,
   presentSpringCategories,
   topologicalActing,
-  resolvePhysics,
   resolveSprings,
   springFor,
 } from './forces'
 import type { Rng } from './rng'
 import type { EdgeCategory, LayoutFrame, LayoutSubject, ResolvedPhysics } from './forces'
-import type { ResolvedScalarAxis, ScalarTuning } from './scalar'
+import type { ResolvedScalar, ScalarTuning } from './scalar'
 import { isScalarTuning } from './scalar'
-import type { AxisNamer, AxisId, AxisValue, AxisMapping } from './axis'
-import { identityMapping, valuesOn } from './axis'
+import type { AxisLabels, AxisNamer, AxisId, AxisValue, AxisMapping } from './axis'
+import { identityMapping, isIdentityMapping, labelled, labelledBy, mappingKey, valuesOn } from './axis'
 import type { Taxonomy } from './taxonomy'
+import { engineOf } from './taxonomy'
 
 // The force helpers now live in ./forces; re-export them so existing consumers
 // (GraphCanvas, GraphControlPanel, ChargeControls) keep importing them here.
@@ -97,10 +96,10 @@ export function withOverride<T>(tuning: AxisTuning<T>, bucketId: string, value: 
  * (`isScalarTuning`, `isScalarAxis`) and two loud casts for the callers that
  * hold the kind already (`mappedTuning`, `mappedAxis`).
  */
-export type LayoutTuning = AxisTuning<BandRange> | ScalarTuning
+export type BandAxisTuning = AxisTuning<BandRange> | ScalarTuning
 
-/** The mapped half of a layout tuning; loud where a caller expects buckets and meets a scalar. */
-export function mappedTuning(t: LayoutTuning): AxisTuning<BandRange> {
+/** The mapped half of a band-axis tuning; loud where a caller expects buckets and meets a scalar. */
+export function mappedTuning(t: BandAxisTuning): AxisTuning<BandRange> {
   if (isScalarTuning(t)) throw new Error(`expected a mapped axis, got scalar ${JSON.stringify(t.scalar)}`)
   return t
 }
@@ -136,18 +135,14 @@ export function withSpringOverride(pair: PairTuning, id: EdgeTypeId, value: Spri
   return { ...pair, spring }
 }
 
-/**
- * The identity bucketing of the taxonomy's style axis — one bucket per declared
- * value. The style axis has no descriptor (it is not a filter), so its labels
- * come from the taxonomy rather than through `identityMapping`.
- */
-export function styleIdentityMapping(taxonomy: Taxonomy): AxisMapping {
+/** The identity bucketing of the taxonomy's style axis: one bucket per declared value, named by `styleLabelFor`. */
+export function styleIdentityMapping(taxonomy: Taxonomy, labels?: AxisLabels): AxisMapping {
   return identityMapping({
     id: taxonomy.styleAxis(),
     label: taxonomy.styleLabel(),
-    labelFor: value => taxonomy.styleOf(value).label,
-    abbreviationFor: value => taxonomy.abbreviationFor(value),
-  }, taxonomy.styleValues)
+    labelFor: styleLabelFor(taxonomy, labels),
+    abbreviationFor: value => engineOf(taxonomy).abbreviationFor(value),
+  }, taxonomy.styleValues())
 }
 
 /** A single-axis tuning on the style axis, bucketed by identity, nothing overridden. */
@@ -193,12 +188,13 @@ export function fitsCeiling(option: AxisOption): boolean {
 
 /**
  * Every axis push/pull can key on for this graph: the style axis bucketed by
- * identity, then each filter axis bucketed by the values the graph presents on
- * it. The token counts are measured, not estimated, so the ceiling is a number
- * the dropdown can show beside an axis it has to decline.
+ * identity, then the host's mappings, then each filter axis bucketed by the
+ * values the graph presents on it. The token counts are measured, not
+ * estimated, so the ceiling is a number the dropdown can show beside an axis
+ * it has to decline.
  */
 export function axisOptions(taxonomy: Taxonomy, graph: Graph): AxisOption[] {
-  const mappings: AxisMapping[] = [styleIdentityMapping(taxonomy)]
+  const mappings: AxisMapping[] = [styleIdentityMapping(taxonomy), ...engineOf(taxonomy).pairMappings]
   for (const axis of nodeAxes(taxonomy, graph)) {
     const values = valuesOn(graph.nodes, axis)
     if (values.length > 0) mappings.push(identityMapping(namerFor(taxonomy, axis), values))
@@ -223,7 +219,7 @@ function nodeAxes(taxonomy: Taxonomy, graph: Graph): AxisId[] {
   const style = taxonomy.styleAxis()
   const out: AxisId[] = []
   const seen = new Set<AxisId>([style])
-  for (const d of taxonomy.filterAxes) {
+  for (const d of taxonomy.filterAxes()) {
     if (seen.has(d.id)) continue
     seen.add(d.id); out.push(d.id)
   }
@@ -236,26 +232,43 @@ function nodeAxes(taxonomy: Taxonomy, graph: Graph): AxisId[] {
   return out
 }
 
-/** How an axis names itself and its values: its descriptor's way, or — for an axis no descriptor declares — the id and the value. */
-export function namerFor(taxonomy: Taxonomy, axis: AxisId): AxisNamer {
-  return taxonomy.axisFor(axis) ?? {
+/** A style value's name: `labels`, then the style axis's `labelFor`, then the style's label. */
+export function styleLabelFor(taxonomy: Taxonomy, labels?: AxisLabels): (value: AxisValue) => string {
+  const style = taxonomy.styleAxis()
+  return labelled(taxonomy.axisFor(style), labels)?.labelFor ?? labelledBy(labels, style, value => taxonomy.styleOf(value).label)
+}
+
+/** How an axis names itself and its values: `labels`, then its descriptor's way, or — for an axis no descriptor declares — the id and the value. */
+export function namerFor(taxonomy: Taxonomy, axis: AxisId, labels?: AxisLabels): AxisNamer {
+  const labelFor = labelledBy(labels, axis, (v: AxisValue) => v)
+  return labelled(taxonomy.axisFor(axis), labels) ?? {
     id: axis,
     label: axis,
-    labelFor: (v: AxisValue) => v,
-    abbreviationFor: (v: AxisValue) => v.slice(0, 2),
+    labelFor,
+    abbreviationFor: v => labelFor(v).slice(0, 2),
   }
+}
+
+/** The parameters with every identity mapping's buckets named by `labels`, for the controls that show them; the forces read no name. */
+export function labelledParams(params: ForceParams, taxonomy: Taxonomy, labels: AxisLabels | undefined): ForceParams {
+  if (labels === undefined) return params
+  const named = (m: AxisMapping): AxisMapping => !isIdentityMapping(m) ? m
+    : m.axis === taxonomy.styleAxis() ? styleIdentityMapping(taxonomy, labels)
+    : identityMapping(namerFor(taxonomy, m.axis, labels), m.buckets.map(b => b.id))
+  const layout = (t: BandAxisTuning): BandAxisTuning => (isScalarTuning(t) ? t : { ...t, mapping: named(t.mapping) })
+  return { ...params, pair: { ...params.pair, mapping: named(params.pair.mapping) }, bandX: layout(params.bandX), bandY: layout(params.bandY) }
 }
 
 /** One choice for a layout axis: a mapping (with its cost) or a computed scalar. */
 export type LayoutAxisOption =
   | { readonly kind: 'mapping'; readonly option: AxisOption }
-  | { readonly kind: 'scalar'; readonly scalar: ResolvedScalarAxis }
+  | { readonly kind: 'scalar'; readonly scalar: ResolvedScalar }
 
-/** Every axis X or Y can key on: the mappings push/pull can (already measured), then every scalar the taxonomy knows. */
+/** Every axis X or Y can key on: the axes push/pull can (already measured), then every scalar the taxonomy knows. The host's mappings are the pair forces' alone. */
 export function layoutAxisOptions(axes: readonly AxisOption[], taxonomy: Taxonomy): LayoutAxisOption[] {
   return [
-    ...axes.map(option => ({ kind: 'mapping' as const, option })),
-    ...taxonomy.scalars.map(scalar => ({ kind: 'scalar' as const, scalar })),
+    ...axes.filter(option => !option.mapping.declared).map(option => ({ kind: 'mapping' as const, option })),
+    ...engineOf(taxonomy).scalars.map(scalar => ({ kind: 'scalar' as const, scalar })),
   ]
 }
 
@@ -264,9 +277,9 @@ export function layoutAxisOptions(axes: readonly AxisOption[], taxonomy: Taxonom
  * options and reads the current one back: what the dropdown's values are and
  * what the tuning answers to.
  */
-export function layoutAxisKey(choice: LayoutTuning | LayoutAxisOption): string {
-  if ('kind' in choice) return choice.kind === 'scalar' ? `scalar:${choice.scalar.id}` : `mapping:${choice.option.mapping.axis}`
-  return isScalarTuning(choice) ? `scalar:${choice.scalar}` : `mapping:${choice.mapping.axis}`
+export function layoutAxisKey(choice: BandAxisTuning | LayoutAxisOption): string {
+  if ('kind' in choice) return choice.kind === 'scalar' ? `scalar:${choice.scalar.id}` : mappingKey(choice.option.mapping)
+  return isScalarTuning(choice) ? `scalar:${choice.scalar}` : mappingKey(choice.mapping)
 }
 
 /** Same axis, same buckets, same values — order-insensitive, since node order is not a fact about the graph. */
@@ -278,21 +291,26 @@ function sameBuckets(a: AxisMapping, b: AxisMapping): boolean {
 
 /**
  * The same parameters, re-bucketed for the graph and taxonomy they now face.
+ *
  * An identity mapping over observed values goes stale when a file is added or
- * removed; the style axis's goes stale when the taxonomy is swapped. Overrides
- * are keyed by value, so they survive where the value does. A tuning whose
- * buckets did not change comes back by reference, so a caller can tell nothing
- * moved. An axis the graph no longer carries, or one that has grown past the
- * token ceiling, falls back to the style axis with nothing overridden. A graph
- * with no nodes judges nothing: the parameters come back as they are, so a
- * layout restored before the data arrives waits for it.
+ * removed, and the style axis's when the taxonomy is swapped; its overrides
+ * are keyed by value, so they survive where the value does. A host's mapping
+ * is read from the taxonomy, not the graph, so it and all its overrides
+ * survive any graph. A tuning whose buckets did not change comes back by
+ * reference, so a caller can tell nothing moved.
+ *
+ * A tuning falls back to the style axis with nothing overridden when its axis
+ * is no longer carried by any node, its mapping is no longer declared, or it
+ * has grown past the token ceiling. A graph with no nodes judges nothing: the
+ * parameters come back as they are, so a layout restored before the data
+ * arrives waits for it.
  */
 export function retunedFor(params: ForceParams, taxonomy: Taxonomy, graph: Graph): ForceParams {
   // A scalar the taxonomy does not know falls back whatever the graph holds:
   // the check reads only the taxonomy, so a stored layout naming a scalar
   // since renamed never reaches the kernels, even while the graph is empty.
-  const knownScalar = (t: LayoutTuning): LayoutTuning =>
-    isScalarTuning(t) && !taxonomy.scalars.some(sc => sc.id === t.scalar) ? identityTuning<BandRange>(taxonomy) : t
+  const knownScalar = (t: BandAxisTuning): BandAxisTuning =>
+    isScalarTuning(t) && !engineOf(taxonomy).scalars.some(sc => sc.id === t.scalar) ? identityTuning<BandRange>(taxonomy) : t
   if (graph.nodes.length === 0) {
     const bandX = knownScalar(params.bandX)
     const bandY = knownScalar(params.bandY)
@@ -302,6 +320,7 @@ export function retunedFor(params: ForceParams, taxonomy: Taxonomy, graph: Graph
   const byId = nodesById(graph.nodes)
   const nodeOf = (id: string) => byId.get(id)
   const refreshed = (m: AxisMapping): AxisMapping | undefined => {
+    if (m.declared) return engineOf(taxonomy).pairMappings.find(d => d.id === m.id)
     if (m.axis === style) return styleIdentityMapping(taxonomy)
     const values = valuesOn(graph.nodes, m.axis)
     return values.length === 0 ? undefined : identityMapping(namerFor(taxonomy, m.axis), values)
@@ -315,9 +334,12 @@ export function retunedFor(params: ForceParams, taxonomy: Taxonomy, graph: Graph
   const refresh = <T extends { mapping: AxisMapping }>(
     tuning: T, fresh: (mapping: AxisMapping) => T, fits: (mapping: AxisMapping) => boolean,
   ): T => {
-    const next = refreshed(tuning.mapping)
-    if (next === undefined || (next.axis !== style && !fits(next))) {
-      fellBack(tuning.mapping.axis, next === undefined ? 'no node carries it any more' : `it has ${next.buckets.length} buckets, past the ceiling of ${TOKEN_CEILING}`)
+    const was = tuning.mapping
+    const next = refreshed(was)
+    const styleIdentity = next !== undefined && !next.declared && next.axis === style
+    if (next === undefined || (!styleIdentity && !fits(next))) {
+      const gone = was.declared ? 'the taxonomy no longer declares it' : 'no node carries it any more'
+      fellBack(was.declared ? `the ${JSON.stringify(was.id)} mapping` : `the ${JSON.stringify(was.axis)} axis`, next === undefined ? gone : `it has ${next.buckets.length} buckets, past the ceiling of ${TOKEN_CEILING}`)
       return fresh(styleIdentityMapping(taxonomy))
     }
     return sameBuckets(next, tuning.mapping) ? tuning : { ...tuning, mapping: next }
@@ -330,9 +352,9 @@ export function retunedFor(params: ForceParams, taxonomy: Taxonomy, graph: Graph
   })
   // A scalar axis has no buckets to go stale; it falls back only when the
   // taxonomy no longer knows the scalar (a swap), with the style identity.
-  const refreshLayout = (tuning: LayoutTuning): LayoutTuning =>
+  const refreshLayout = (tuning: BandAxisTuning): BandAxisTuning =>
     isScalarTuning(tuning)
-      ? (taxonomy.scalars.some(sc => sc.id === tuning.scalar) ? tuning : identityTuning<BandRange>(taxonomy))
+      ? (engineOf(taxonomy).scalars.some(sc => sc.id === tuning.scalar) ? tuning : identityTuning<BandRange>(taxonomy))
       : refresh(tuning, m => ({ mapping: m, overrides: new Map() }), bucketsFit)
   const pair = refresh(params.pair, pairTuning, pairFits)
   const bandX = refreshLayout(params.bandX)
@@ -340,14 +362,14 @@ export function retunedFor(params: ForceParams, taxonomy: Taxonomy, graph: Graph
   return pair === params.pair && bandX === params.bandX && bandY === params.bandY ? params : { ...params, pair, bandX, bandY }
 }
 
-// A fallback is said once per axis and reason: it happens on every retune
-// after the first, and the user has one control to look at, not a stream.
+// A fallback is said once per axis or mapping and reason: it happens on every
+// retune after the first, and the user has one control to look at, not a stream.
 const FELL_BACK = new Set<string>()
-function fellBack(axis: AxisId, reason: string): void {
-  const key = `${axis}\u0000${reason}`
+function fellBack(what: string, reason: string): void {
+  const key = `${what}\u0000${reason}`
   if (FELL_BACK.has(key)) return
   FELL_BACK.add(key)
-  console.warn(`[graph] the ${JSON.stringify(axis)} axis cannot be tuned on: ${reason}; the forces returned to the style axis with nothing overridden.`)
+  console.warn(`[graph] ${what} cannot be tuned on: ${reason}; the forces returned to the style axis with nothing overridden.`)
 }
 
 // PUSH — repulsion. Per-type charge strength and core radius, the masters that
@@ -383,8 +405,8 @@ export interface GravityParams {
    * A strength of zero switches an axis off; when both are off and
    * topological gravity is too, center gravity is the baseline.
    */
-  bandX: LayoutTuning
-  bandY: LayoutTuning
+  bandX: BandAxisTuning
+  bandY: BandAxisTuning
   gravityX: number
   gravityY: number
   // Band falloff exponent applied to the displacement outside the rest band
@@ -407,7 +429,6 @@ export interface GravityParams {
   // Center gravity strength: radial pull toward the world origin — the baseline
   // cohesion/anchor force used when neither band axis nor Topological is active.
   gravityCenter: number
-  topologicalEnabled: boolean
 }
 
 // DYNAMICS — how the simulation cools and damps over time.
@@ -484,7 +505,6 @@ export function defaultParamsFor(taxonomy: Taxonomy): ForceParams {
     gravityTopological: 0,
     gravityTopologicalExp: 3,
     gravityCenter: 0.05,
-    topologicalEnabled: false,
 
     // Dynamics. alphaMin is well below the d3 default (0.001) so the
     // simulation continues into its slow-cooling tail — layouts read as
@@ -536,6 +556,13 @@ export function sprungEdges(edges: readonly GraphEdge[], visibleIds: ReadonlySet
   return edges.filter(e => visibleIds.has(e.sourceId) && visibleIds.has(e.targetId))
 }
 
+/** The force parameters, the tables they resolve to, and the frame those place the simulation's graph in. */
+export interface Layout {
+  readonly params: ForceParams
+  readonly resolved: ResolvedPhysics
+  readonly frame: LayoutFrame
+}
+
 export class Simulation {
   nodes: SimNode[]
   edges: readonly GraphEdge[]
@@ -553,41 +580,36 @@ export class Simulation {
   // jitter. Defaults to the platform generator, so app behaviour is unchanged.
   private rng: Rng
 
-  // The taxonomy the link force resolves spring categories through. Held rather
-  // than imported so the engine is not bound to one set of edge categories.
-  private taxonomy: Taxonomy
-
-  // The per-bucket tables, resolved once from (params, taxonomy) and read by the
-  // kernels per pair / per node. Recomputed only when either input changes —
-  // never per tick, and never inside a loop.
+  // The per-bucket tables the kernels read per pair / per node, and the frame
+  // the band forces act in — median centres and ring radii over the WHOLE node
+  // set — shared by seeding, the kernels and the overlay. Both arrive with the
+  // params (`Layout`).
   private resolved: ResolvedPhysics
-  // The frame the band forces act in — median centres and ring radii over the
-  // WHOLE node set — shared by seeding, the kernels and (through the view) the
-  // overlay, so they agree by construction. Recomputed with the tables.
   private frame: LayoutFrame
   // Each edge's spring category, classified once per (edges, resolved) rather
   // than per tick: an edge's category depends on the edge, its endpoints'
   // buckets and the pair mapping, none of which change between ticks. Built on
   // first use and dropped whenever the tables are re-resolved.
   private springByEdge: Map<string, EdgeCategory> | null = null
+  // The multiplier on each edge's stiffness the view's group cohesion asks
+  // for, by edge id; an edge absent is unchanged. Folded into the
+  // classification above, so it costs nothing per tick.
+  private cohesion: ReadonlyMap<string, number> = new Map()
 
-  // `taxonomy` is REQUIRED, deliberately: a default here would let one
-  // construction site resolve through a taxonomy every component ignores,
-  // a split no gate can see because both halves are individually correct.
   constructor(
     graph: Graph,
-    params: Partial<ForceParams> | undefined,
+    // Framed over this graph.
+    layout: Layout,
     rng: Rng,
-    taxonomy: Taxonomy,
     // Where a node starts when something already knows: a layout the host
     // kept, or the previous simulation's. A node with an entry is not seeded.
     positions?: ReadonlyMap<string, { x: number; y: number }>,
   ) {
-    this.params = { ...defaultParamsFor(taxonomy), ...params }
+    this.params = layout.params
+    this.resolved = layout.resolved
+    this.frame = layout.frame
     this.alpha = 1.0
     this.rng = rng
-    this.taxonomy = taxonomy
-    this.resolved = resolvePhysics(this.params, taxonomy)
 
     // Seed each node in the frame the forces act in. Cartesian: inside its
     // rest band on both axes, re-centred as the force re-centres them, and
@@ -599,9 +621,7 @@ export class Simulation {
     // bucket sits at the axis's centre, or at the origin.
     this.nodes = []
     this.nodeMap = new Map()
-    const seedNodes = graph.nodes
-    this.frame = layoutFrame(readableGraph(graph), this.resolved)
-    for (const node of seedNodes) {
+    for (const node of graph.nodes) {
       const given = positions?.get(node.id)
       const [x, y] = given ? [given.x, given.y] : this.seedPosition(node, rng)
       const sim: SimNode = { ...node, x, y, vx: 0, vy: 0, pinned: false }
@@ -657,7 +677,7 @@ export class Simulation {
   }
 
   tick(visibleIds?: Set<string>, downstreamScores?: Map<string, number>): void {
-    if (this.alpha < this.params.alphaMin) return
+    if (this.isStable()) return
 
     const active = visibleIds
       ? this.nodes.filter(n => visibleIds.has(n.id))
@@ -748,8 +768,14 @@ export class Simulation {
     this.reheatDecay = null
   }
 
+  // Start at the threshold, for nodes already where they rest: at most one
+  // tick there, and the next stops.
+  cool(): void {
+    this.alpha = this.params.alphaMin
+  }
+
   isStable(): boolean {
-    return this.alpha < this.params.alphaMin
+    return this.alpha < this.params.alphaMin || this.alpha === 0
   }
 
   pinNode(id: string, x: number, y: number): void {
@@ -770,12 +796,17 @@ export class Simulation {
     }
   }
 
-  setParams(params: Partial<ForceParams>): void {
-    Object.assign(this.params, params)
-    // A patch may replace a whole tuning; the dense tables and the per-edge
-    // classification follow it.
-    this.resolved = resolvePhysics(this.params, this.taxonomy)
-    this.frame = layoutFrame(this, this.resolved)
+  /** Take new params with their tables and frame, over the same graph; the per-edge classification follows. */
+  setLayout(layout: Layout): void {
+    this.params = layout.params
+    this.resolved = layout.resolved
+    this.frame = layout.frame
+    this.springByEdge = null
+  }
+
+  /** Multiply each listed edge's stiffness, by edge id; every other edge springs as its category says. */
+  setCohesion(cohesion: ReadonlyMap<string, number>): void {
+    this.cohesion = cohesion
     this.springByEdge = null
   }
 
@@ -784,7 +815,10 @@ export class Simulation {
     for (const edge of this.edges) {
       const src = this.nodeMap.get(edge.sourceId)
       const tgt = this.nodeMap.get(edge.targetId)
-      if (src && tgt) byEdge.set(edge.id, springFor(this.resolved.spring, edge, src, tgt))
+      if (!src || !tgt) continue
+      const cat = springFor(this.resolved.spring, edge, src, tgt)
+      const k = this.cohesion.get(edge.id)
+      byEdge.set(edge.id, k === undefined ? cat : { ...cat, strength: cat.strength * k })
     }
     return byEdge
   }

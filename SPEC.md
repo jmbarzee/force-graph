@@ -17,33 +17,41 @@ the energy (alpha) cools, and ticking pauses below a threshold.
 | Force | Acts on | Behaviour |
 |---|---|---|
 | Push | every pair of visible nodes | `F = charge / (d² + r²)^exp`, a charge and a core radius `r` per bucket of the push axis |
-| Pull | every sprung edge | `F = α × stiffness × Δ^exp / d`, `Δ = d − length` (signed), a stiffness and a rest length per spring category |
+| Pull | every sprung edge | `F = α × stiffness × Δ^exp / d`, `Δ = d − length` (signed), a stiffness and a rest length per spring category; `groupCohesion` multiplies the stiffness of an edge whose ends share a visible group |
 | Band | every node, on X and on Y | none inside its rest band; outside it, `strength × dᵉˣᵖ` back toward it |
 | Topological | every node | an inward pull scaled by reach, the depth of its dependency chain, propagated up containment so no node is pulled above its container |
 | Center | every node | a pull to the origin, only while no band axis and no topological pull acts |
 
 - **Push and pull key on one axis**, the push axis: the style axis unless the
-  user picks another the nodes carry. On the style axis a bucket starts from
-  its value's declared physics and the spring categories are the declared edge
-  types; on any other axis every bucket starts from the taxonomy's typical
-  physics (the mean over its values) and there is one spring category per
-  unordered bucket pair per relation. A sprung edge is an original edge with
+  user picks another the nodes carry, or one of the host's `pairMappings`,
+  which buckets an axis's values as the host declares. On the style axis a
+  bucket starts from the mean of its values' declared physics, its own
+  value's when bucketed by identity; on any other axis, from the taxonomy's
+  typical physics. The spring categories are the declared edge types only on
+  the style axis bucketed by identity; otherwise there is one per unordered
+  bucket pair per relation. A sprung edge is an original edge with
   both ends visible; a graduated edge is drawn and never sprung.
 - **Two layout axes**, X and Y, each keyed on a node axis — every bucket rests
   in a band — or on a computed scalar, read across a span from where 0 rests to
   where 1 rests (built in: reach, degree, depth; the catalog adds credits and
   level). A strength of zero turns an axis off; a node with no value on it
-  rests at its centre. A filter change moves no band.
+  rests at its centre. So does a node whose scalar answer is refused (not
+  finite, or outside [0, 1] once normalized), or every node when the scalar
+  throws; the pane's diagnostics name each, never a throw to the host. A
+  filter change moves no band.
 - **Radial**, a switch on Y: Y's buckets become rings about the origin, the
   lowest innermost; X is ignored; the topological pull draws to the centre
   instead of the top. Charge spreads a ring's nodes; nothing acts on angle.
 - **Seeding.** A node starts inside its bands, low in its Y band and at its
   parent's X (in radial, on its ring near its parent's angle). A node with a
   kept position (`defaultPositions`, or the last graph's layout) starts there.
-  A changed graph keeps the camera and the tuning.
-- **Reheat.** A changed graph, a filter change, a force edit and a dragged
-  node each re-energise the layout; there is no Reheat button. A node
-  scaling edit only redraws.
+  A changed graph keeps the camera and the tuning. A first layout with every
+  node's position given starts cool, at the threshold: a reload of what
+  `onSettled` kept holds still.
+- **Reheat.** A changed graph, a filter change, a force edit, a changed
+  `groupCohesion` and a dragged node each re-energise the layout, whatever
+  positions it kept; there is no Reheat button. A node scaling edit only
+  redraws.
 
 ## Which nodes are visible
 
@@ -58,9 +66,9 @@ hidden tiers, attaching a visible child to its nearest visible ancestor —
 with departments hidden, courses cluster round their faculty. A hidden
 child's containment edge is dropped.
 
-A filter that hides every node leaves an empty canvas reading
-`0 nodes, 0 edges`; a message is
-[#6](https://github.com/jmbarzee/force-graph/issues/6).
+A filter that hides every node of a graph that has some says so, centred in
+the canvas below the overlay: "No nodes match the filter." An empty graph
+draws no line; it is the host's to explain.
 
 ## Revealing a bucket
 
@@ -79,13 +87,23 @@ that would animate a reveal or a hide are
 |---|---|
 | Scroll or pinch | Zoom about the pointer, 0.1× to 40×; the page behind never scrolls |
 | Drag the background | Pan |
+| Ctrl/Meta+drag the background | Lasso: add every node whose centre it encloses to the selection |
 | Drag a node | Move it, held in place until release; the layout reheats around it |
-| Click a node / the background | Select it / clear the selection |
-| Double-click a node | Frame it and its neighbours (`chrome.activateZoom`), and `onNodeActivate` |
+| Click a node / the background | Select it alone / clear the selection |
+| Ctrl/Meta+click a node | Add it to the selection, or remove it |
+| Double-click a node | Frame it and its neighbors (`chrome.activateZoom`), and `onNodeActivate` |
 | Double-click the background | Frame the visible set |
 
-**Fit** (the button, `fit()`) frames every visible node. The first
-layout is framed once its warm-up cools, and so is a refitting filter change.
+**Fit** (the button, `fit()`) frames every visible node. A layout that
+follows a drawing of no node — the first, or a graph after an empty one — is
+framed from its first drawn tick until it settles, or, if the pane or the
+drawing holds it up past the settle, once when they allow; so is a
+refitting filter change. A pan,
+zoom, drag or newer frame lets go at once. Any other new graph keeps the
+viewport, and a frame still holding carries on over the nodes it names that
+the new graph draws.
+Every frame lands in what the pane's chrome leaves clear, or, on an axis
+where too little is left, across the whole pane.
 Resizing the pane keeps
 the world point at its centre fixed.
 
@@ -97,11 +115,13 @@ pointer, so zoomed content bleeds visibly under it. The bar is one row of chips
 per axis shown, each with its lock and a `×` on hover that removes it; a `+`
 adds a declared axis not shown; then the search. The host's `findings` fill a
 slot at its bottom, and the bar can flash on a host's refresh. A host's
-`groupsControl` anchors under it, at `--gv-toolbar-height`.
+`legend` anchors under it, at `--gv-toolbar-height`; a `ColorLegend`
+ends above the pane's foot, its sections — fill, glow, ring — scrolling under
+the host's controls.
 
 An axis whose chips overflow its row shows the row and a count of the rest;
 the count opens it and **Less** closes it. Every axis starts closed, and which
-are open is not remembered. A change to an axis's selection from outside the
+are open is not remembered. A change to an axis's chosen values from outside the
 bar — a focus, a view switch, the host — opens it, so the chips that turned on
 are in view when they flash; so does the keyboard reaching a chip past the row.
 A click in the bar leaves its axis as the user has it, and a re-seed — the pane
@@ -117,7 +137,9 @@ At the bottom, out of the bar's way:
   and the frame rate while the simulation runs;
 - **bottom right** — the control panel.
 
-`chrome` turns each part off.
+`chrome` turns each part off. Every word the pane and its bar render is one
+of `strings`, over the English `DEFAULT_STRINGS`; the control panel's
+equations are notation, and stay.
 
 ## The control panel
 
@@ -127,20 +149,41 @@ switching never resizes the panel. A force tab shows its equation in a card,
 then the controls for every term in it; hovering a symbol in the equation
 lights the global slider it names. Every control is live.
 
+**Presets** sit above the tabs, a dropdown styled as the axis dropdowns:
+the library's `TUNING_PRESETS` (Balanced, Tight clusters, Spread out, Free
+form, Rings), or a host's own through `presets` — beside them, in place of
+them, or `[]` for no row. Choosing one carries every control to its values
+over 400 ms, ease-out (at once under `prefers-reduced-motion`), the axes
+and switches on the first frame; any other edit stops it. What a preset
+leaves out returns to its default, except the node scale, kept unless it
+names one. The dropdown shows the preset the tuning is, else `custom`. A
+preset naming an axis or scalar the taxonomy lacks is listed disabled with
+why, as an axis past the ceiling is, and said once on the console.
+
 **A control offers what the visible set holds**: a push token per bucket a
 visible node falls in, a pull token per spring category a sprung edge falls in,
 a column per bucket on each layout axis. Hiding a chip removes its tokens and
-keeps their tuning for when they return. The axis dropdowns alone measure the
-whole graph, so an axis's availability never flips with a filter.
+keeps their tuning for when they return. A push or pull map, or a layout axis's
+band plot, that the visible set leaves empty gives way to one line, "Nothing
+visible on this axis — turn a chip on.", and a push or pull map's curves to
+their `exp` slider; the equation and every slider stay. When the legend's
+groups hide every node, chips or no, the line is "Nothing visible — turn a
+group on in the legend." instead. The axis dropdowns
+alone measure the whole graph, so an axis's availability never flips with a
+filter.
 
 **The token ceiling is 24** push tokens and 24 pull tokens. The push axis
 dropdown shows an axis's push and pull token counts beside its name, a layout
 axis dropdown its column count; an axis past the ceiling is listed
 disabled with the count that disqualifies it. Switching axes starts
-from the declared or typical physics on the new buckets. When the graph changes,
-an axis bucketed by observed values is rebuilt and keeps the tuning of the
-values that survive; an axis that vanishes or outgrows the ceiling returns the
-forces to the style axis, said once on the console.
+from the declared or typical physics on the new buckets. The push axis
+dropdown lists the style axis, then the host's pair mappings, then each axis
+bucketed by its observed values; the layout axis dropdowns list no host
+mapping. When the graph changes, an axis bucketed by observed values is
+rebuilt and keeps the tuning of the values that survive, and a host mapping
+keeps all of its; an axis that vanishes or outgrows the ceiling, or a mapping
+a new taxonomy drops, returns the forces to the style axis, said once on the
+console.
 
 ### Push/Pull
 
@@ -151,7 +194,11 @@ a 2D map and a curve:
   100). One solid token per bucket; dragging it sets both values. Tokens that
   coincide, as every bucket does on a freshly picked axis, fan out on a small
   ring; a drag still writes the token's own value. The `push` and
-  `coreRadiusMultiplier` sliders run along the axes they scale.
+  `coreRadiusMultiplier` sliders run along the axes they scale. On the style
+  axis, two or more shown rungs of a ladder (values sharing a `ladder` id) are
+  joined by a faint line in declaration order; its toggle under the map
+  collapses them to one ringed token at their centroid, which moves every shown
+  rung alike, as far as all stay in range, and links no hover.
 - **Push curve** — each bucket's falloff against distance, its core radius
   marked; the `exp` slider (0.5 to 1.0, default 0.7) beneath.
 - **Pull map** — x is rest length, y is stiffness. One token per spring
@@ -169,8 +216,8 @@ brightens its curve and dims the rest, and the reverse.
 ### Gravity
 
 Sub-tabs **X Axis**, **Y Axis** (carrying the Radial switch) and
-**Topological** (carrying its on/off switch). A switch never changes which
-body shows.
+**Topological**. Each force is off at a strength of 0, with no switch of its
+own. The Radial switch never changes which body shows.
 
 - **X Axis / Y Axis** — `F = strength × dᵉˣᵖ`, an axis dropdown (a node axis
   within the ceiling, or a scalar), a plot with one column per bucket and its
@@ -179,20 +226,30 @@ body shows.
   slider shared by both axes. On a scalar axis the plot is a gradient whose two
   ends are the handles, and dragging them past each other flips the axis; until
   the user drags, the span follows the taxonomy. 1 sits at the top of both
-  plots.
+  plots. On the style axis a ladder's shown rungs stand side by side on a faint
+  backdrop under its id; its toggle under the plot collapses them to one
+  column of their stripes, whose handles shift every min, or every max, alike,
+  as far as none leaves the plot or inverts its band, and which links no hover.
+  Each plot collapses on its own.
 - **Topological** — `F = strength × depthᵉˣᵖ × d`, a depth-to-pull curve, and
   its strength and `exp` sliders.
 
-A body whose force does nothing — zero strength, X in radial, Topological
-off — stays shown, dimmed. Center gravity has no control.
+A body whose force does nothing — zero strength, X in radial — stays shown,
+dimmed. Center gravity has no control.
 
 ### Misc
 
+Each section is its equation, a curve and its sliders; as on a force tab,
+hovering a symbol lights the slider it names.
+
 - **Dynamics** — `friction` (velocity damping per tick), `cooling` (energy
-  lost per tick), `threshold` (the energy below which ticking pauses).
+  lost per tick), `threshold` (the energy below which ticking pauses). The
+  curve plots α against ticks, from 1 down to `threshold`, marking the tick
+  the simulation stops at.
 - **Node scaling** — on-screen size is `r × size × clamp(zoom, shrink floor,
   grow cap)`, defaults 0.6, 0.4 and 1.65; lowering the grow cap makes nodes
-  shrink sooner as the user zooms out.
+  shrink sooner as the user zooms out. The curve plots that scale against
+  zoom: flat below the shrink floor and above the grow cap.
 
 ## Force-field visualisation
 
@@ -215,12 +272,12 @@ A query matches, case-insensitively, the text `searchText` gives — the name
 by default. Matching visible nodes stay at full opacity and the rest dim to
 20%. A match a filter hides badges the chip hiding it, on the first axis shown that it fails, and the
 search control carries the total (`+N`). The dropdown lists the visible
-matches; picking one centres on it and selects it.
+matches; picking one centres on it and selects it alone.
 
 ## Hover and selection
 
-The active node — the hovered one, else the selected one — highlights its
-transitive chain over visible dependency edges, graduated ones included:
+The active nodes — the hovered one, else every selected one — highlight the
+union of their transitive chains over visible dependency edges, graduated ones included:
 downstream by default, upstream while Shift is held. Containment is never
 walked. The chain stays at full opacity, its edges and arrowheads reinforced;
 everything else dims to 20% (50% while groups glow). `highlight` may widen or
@@ -243,42 +300,69 @@ The hover box, beside the node, holds:
 The box stays open while the pointer travels onto it and over it, so its
 button can be clicked.
 
-The selected node wears a ring. A graph that no longer holds the view's own selection
-clears it.
+With no node under the pointer, the drawn edge nearest it within 4 px,
+containment included, is hovered: drawn last, at full opacity over any dim,
+2 px wider, in its own colour and dash. Its box, where the pointer met the edge,
+holds the original's ends (`source → target`, `↔` for an undirected type),
+its type's tooltip, and the lines `edgeContextLine` answers. A hovered node
+wins over an edge, through its grace period too.
+
+Every selected node wears a ring. A graph that no longer holds some of the
+view's own selection drops them.
 
 ## Copies
 
-When the active node has sister copies — nodes sharing its `copyKey` — every
-visible one wears a halo in its own colour. A sister is not added to the
-highlight: one off the chain dims with the rest, and the halo marks it.
+When a hovered or selected node has sister copies — nodes sharing its
+`copyKey` — every visible one wears a halo in its own colour. A sister is not
+added to the highlight: one off the chain dims with the rest, and the halo
+marks it.
 Hovering one listing of a cross-listed course (Biochemistry, CHEM 310 and
 BIOL 310) halos every listing.
 
 ## Group glow
 
-`groups` glow behind everything else on the canvas. Each visible member gets a
-radial halo in its group's colour that fuses with its neighbours' into one
-blob; an edge glows when both ends are in one group. A group without a
-`color` takes a small cycling palette's slot for its place in the host's
-list, so hiding one group recolours no other. A focused group — the one
-`emphasize` names, or the one holding the active node — brightens and swells. In the catalog each degree programme is a
-group.
+`groups` glow behind everything else on the canvas: derived, as keys the host
+declares and a function answering each node's keys, or listed, as node ids per
+group. Membership is settled once per graph and groups; a key the function
+answers that the keys do not declare is ignored and reported, and so is a
+`color` that is not hex, `rgb()` or `hsl()`, which falls back to the palette.
+Which groups are shown is the filter's `GROUPS` entry, saved and controlled
+with the axes: a hidden group draws no glow and hides every node no shown
+group holds, a node in no group always passing. Each visible
+member gets a radial halo in its group's colour that fuses with its
+neighbors' into one blob; an edge glows when both ends are in one group. A
+group without a `color` takes a small cycling palette's slot, settled in list
+or key order over the whole graph: its own place, or the next slot no earlier
+group joined to it by an edge holds — so touching groups differ in hue while
+the palette has a slot free, and hiding one group recolours no other. A
+group's `weight` (0..1) swells its halo and corridor, up to double; hue and
+brightness stay. A focused group — the one `emphasize` names, or the one
+holding a hovered or selected node — brightens and swells. In the catalog
+each degree programme is a group, and its legend's glow checkboxes write the
+group filter; glowing by campus, they write the campus axis.
 
 ## Appearance
 
 - **Nodes.** A disc of the value's `size.r` in its fill and border for the
   resolved theme, its icon inside and its name below, in
   `--gv-color-graph-label`, semibold and slightly translucent. Names over 15
-  characters show 12 and an ellipsis. Badges sit above the node; a `dashed`
-  ring circles it. Size follows Node scaling.
+  characters show 12 and an ellipsis. Badges sit above the node. A `stack`
+  node draws two fading copies of its body up and to its right, behind
+  every edge. Nothing hovers or rings them. Its rings
+  stack outward, 2 px apart, an absent one leaving no gap: the
+  `coloring.ring` key's colour, dashed for a `dashed` node and in its fill
+  when keyless; the copy halo; the selection; the focus. Size follows Node
+  scaling.
 - **Labels by density.** Below a zoom of 0.25 labels and icons hide, except
-  the active node's. Above it, a label is drawn only where it overlaps no
-  label already placed and no node body, greedily in node order, so a settled
-  layout does not flicker; the active node always wins.
-- **Detail by zoom.** Below a zoom of 0.1 the decorative rings drop. A node
-  stays hoverable and clickable at every zoom.
-- **Edges.** Stroked by their resolved type (`EdgeType.style`) — a graduated
-  edge keeps the type of the edge it stands for. Dependency edges carry an
+  the hovered and selected nodes'. Above it, a label is drawn only where it
+  overlaps no label already placed and no node body, greedily in node order,
+  so a settled layout does not flicker; the hovered and selected nodes always
+  win.
+- **Detail by zoom.** A node's rings draw at every zoom, and it stays
+  hoverable and clickable at every zoom.
+- **Edges.** Stroked by their resolved type (`EdgeType.stroke`), widened by
+  `weight`, up to double — a graduated edge keeps the type and weight of the
+  edge it stands for. Dependency edges carry an
   8 px arrowhead toward the dependency, at every zoom; containment is
   undirected. Parallel edges between one pair draw in lanes. A `markedEdges`
   edge gets a dashed band in the label ink behind its own stroke, so it keeps
@@ -290,19 +374,24 @@ A host with a second view links them through `useLinkedViews`
 ([README § Two views sharing a bar](README.md#two-views-sharing-a-bar)).
 
 - **The search query** is shared by every view.
-- **A switch reconciles.** A manual switch adopts the source view's selection
-  on every axis the destination shows, except where the destination is locked.
-  A focus widens the destination only as far as its target needs, by each
-  axis's `widens` and by whole chips, and overrides a lock for that switch
-  alone; the bar flashes the overridden lock and the chips that turned on.
+- **A switch reconciles.** A manual switch adopts the source view's chosen
+  values on every axis the destination shows, except where the destination is locked;
+  its group filter stays its own. A focus widens the destination only as far
+  as its target needs, by each axis's `widens` and by whole chips, turns on
+  every group of a target the group filter hides, and overrides a lock for
+  that switch alone; the bar flashes the overridden lock and the chips that
+  turned on.
   There is no switch that copies one view's filter onto another past its
   locks.
+- **`/`** opens the search of the bar on screen, unless focus is in a field
+  the key types into.
 - **A lock** holds one view's axis against manual switches. Unlocking resumes
   adoption from the next switch.
 - **Focus into the graph** is `focusNode`
-  ([README § The view](README.md#the-view)). Framing the node's
-  neighbourhood, holding the viewport and flashing the target are
-  [#21](https://github.com/jmbarzee/force-graph/issues/21).
+  ([README § The view](README.md#the-view)). Its frame of the node and its
+  neighbors holds as the first layout's does; when a settled layout, a pan,
+  zoom or drag lets it go, a ring round the node fades over 600 ms, and a
+  newer frame lets it go without one.
 
 ## Keyboard
 
@@ -312,18 +401,23 @@ keeps its own keys, Escape aside.
 
 | Key | Action |
 |---|---|
-| Tab / Shift+Tab | Move the focus ring to the next or previous visible node, in graph order, while the pane itself has focus |
-| Enter | Select the focused node |
-| Escape | Close the shortcuts panel, else the search, else clear the selection, else (on the pane) give focus back |
+| Tab / Shift+Tab | Move the focus ring to the next or previous visible node, while the pane itself has focus; past the last or before the first, leave the pane, which keeps the focus until a Tab comes back in at that end and starts over |
+| Enter | Select the focused node alone |
+| Escape | Close the shortcuts panel, else the search, else clear the selection, else give the pane's focus back |
 | Arrows | Pan |
 | `+` / `-` | Zoom about the centre |
 | `F` | Fit |
 | `/` | Open the search and focus it, while `chrome.search` offers it |
 | Space | Play / Pause |
-| `?` | Toggle the shortcuts panel, which also lists Shift+hover, while `chrome.shortcuts` offers it |
+| `?` | Toggle the shortcuts panel, which also lists Shift+hover, Ctrl/Meta+click and the lasso, while `chrome.shortcuts` offers it |
 | Shift (held) | Reverse the walk ([§ Hover and selection](#hover-and-selection)) |
 
 Nodes are not DOM elements: the pane keeps a virtual focus over the canvas.
-The ordering, an accessible name per node and the hover box following the
-focus are
-[#7](https://github.com/jmbarzee/force-graph/issues/7).
+The root is focusable unless `keyboard` is `none`, a region named `Graph`
+with its node and edge counts. The focus walks the visible nodes
+depth-first by containment, each under its nearest visible ancestor,
+siblings by name. It is held by id: a filter or a reload that stops drawing
+the node moves it to its nearest drawn ancestor, else clears it. A polite
+status region announces the focused node's name, its style value's label and
+its context line, and the hover box follows the focus while the pane holds
+it, as it follows the pointer.

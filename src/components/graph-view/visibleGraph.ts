@@ -1,10 +1,10 @@
 // computeVisibleGraph — the pure derivation behind useVisibleGraph.
 //
-// Filters the graph's nodes on the axes the view shows, graduates edges across
-// hidden nodes (containment walks up to the nearest visible ancestor;
-// dependency edges project or splice, and the graduated ones collapse per
-// pair), classifies every edge once on its original endpoints, and computes
-// per-node summaries and downstream-reach scores.
+// Filters the graph's nodes on the axes the view shows and on their groups,
+// graduates edges across hidden nodes (containment walks up to the nearest
+// visible ancestor; dependency edges project or splice, and the graduated
+// ones collapse per pair), classifies every edge once on its original
+// endpoints, and computes per-node summaries and downstream-reach scores.
 //
 // Lifted out of the hook so it is callable without React, and the taxonomy
 // arrives as a parameter, so both the visibility predicate and the summary
@@ -22,11 +22,12 @@ import { isContainment, relationOf } from '../../graph/model'
 import type { SimNode } from '../../graph/simulation'
 import type { GraphEdge, ReadableGraph } from '../../graph/model'
 import type { Taxonomy } from '../../graph/taxonomy'
+import { engineOf } from '../../graph/taxonomy'
 import type { ResolvedAxisDescriptor } from '../../graph/axis'
 import type { EdgeTypeId } from '../../graph/shapes'
-import type { PhysicsSubject } from '../../graph/forces'
+import type { LayoutSubject } from '../../graph/forces'
 import type { FilterState } from '../../filter/types'
-import { passesDescriptors } from '../../filter/types'
+import { passesDescriptors, passesGroups } from '../../filter/types'
 
 export interface VisibleGraph {
   visibleNodes: SimNode[]
@@ -40,6 +41,8 @@ export interface VisibleGraph {
    * declare — `validateGraph` names those; here they draw neutral.
    */
   edgeTypes: Map<string, EdgeTypeId | undefined>
+  /** The visible edges whose type is undirected, by id. */
+  undirected: Set<string>
   /** Each visible edge's original: the host's edge it is, or the one a graduated edge stands for. */
   origins: Map<string, string>
   nodeSummaries: Map<string, string>
@@ -61,6 +64,7 @@ export const EMPTY_VISIBLE_GRAPH: VisibleGraph = {
   visibleEdges: [],
   visibleIds: new Set<string>(),
   edgeTypes: new Map<string, EdgeTypeId | undefined>(),
+  undirected: new Set<string>(),
   origins: new Map<string, string>(),
   nodeSummaries: new Map<string, string>(),
   downstreamScores: new Map<string, number>(),
@@ -104,7 +108,7 @@ function resolveDepEndpoint(
   if (visited.has(nodeId)) return []
   visited.add(nodeId)
   const node = getNode(nodeId)
-  if (node && taxonomy.nodeStyleOf(node).whenHidden === 'splice') {
+  if (node && engineOf(taxonomy).nodeStyleOf(node).whenHidden === 'splice') {
     const out: string[] = []
     for (const e of sim.edges) {
       if (isContainment(e)) continue
@@ -129,7 +133,8 @@ function computeGraphNodeSummary(
   nodeMap: Map<string, SimNode>,
   taxonomy: Taxonomy,
 ): string {
-  const { summaryKind } = taxonomy.nodeStyleOf(node)
+  const engine = engineOf(taxonomy)
+  const { summaryKind } = engine.nodeStyleOf(node)
 
   if (summaryKind === 'none') return ''
 
@@ -141,13 +146,13 @@ function computeGraphNodeSummary(
       if (!isContainment(e) || e.targetId !== node.id) continue
       const child = nodeMap.get(e.sourceId)
       if (!child) continue
-      const value = taxonomy.styleValueOf(child)
+      const value = engine.styleValueOf(child)
       if (value === undefined) continue
       counts.set(value, (counts.get(value) ?? 0) + 1)
     }
-    return taxonomy.styleValues
+    return taxonomy.styleValues()
       .filter(k => counts.has(k))
-      .map(k => `${counts.get(k)} ${taxonomy.abbreviationFor(k)}`)
+      .map(k => `${counts.get(k)} ${engine.abbreviationFor(k)}`)
       .join(' · ')
   }
 
@@ -164,18 +169,23 @@ function computeGraphNodeSummary(
   return parts.join(' ')
 }
 
+const IN_NO_GROUP: ReadonlyMap<string, readonly string[]> = new Map()
+const NO_GROUP_IDS: readonly string[] = []
+
 /**
- * `passesDescriptors` for a graph node, on its own values, on the
- * axes given — the ones the view shows. Every declared axis is the default
- * for a caller that shows them all.
+ * `passesDescriptors` for a graph node, on its own values, on the axes
+ * given — the ones the view shows — and `passesGroups` on its groups, by
+ * `groupsByNode`. Every declared axis is the default for a caller that shows
+ * them all, and no groups for one that has none.
  */
 export function passesFilter(
-  node: PhysicsSubject,
+  node: LayoutSubject,
   filter: FilterState,
   taxonomy: Taxonomy,
-  axes: readonly ResolvedAxisDescriptor[] = taxonomy.filterAxes,
+  axes: readonly ResolvedAxisDescriptor[] = taxonomy.filterAxes(),
+  groupsOf: ReadonlyMap<string, readonly string[]> = IN_NO_GROUP,
 ): boolean {
-  return passesDescriptors(filter, axes, axis => node.values[axis])
+  return passesDescriptors(filter, axes, axis => node.values[axis]) && passesGroups(filter, groupsOf.get(node.id) ?? NO_GROUP_IDS)
 }
 
 /**
@@ -185,14 +195,15 @@ export function passesFilter(
  * no type here and draws neutral.
  */
 function classifyEdges(sim: VisibleGraphSource, taxonomy: Taxonomy): Map<string, EdgeTypeId | undefined> {
-  const declared = new Map(taxonomy.edgeTypes.map(e => [e.id, e]))
+  const engine = engineOf(taxonomy)
+  const declared = new Map(taxonomy.edgeTypes().map(e => [e.id, e]))
   const out = new Map<string, EdgeTypeId | undefined>()
   for (const edge of sim.edges) {
     const src = sim.getNode(edge.sourceId)
     const tgt = sim.getNode(edge.targetId)
     let id: EdgeTypeId | undefined
     try {
-      id = taxonomy.edgeTypeOf(edge, src && taxonomy.styleValueOf(src), tgt && taxonomy.styleValueOf(tgt))
+      id = engine.edgeTypeOf(edge, src && engine.styleValueOf(src), tgt && engine.styleValueOf(tgt))
     } catch {
       id = undefined
     }
@@ -202,23 +213,38 @@ function classifyEdges(sim: VisibleGraphSource, taxonomy: Taxonomy): Map<string,
   return out
 }
 
+/** The node and every node one edge from it. */
+export function neighborhoodOf(id: string, edges: readonly GraphEdge[]): Set<string> {
+  const ids = new Set([id])
+  for (const edge of edges) {
+    if (edge.sourceId === id) ids.add(edge.targetId)
+    if (edge.targetId === id) ids.add(edge.sourceId)
+  }
+  return ids
+}
+
 export function computeVisibleGraph(
   sim: VisibleGraphSource,
   filter: FilterState,
   taxonomy: Taxonomy,
-  axes: readonly ResolvedAxisDescriptor[] = taxonomy.filterAxes,
+  axes: readonly ResolvedAxisDescriptor[] = taxonomy.filterAxes(),
+  groupsOf?: ReadonlyMap<string, readonly string[]>,
 ): VisibleGraph {
   const ids = new Set<string>()
   const vNodes: SimNode[] = []
 
   for (const node of sim.nodes) {
-    if (passesFilter(node, filter, taxonomy, axes)) {
+    if (passesFilter(node, filter, taxonomy, axes, groupsOf)) {
       ids.add(node.id)
       vNodes.push(node)
     }
   }
 
   const originalTypes = classifyEdges(sim, taxonomy)
+  const undirectedTypes = new Set<EdgeTypeId | undefined>(taxonomy.edgeTypes().filter(t => t.direction === 'undirected').map(t => t.id))
+  // A pair by its ends in order, or in either order for an undirected edge.
+  const pairKey = (edge: GraphEdge, s: string, t: string): string =>
+    undirectedTypes.has(originalTypes.get(edge.id)) ? [s, t].sort().join('↔') : `${s}→${t}`
   const edgeTypes = new Map<string, EdgeTypeId | undefined>()
   const origins = new Map<string, string>()
 
@@ -256,7 +282,7 @@ export function computeVisibleGraph(
       kept.push(edge)
       edgeTypes.set(edge.id, originalTypes.get(edge.id))
       origins.set(edge.id, edge.id)
-      originalPairs.add(`${edge.sourceId}→${edge.targetId}`)
+      originalPairs.add(pairKey(edge, edge.sourceId, edge.targetId))
     } else {
       projected.push(edge)
     }
@@ -271,13 +297,13 @@ export function computeVisibleGraph(
     for (const rs of sources) {
       for (const rt of targets) {
         if (rs === rt) continue
-        const key = `${rs}→${rt}`
+        const key = pairKey(edge, rs, rt)
         if (originalPairs.has(key)) continue
         // Two graduated edges on one pair stand for two paths through hidden
         // nodes that now read as one reach; the taxonomy says which survives,
         // and the one met first does when it does not say.
         const existing = graduated.get(key)
-        if (existing && taxonomy.collapse(existing.origin, edge) === existing.origin) continue
+        if (existing && engineOf(taxonomy).collapse(existing.origin, edge) === existing.origin) continue
         graduated.set(key, { origin: edge, edge: { ...edge, sourceId: rs, targetId: rt, id: `grad:${key}` } })
       }
     }
@@ -289,6 +315,8 @@ export function computeVisibleGraph(
     edgeTypes.set(edge.id, originalTypes.get(origin.id))
     origins.set(edge.id, origin.id)
   }
+
+  const undirected = new Set(vEdges.filter(e => undirectedTypes.has(edgeTypes.get(e.id))).map(e => e.id))
 
   const vNodeMap = new Map<string, SimNode>()
   for (const n of vNodes) vNodeMap.set(n.id, n)
@@ -302,5 +330,5 @@ export function computeVisibleGraph(
   // over the whole graph is a layout axis (graph/scalar.ts).
   const downstreamScores = computeDownstreamReach({ nodes: vNodes, edges: vEdges, getNode: id => vNodeMap.get(id) })
 
-  return { visibleNodes: vNodes, visibleEdges: vEdges, visibleIds: ids, edgeTypes, origins, nodeSummaries, downstreamScores }
+  return { visibleNodes: vNodes, visibleEdges: vEdges, visibleIds: ids, edgeTypes, undirected, origins, nodeSummaries, downstreamScores }
 }

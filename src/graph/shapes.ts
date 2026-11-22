@@ -1,7 +1,7 @@
 // The definition *shapes* a taxonomy is expressed in.
 //
 // This is the library half of the registries. The shapes live here; the entries
-// — which node styles exist, what they are called, what colour they are — live
+// — which values exist, what they are called, what colour they are — live
 // with the host, and reach the engine through an `Taxonomy`. That split is the
 // whole point: a host declares its own values against these shapes and gets the
 // full graph engine, without the library knowing a single one of its names.
@@ -13,18 +13,26 @@
 
 import type { AxisId, AxisValue } from './axis'
 import type { EdgeStroke, ThemedColor } from './scheme'
+import { hueOf, pairOf } from './scheme'
 
-// ── Node styles ─────────────────────────────────────────────────────────────
+// ── Value specs ─────────────────────────────────────────────────────────────
 
 /** A rest band on one layout axis: the range inside which a value feels no gravity. */
-export interface Band { min: number; max: number }
+export interface Band {
+  /** The band's low edge, in world units. */
+  min: number
+  /** The band's high edge, in world units. */
+  max: number
+}
 
 /**
  * How one value on the style axis is drawn, sized, and physically weighted,
- * as a host declares it. Only the id, the label and the colour are required;
- * the rest is derived from them and from the value's position in the
- * declaration order (top of the hierarchy first):
+ * as a host declares it. Only the id is required; the rest is derived from
+ * it and from the value's position in the declaration order (top of the
+ * hierarchy first):
  *
+ *   - `label`: the id.
+ *   - `color`: the palette's hue at the value's position (`PALETTE`).
  *   - `abbreviation`: the first two characters of the label.
  *   - `icon`: none.
  *   - `size.r`: 12; `size.iconSize`: nine tenths of the radius, rounded, at least 9.
@@ -37,11 +45,11 @@ export interface Band { min: number; max: number }
  * A field given overrides its default, field by field — a band's `x` may be
  * declared and its `y` left to the stack.
  */
-export interface NodeStyle {
-  /** The value on the style axis this style is for. */
+export interface ValueSpec {
+  /** The value on the style axis this spec is for. */
   id: AxisValue
   /** Display name, e.g. "Service". */
-  label: string
+  label?: string
   /**
    * One or two characters for a control token: a control surface renders a
    * token per value and has no room for a name.
@@ -50,13 +58,15 @@ export interface NodeStyle {
   /** Single glyph drawn inside the canvas node. */
   icon?: string
   /** Fill and border in both themes; the canvas reads `color[theme]`. */
-  color: ThemedColor
+  color?: ThemedColor
+  /** The node's drawn size. */
   size?: {
     /** Circle radius in world units. Hit-test radius = r + 4. */
     r?: number
     /** Font size for the icon glyph (px). */
     iconSize?: number
   }
+  /** The node's weight in the simulation. */
   physics?: {
     /**
      * Repulsion charge. Negative = repulsion. The starting point for the
@@ -87,32 +97,50 @@ export interface NodeStyle {
    */
   whenHidden?: 'ascend' | 'splice'
   /**
-   * The glanceable summary for a node of this value: the children it contains,
+   * The glanceable summary in the hover box of a node of this value: `degree`,
+   * its dependency degree (`→3 ←2`); `children`, the children it contains,
    * counted per style value and named by that value's abbreviation
-   * (`2 Sv · 1 Pd`); its dependency degree (`→3 ←2`); or nothing.
+   * (`2 Sv · 1 Pd`), above the same degree row; `none`, neither.
    */
   summaryKind?: 'children' | 'degree' | 'none'
+  /**
+   * The ladder this value is a rung of: style values sharing a ladder id are
+   * one family, its rungs in declaration order, which the push map and the
+   * band plots set apart and can collapse to one row tuned as one. Neither
+   * empty nor another value's id. Absent, a value on its own.
+   */
+  ladder?: string
 }
 
 /**
- * A node style with every default filled in — what `Taxonomy.styleOf` answers.
+ * A value spec with every default filled in — what `Taxonomy.styleOf` answers.
  *
- * Reached through `Taxonomy.nodeStyleOf`, never by key lookup from the
- * engine — a miss has to resolve to the fallback rather than throw, because
- * the resolution happens per node per frame inside the draw loop where an
+ * Reached through the taxonomy, never by key lookup from the engine — a
+ * miss has to resolve to the fallback rather than throw, because the
+ * resolution happens per node per frame inside the draw loop where an
  * exception stops the canvas repainting for good.
  */
-export interface ResolvedNodeStyle {
+export interface ResolvedValueSpec {
+  /** The value on the style axis this spec is for. */
   id: AxisValue
+  /** Display name. */
   label: string
+  /** One or two characters for a control token. */
   abbreviation: string
   /** Empty when the style declares none: nothing is drawn. */
   icon: string
+  /** Fill and border in both themes. */
   color: ThemedColor
+  /** Circle radius and icon font size. */
   size: { r: number; iconSize: number }
+  /** Charge, core radius and rest bands. */
   physics: { charge: number; coreRadius: number; band: { x: Band; y: Band } }
+  /** What a dependency edge touching a hidden node of this value does. */
   whenHidden: 'ascend' | 'splice'
+  /** The glanceable summary for a node of this value. */
   summaryKind: 'children' | 'degree' | 'none'
+  /** The ladder this value is a rung of, if any. */
+  ladder?: string
 }
 
 // ── Edge types ──────────────────────────────────────────────────────────────
@@ -127,9 +155,11 @@ export interface ResolvedNodeStyle {
  */
 export type EdgeTypeId = string
 
-/** One spring: stiffness (k) and rest length. */
+/** One spring. */
 export interface SpringPhysics {
+  /** Stiffness, k. */
   strength: number
+  /** Rest length, in world units. */
   distance: number
 }
 
@@ -137,12 +167,9 @@ export interface SpringPhysics {
  * One kind of edge, as a host declares it: which values it runs between and
  * which relation it expresses, optionally which values the edge itself must
  * carry (`match`), and — optionally — how it is stroked, its spring and its
- * hover text. An edge is classified as the declared type of its relation
- * that runs between its endpoints' values, in either orientation, and whose
- * `match` (if any) its own values satisfy; a satisfied `match` beats a type
- * without one, the declared orientation beats the reverse, and declaration
- * order settles the rest — unless the taxonomy's `classifyEdge` says
- * otherwise. A label left out is the id; a stroke left out is the neutral
+ * hover text. Which type an edge is: [the classification
+ * table](https://github.com/jmbarzee/force-graph#classifying-an-edge).
+ * A label left out is the id; a stroke left out is the neutral
  * stroke (the containment stroke for a containment type), field by field; a
  * spring left out is the middling spring; a tooltip left out is the label.
  */
@@ -152,44 +179,55 @@ export interface EdgeType {
   /** Short control-panel label. Default: the id. */
   label?: string
   /**
-   * The endpoint values on the style axis this type runs between — one
-   * value or several at each end: the type runs between every source value
-   * and every target value, in either orientation. Read off the edge's
-   * original endpoint nodes when an edge is classified; the first of each
-   * is the split-colour token's two halves. Values, not types: the engine
-   * resolves an edge's type from where its nodes sit.
+   * The style values at the source end — one or several, or left out for
+   * any declared value: the type runs between every source value and every
+   * target value, in either orientation. Read off the edge's original
+   * endpoint nodes when an edge is classified.
    */
-  sourceValue: AxisValue | readonly AxisValue[]
-  targetValue: AxisValue | readonly AxisValue[]
+  sources?: AxisValue | readonly AxisValue[]
+  /** The style values at the target end, as `sources` reads them. */
+  targets?: AxisValue | readonly AxisValue[]
   /** Which relation an edge of this type expresses; an edge is classified only as a type of its own relation. */
   relation: 'containment' | 'dependency'
   /**
+   * Whether an edge of this type runs one way, or is a symmetric relation:
+   * an undirected edge draws no arrowhead, highlights from either end, and
+   * counts as `↔n` in the hover box. Default: `directed`. A containment type
+   * declares none.
+   */
+  direction?: 'directed' | 'undirected'
+  /**
    * Values the edge itself must carry on the host's edge axes to be this
    * type — how two types on one pair are told apart (a call and a signal
-   * between the same two values, by the edge's `dispatch`). An edge lacking
-   * one of these values is not this type. Absent, the pair alone decides,
-   * and this type is the fallback for a pair other types `match` on.
+   * between the same two values, by the edge's `kind`). An edge lacking
+   * one of these values is not this type.
    */
   match?: Readonly<Record<AxisId, AxisValue>>
   /** Declared stiffness / rest length — what the type resolves to until tuned. */
   physics?: SpringPhysics
   /** How the canvas strokes an edge of this type, in both themes; any field left out is its relation's default stroke's (`NEUTRAL_STROKE`, or `CONTAINMENT_STROKE` for a containment type). */
-  style?: Partial<EdgeStroke>
+  stroke?: Partial<EdgeStroke>
   /** The hover text for the type. Default: the label. */
   tooltip?: string
 }
 
-/** An edge type with its defaults filled in — what `Taxonomy.edgeTypes` carries. */
-export interface ResolvedEdgeType extends EdgeType {
+/** An edge type with its defaults filled in — what `Taxonomy.edgeTypes()` carries. */
+export interface ResolvedEdgeType extends Omit<EdgeType, 'sources' | 'targets'> {
+  /** The declared label, else the id. */
   label: string
-  /** The first declared source value — one half of the split-colour token. */
-  sourceValue: AxisValue
-  /** The first declared target value — the other half. */
-  targetValue: AxisValue
+  /** Every value the source end claims: every declared value where it is left out. */
+  sources: readonly AxisValue[]
+  /** Every value the target end claims, likewise. */
+  targets: readonly AxisValue[]
+  /** The split-colour token's two halves: each end's first value, `null` where the type leaves that end out. */
+  swatch: readonly [AxisValue | null, AxisValue | null]
   /** Every (source, target) pair the type runs between: each source value with each target value, in declaration order. */
   pairs: readonly (readonly [AxisValue, AxisValue])[]
+  /** The declared spring, else the middling one. */
   physics: SpringPhysics
-  style: EdgeStroke
+  /** The declared stroke over its relation's default, field by field. */
+  stroke: EdgeStroke
+  /** The declared tooltip, else the label. */
   tooltip: string
 }
 
@@ -198,15 +236,25 @@ export const NEUTRAL_STROKE: EdgeStroke = { color: { light: '#94A3B8', dark: '#6
 /** The stroke a containment type starts from, and the stroke of a containment edge no type claims: the same grey, faint and dashed. */
 export const CONTAINMENT_STROKE: EdgeStroke = { color: { light: '#94A3B8', dark: '#64748B' }, alpha: 0.35, dash: [3, 4], width: 1 }
 
-/** The values declared at one end of an edge type, as a list. */
-export function endpointValues(declared: AxisValue | readonly AxisValue[]): readonly AxisValue[] {
-  return typeof declared === 'string' ? [declared] : declared
+/** The stroke widened by a weight in `[0, 1]` (an edge's `unitWeight`), up to double; the same stroke at 0. */
+export function weighted(stroke: EdgeStroke, w: number): EdgeStroke {
+  return w ? { ...stroke, width: stroke.width * (1 + w) } : stroke
+}
+
+/** The stroke at an intensity in `[0, 1]`: widened by it, as `weighted`, and its alpha scaled by it. */
+export function played(stroke: EdgeStroke, u: number): EdgeStroke {
+  return { ...weighted(stroke, u), alpha: stroke.alpha * u }
+}
+
+/** The values at one end of an edge type, as a list: `every` declared value where the end is left out. */
+export function endpointValues(declared: AxisValue | readonly AxisValue[] | undefined, every: readonly AxisValue[]): readonly AxisValue[] {
+  return declared === undefined ? every : typeof declared === 'string' ? [declared] : declared
 }
 
 /** Every (source, target) pair a type runs between: each source value with each target value, in declaration order. */
-export function edgePairs(type: Pick<EdgeType, 'sourceValue' | 'targetValue'>): readonly (readonly [AxisValue, AxisValue])[] {
-  const targets = endpointValues(type.targetValue)
-  return endpointValues(type.sourceValue).flatMap(s => targets.map(t => [s, t] as const))
+export function edgePairs(type: Pick<EdgeType, 'sources' | 'targets'>, every: readonly AxisValue[]): readonly (readonly [AxisValue, AxisValue])[] {
+  const targets = endpointValues(type.targets, every)
+  return endpointValues(type.sources, every).flatMap(s => targets.map(t => [s, t] as const))
 }
 
 // ── Defaults ────────────────────────────────────────────────────────────────
@@ -237,47 +285,54 @@ export function stackBand(i: number, n: number): Band {
 }
 
 /**
- * A declared style with every default filled in, given its position in the
+ * A declared value spec with every default filled in, given its position in the
  * declaration order. Pure: the same inputs give the same object, so the
  * taxonomy resolves each value once and hands out that one object.
  */
-export function resolveNodeStyle(style: NodeStyle, i: number, n: number): ResolvedNodeStyle {
-  const r = style.size?.r ?? DEFAULT_RADIUS
+export function resolveValueSpec(spec: ValueSpec, i: number, n: number): ResolvedValueSpec {
+  const r = spec.size?.r ?? DEFAULT_RADIUS
+  const label = spec.label ?? spec.id
   return {
-    ...style,
-    abbreviation: style.abbreviation ?? style.label.slice(0, 2),
-    icon: style.icon ?? '',
-    size: { r, iconSize: style.size?.iconSize ?? Math.max(9, Math.round(r * 0.9)) },
+    ...spec,
+    label,
+    color: spec.color ?? pairOf(hueOf(undefined, i)),
+    abbreviation: spec.abbreviation ?? label.slice(0, 2),
+    icon: spec.icon ?? '',
+    size: { r, iconSize: spec.size?.iconSize ?? Math.max(9, Math.round(r * 0.9)) },
     physics: {
-      charge: style.physics?.charge ?? -40 * r,
-      coreRadius: style.physics?.coreRadius ?? 4 * r,
+      charge: spec.physics?.charge ?? -40 * r,
+      coreRadius: spec.physics?.coreRadius ?? 4 * r,
       band: {
-        x: style.physics?.band?.x ?? { ...BAND_FRAME.x },
-        y: style.physics?.band?.y ?? stackBand(i, n),
+        x: spec.physics?.band?.x ?? { ...BAND_FRAME.x },
+        y: spec.physics?.band?.y ?? stackBand(i, n),
       },
     },
-    whenHidden: style.whenHidden ?? 'ascend',
-    summaryKind: style.summaryKind ?? 'degree',
+    whenHidden: spec.whenHidden ?? 'ascend',
+    summaryKind: spec.summaryKind ?? 'degree',
   }
 }
 
 /**
- * A declared edge type with its defaults filled in: the id as label, the
- * first declared value at each end beside every pair, the middling spring,
- * its relation's stroke field by field, the label as tooltip. The taxonomy
- * has refused an end that names no value before this runs.
+ * A declared edge type with its defaults filled in, given `every` declared
+ * value: the id as label, every value at each end, the swatch, every pair,
+ * the middling spring, its relation's stroke field by field, the label as
+ * tooltip. The taxonomy has refused an end that lists no value before this
+ * runs.
  */
-export function resolveEdgeType(type: EdgeType): ResolvedEdgeType {
+export function resolveEdgeType(type: EdgeType, every: readonly AxisValue[]): ResolvedEdgeType {
   const start = type.relation === 'containment' ? CONTAINMENT_STROKE : NEUTRAL_STROKE
   const label = type.label ?? type.id
+  const sources = endpointValues(type.sources, every)
+  const targets = endpointValues(type.targets, every)
   return {
     ...type,
     label,
-    sourceValue: endpointValues(type.sourceValue)[0]!,
-    targetValue: endpointValues(type.targetValue)[0]!,
-    pairs: edgePairs(type),
+    sources,
+    targets,
+    swatch: [type.sources === undefined ? null : sources[0]!, type.targets === undefined ? null : targets[0]!],
+    pairs: edgePairs(type, every),
     physics: type.physics ?? { ...MIDDLING_SPRING },
-    style: { ...start, ...type.style, color: { ...start.color, ...type.style?.color } },
+    stroke: { ...start, ...type.stroke, color: { ...start.color, ...type.stroke?.color } },
     tooltip: type.tooltip ?? label,
   }
 }

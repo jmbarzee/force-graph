@@ -1,37 +1,46 @@
 // useViewport — the camera concern for the Graph View.
 //
-// Owns the viewport (pan/zoom transform, which follows a pane resize) and the
-// DOM container ref used to measure the canvas, plus two coordination refs the
-// physics loop reads: the one-shot `initialFitDone` guard and the cross-view
-// `pendingCenterRef` request. `fit()` frames a set of nodes; every other
-// framing (the loop's initial fit and centring, search) sets the viewport
-// against the size `measure()` returns, and the keyboard handlers zoom about
-// the centre of `containerRef`.
+// Owns the viewport, which follows a pane resize, and every framing: each
+// lands in the canvas the pane's chrome leaves clear.
 
 import React from 'react'
-import { DEFAULT_VIEWPORT, fitToView, followResize } from '../../graph/viewport'
+import { DEFAULT_VIEWPORT, followResize } from '../../graph/viewport'
 import type { PaneSize, Viewport } from '../../graph/viewport'
 import type { SimNode } from '../../graph/simulation'
+import { chromeInsets, frameQueue, frameView } from './frame'
+import { useIsomorphicLayoutEffect } from './useIsomorphicLayoutEffect'
+import type { FrameRequest } from './frame'
 
 export interface ViewportController {
   viewport: Viewport
-  setViewport: React.Dispatch<React.SetStateAction<Viewport>>
+  moveViewport: React.Dispatch<React.SetStateAction<Viewport>>
   containerRef: React.RefObject<HTMLDivElement>
-  // One-shot initial-fit guard; reset on sim rebuild / visible-type change.
-  initialFitDone: React.MutableRefObject<boolean>
-  // Cross-view "center on this node after warmup" request, consumed by the loop.
-  pendingCenterRef: React.MutableRefObject<{ nodeId: string } | null>
-  // The container's size, for a viewport computed against it.
-  measure: () => PaneSize | null
-  // Frame the viewport to the given nodes (measures the container first).
-  fit: (nodes: SimNode[], padding?: number) => void
+  overlayRef: React.RefObject<HTMLDivElement>
+  overlayHeight: number
+  requestFrame: (request: FrameRequest) => void
+  // Frame what `requestFrame` left waiting or holding; the loop calls it each tick.
+  tickFrame: () => void
+  releaseFrame: () => void
+  settleFrame: () => void
 }
 
-export function useViewport(): ViewportController {
+/** The camera, framing the nodes `drawn` holds. */
+export function useViewport(drawn: React.RefObject<readonly SimNode[]>): ViewportController {
   const [viewport, setViewport] = React.useState<Viewport>(DEFAULT_VIEWPORT)
   const containerRef = React.useRef<HTMLDivElement>(null)
-  const initialFitDone = React.useRef(false)
-  const pendingCenterRef = React.useRef<{ nodeId: string } | null>(null)
+  const overlayRef = React.useRef<HTMLDivElement>(null)
+
+  // The overlay's height, for `--gv-toolbar-height`.
+  const [overlayHeight, setOverlayHeight] = React.useState(0)
+  useIsomorphicLayoutEffect(() => {
+    const el = overlayRef.current
+    if (!el || typeof ResizeObserver === 'undefined') return
+    const update = () => setOverlayHeight(el.getBoundingClientRect().height)
+    update()
+    const ro = new ResizeObserver(update)
+    ro.observe(el)
+    return () => ro.disconnect()
+  }, [])
 
   // A resize keeps the world point at the pane's centre fixed. The shift is
   // the change since the size the viewport was last computed for: `measure()`
@@ -46,6 +55,24 @@ export function useViewport(): ViewportController {
     sizeRef.current = { width, height }
     return { width, height }
   }, [])
+  const apply = React.useCallback((request: FrameRequest): boolean => {
+    const nodes = drawn.current ?? []
+    const ids = new Set(request.ids)
+    if (!nodes.some(n => ids.has(n.id))) return false
+    const size = measure()
+    if (!size?.width || !size.height) return false
+    const container = containerRef.current!
+    const pane = container.getBoundingClientRect()
+    const chrome = [...container.children].filter(c => !c.classList.contains('gv-graph-canvas-area')).map(c => {
+      const r = c.getBoundingClientRect()
+      return { left: r.left - pane.left, top: r.top - pane.top, right: r.right - pane.left, bottom: r.bottom - pane.top }
+    })
+    const area = { ...size, insets: chromeInsets(size, chrome) }
+    setViewport(vp => frameView(vp, request, nodes, area))
+    return true
+  }, [measure, drawn])
+
+  const queue = React.useMemo(() => frameQueue(apply), [apply])
   React.useEffect(() => {
     const container = containerRef.current
     if (!container || typeof ResizeObserver === 'undefined') return
@@ -53,16 +80,17 @@ export function useViewport(): ViewportController {
       const prev = sizeRef.current
       const size = measure()
       if (size) setViewport(vp => followResize(vp, prev, size))
+      queue.retry()
     })
     ro.observe(container)
     return () => ro.disconnect()
-  }, [measure])
+  }, [measure, queue])
+  // Each commit may draw an id a waiting frame names.
+  React.useEffect(() => { queue.retry() })
+  const moveViewport = React.useCallback((action: React.SetStateAction<Viewport>) => {
+    queue.release()
+    setViewport(action)
+  }, [queue])
 
-  const fit = React.useCallback((nodes: SimNode[], padding?: number) => {
-    const size = measure()
-    if (!size) return
-    setViewport(fitToView(nodes, size.width, size.height, padding))
-  }, [measure])
-
-  return { viewport, setViewport, containerRef, initialFitDone, pendingCenterRef, measure, fit }
+  return { viewport, moveViewport, containerRef, overlayRef, overlayHeight, requestFrame: queue.request, tickFrame: queue.tick, releaseFrame: queue.release, settleFrame: queue.settle }
 }

@@ -12,17 +12,23 @@ import type { Viewport } from '../graph/viewport'
 import { screenToWorld, worldToScreen } from '../graph/viewport'
 import { nodeSizeMul, type NodeScaleParams } from '../graph/node-scale'
 import type { Taxonomy } from '../graph/taxonomy'
+import { engineOf } from '../graph/taxonomy'
+import type { GlowGroup } from '../graph/groups'
+import { hueFor, pairFor } from '../graph/coloring'
+import type { Fill, ResolvedColoring } from '../graph/coloring'
 import { useTaxonomy } from './graph-view/useTaxonomy'
+import { useFill } from './graph-view/useFill'
 import { useLatest } from './graph-view/useControllable'
+import { usePalette } from './graph-view/usePalette'
+import type { Palette } from './graph-view/usePalette'
 import { listenWheelZoom } from './graph-view/wheelZoom'
+import { lassoed, type Point } from './graph-view/lasso'
 import type { EdgeStroke, Theme } from '../graph/scheme'
 import { NEUTRAL_STROKE } from '../graph/shapes'
 import { withAlpha } from '../graph/scheme'
 import type { ForceSection } from './GraphControlPanel'
 import type { GravityHover } from './GravityControls'
 
-const FOCUS_RING_COLOR = '#4A90D9'
-const SELECTION_RING_COLOR = '#FFFFFF'
 const DIM_ALPHA = 0.2
 // A gentler dim floor used while the decomposition group glow is active. The
 // glow already pulls the eye to the grouped nodes, so the full 0.2 dim on the
@@ -42,8 +48,10 @@ const GROUP_GLOW_EDGE_WIDTH = 9
 // out of a field of faint ones. This is the fraction of the strength boost applied
 // to size (0 = brighten only, 1 = size grows in lockstep with alpha).
 const GROUP_GLOW_FOCUS_SWELL = 0.6
-function glowSwell(strength: number): number {
-  return 1 + Math.max(0, strength - 1) * GROUP_GLOW_FOCUS_SWELL
+// A group's `weight` (0..1) swells its glow too, up to doubling it at 1;
+// brightness stays the strength's alone.
+function glowSwell(g: GlowGroup): number {
+  return (1 + Math.max(0, g.strength - 1) * GROUP_GLOW_FOCUS_SWELL) * (1 + Math.min(1, Math.max(0, g.weight ?? 0)))
 }
 
 // A marked edge's band, behind its own stroke so the edge keeps its type's
@@ -52,7 +60,8 @@ const MARK_DASH = [6, 4]
 const MARK_WIDTH = 6
 const MARK_ALPHA = 0.55
 
-const ICON_FONT_FAMILY = '-apple-system, BlinkMacSystemFont, "Segoe UI", Roboto, sans-serif'
+// White, not the surface token: a glyph sits on its node's fill, not on the surface.
+const GLYPH_COLOR = 'white'
 const LABEL_FONT_PX = 11
 // Slight translucency on node labels so they don't read as the only bright
 // text on the dark canvas and edges remain visible through them.
@@ -67,11 +76,11 @@ function labelText(name: string): string {
   return name.length > LABEL_MAX_CHARS ? name.slice(0, LABEL_TRUNC_CHARS) + '\u2026' : name
 }
 
-// Build the node-label font string at a given pixel size. Semibold (600) so
-// labels read against the canvas background and over edges without needing a
+// The font labels and badges draw in, at a given pixel size. Semibold (600)
+// so they read against the canvas background and over edges without needing a
 // halo/outline.
-function labelFont(px: number): string {
-  return `600 ${px.toFixed(1)}px ${ICON_FONT_FAMILY}`
+function textFont(px: number, family: string): string {
+  return `600 ${px.toFixed(1)}px ${family}`
 }
 
 // Badges: a host's short texts drawn as a row of chips above the node, as
@@ -82,13 +91,6 @@ const BADGE_PAD_X = 4          // horizontal text padding inside a chip
 const BADGE_PAD_Y = 2          // vertical text padding inside a chip
 const BADGE_GAP = 3            // gap between adjacent chips
 const BADGE_NODE_GAP = 4       // gap between the node's top edge and the chip row
-// Violet chip — deliberately outside the node-type palette so a cardinality
-// badge never reads as a node body of some type.
-const BADGE_FILL = '#7C3AED'
-const BADGE_TEXT_COLOR = '#FFFFFF'
-function badgeFont(px: number): string {
-  return `600 ${px.toFixed(1)}px ${ICON_FONT_FAMILY}`
-}
 // Rounded-rect path helper (arcTo keeps it compatible without relying on
 // CanvasRenderingContext2D.roundRect being present).
 function roundRectPath(
@@ -114,37 +116,60 @@ function badgeExtent(node: { badges?: readonly string[] }, mul: number): number 
 }
 
 
-// Read a CSS custom property with a fallback, resolved against a specific
-// element. We resolve against the canvas (not `document.documentElement`)
-// because the theme is declared on the pane's root, below `<html>` — reading
-// from the document root would yield the host's value, not the pane's. The
-// canvas is a descendant of the themed element, so it inherits the right
-// value in either theme.
-function cssVar(el: Element | null, name: string, fallback: string): string {
-  const target = el ?? (typeof document !== 'undefined' ? document.documentElement : null)
-  if (!target) return fallback
-  const v = getComputedStyle(target).getPropertyValue(name).trim()
-  return v || fallback
-}
-
 // What an edge draws as when the view's stroke map has no entry for it — a
 // state the view does not produce (the map is built from the same edge array
 // this canvas is given), kept quiet because this runs in the draw loop.
 
 const ARROWHEAD_SIZE = 8
+const EDGE_HIT_PX = 4
 const CULL_MARGIN = 100
+const FLASH_MS = 600
 
-// Zoom elision thresholds
 const LABEL_ELIDE_SCALE = 0.25    // hide name labels below this scale (except hovered/selected)
-const DETAIL_REDUCE_SCALE = 0.1   // drop decorative rings below this scale
 
-// A group glow request: the visible node ids that belong to one decomposition
-// group, the color to glow them, and a strength multiplier (hovered groups glow
-// stronger). ActiveGroup from graph/groups.ts is structurally assignable.
-export interface GroupGlow {
-  nodeIds: ReadonlySet<string>
-  color: string
-  strength: number
+// A node's rings stack outward, each RING_GAP screen px clear of the one inside it.
+const RING_GAP = 2
+const RING_WIDTH = 2
+export const SELECTION_WIDTH = 2.5
+const NO_DASH: number[] = []
+const DATA_DASH = [3, 3]
+export const FOCUS_DASH = [2, 2]
+
+/** Strokes a ring `RING_GAP` outside `edge` and answers its outer edge, where the next ring starts. */
+export function drawRing(
+  ctx: CanvasRenderingContext2D, x: number, y: number, edge: number,
+  width: number, color: string, dash: number[], alpha: number,
+): number {
+  ctx.strokeStyle = color
+  ctx.lineWidth = width
+  ctx.setLineDash(dash)
+  ctx.globalAlpha = alpha
+  ctx.beginPath()
+  ctx.arc(x, y, edge + RING_GAP + width / 2, 0, Math.PI * 2)
+  ctx.stroke()
+  return edge + RING_GAP + width
+}
+
+// A stacked node's ghost k sits k·GHOST_STEP·r up and right of it, at GHOST_ALPHA[k − 1] of its alpha.
+const GHOST_STEP = 0.2
+const GHOST_ALPHA = [0.5, 0.25]
+
+/** Paints a stacked node's ghosts, back first. */
+export function drawGhosts(
+  ctx: CanvasRenderingContext2D, x: number, y: number, r: number,
+  fill: string, border: string, lineWidth: number, alpha: number,
+): void {
+  ctx.fillStyle = fill
+  ctx.strokeStyle = border
+  ctx.lineWidth = lineWidth
+  for (let k = GHOST_ALPHA.length; k > 0; k--) {
+    const o = k * GHOST_STEP * r
+    ctx.globalAlpha = GHOST_ALPHA[k - 1] * alpha
+    ctx.beginPath()
+    ctx.arc(x + o, y - o, r, 0, Math.PI * 2)
+    ctx.fill()
+    ctx.stroke()
+  }
 }
 
 interface GraphCanvasProps {
@@ -159,12 +184,19 @@ interface GraphCanvasProps {
   // Frame every visible node (a double-click on the background).
   onFitView: () => void
   onHoverNode: (id: string | null) => void
-  onSelectNode: (id: string | null) => void
+  /** A click: on a node, `additive` (Ctrl/Meta) toggling it; on the background, null. */
+  onSelectNode: (id: string | null, additive: boolean) => void
+  /** A Ctrl/Meta+drag from the background released: the nodes it encloses. */
+  onLassoSelect: (ids: string[]) => void
   highlightedNodes: Set<string> | null
   highlightedEdges: Set<string> | null
   hoveredNodeId: string | null
-  selectedNodeId: string | null
+  hoveredEdgeId: string | null
+  onHoverEdge: (hover: EdgeHover | null) => void
+  selectedNodeIds: ReadonlySet<string>
   focusedNodeId: string | null
+  /** Flashes `id` for `FLASH_MS` from `at`, a `performance.now()` time. */
+  flashNode: { id: string; at: number } | null
   searchMatchIds: ReadonlySet<string> | null
   running: boolean
   forceParams: ForceParams
@@ -177,13 +209,16 @@ interface GraphCanvasProps {
   edgeStrokes: ReadonlyMap<GraphEdge, EdgeStroke>
   /** Lane offsets in screen pixels for edges that share a pair of endpoints, by edge id; absent means on the line. */
   edgeOffsets: ReadonlyMap<string, number>
+  undirectedEdges: ReadonlySet<string>
   activeSection: ForceSection
   activePushBucket: string | null
   activeGravityBucket: GravityHover | null
   activePullEdge: string | null
   nodeScale: NodeScaleParams
   // Decomposition group glow layer (drawn behind everything). Empty = no overlay.
-  groupGlows: GroupGlow[]
+  groupGlows: GlowGroup[]
+  /** The ring colouring; null rings only the nodes marked `ring: 'dashed'`, in their fill. */
+  ring: ResolvedColoring | null
   /** The visible edges drawn with a marking band, by id. */
   markedEdges: ReadonlySet<string>
 }
@@ -208,22 +243,65 @@ function laneOffset(
   return [sx + nx, sy + ny, tx + nx, ty + ny]
 }
 
+/** An edge's stroke on screen, source to target, in its lane. */
+function segmentOf(
+  edge: GraphEdge, src: Point, tgt: Point, vp: Viewport, offsets: ReadonlyMap<string, number>,
+): [number, number, number, number] {
+  const [sx, sy] = worldToScreen(vp, src.x, src.y)
+  const [tx, ty] = worldToScreen(vp, tgt.x, tgt.y)
+  return laneOffset(edge, offsets.get(edge.id) ?? 0, sx, sy, tx, ty)
+}
+
+/** The edge under the pointer, and the screen point where the pointer is on it. */
+export interface EdgeHover { id: string; x: number; y: number }
+
+/** The drawn edge whose stroke passes within `EDGE_HIT_PX` of a screen point, the nearest when several do; one stroked at alpha 0 is not drawn. */
+export function edgeAt(
+  px: number, py: number, edges: readonly GraphEdge[], nodeMap: ReadonlyMap<string, Point>,
+  vp: Viewport, offsets: ReadonlyMap<string, number>, strokes: ReadonlyMap<GraphEdge, EdgeStroke>,
+): GraphEdge | null {
+  let hit: GraphEdge | null = null
+  let nearest = EDGE_HIT_PX
+  for (const edge of edges) {
+    if (strokes.get(edge)?.alpha === 0) continue
+    const src = nodeMap.get(edge.sourceId)
+    const tgt = nodeMap.get(edge.targetId)
+    if (!src || !tgt) continue
+    const [ax, ay, bx, by] = segmentOf(edge, src, tgt, vp, offsets)
+    const dx = bx - ax, dy = by - ay
+    const t = Math.max(0, Math.min(1, ((px - ax) * dx + (py - ay) * dy) / (dx * dx + dy * dy || 1)))
+    const d = Math.hypot(px - ax - t * dx, py - ay - t * dy)
+    if (d <= nearest) { hit = edge; nearest = d }
+  }
+  return hit
+}
+
+/** The edges in drawing order, the hovered one last, so no other edge crosses it. */
+function hoveredLast(edges: GraphEdge[], id: string | null): GraphEdge[] {
+  const i = id === null ? -1 : edges.findIndex(e => e.id === id)
+  return i < 0 ? edges : [...edges.slice(0, i), ...edges.slice(i + 1), edges[i]]
+}
+
 // All data the draw function needs, stored in a ref to avoid effect teardown
 interface DrawData {
   // Read by the loop rather than closed over: drawData.current is rewritten
   // every render, a closure is not.
   taxonomy: Taxonomy
+  fill: Fill
+  ring: ResolvedColoring | null
   nodes: SimNode[]
   edges: GraphEdge[]
   nodeMap: Map<string, SimNode>
   viewport: Viewport
-  groupGlows: GroupGlow[]
+  groupGlows: GlowGroup[]
   markedEdges: ReadonlySet<string>
   highlightedNodes: Set<string> | null
   highlightedEdges: Set<string> | null
   hoveredNodeId: string | null
-  selectedNodeId: string | null
+  hoveredEdgeId: string | null
+  selectedNodeIds: ReadonlySet<string>
   focusedNodeId: string | null
+  flashNode: { id: string; at: number } | null
   searchMatchIds: ReadonlySet<string> | null
   forceParams: ForceParams
   resolved: ResolvedPhysics
@@ -231,6 +309,7 @@ interface DrawData {
   theme: Theme
   edgeStrokes: ReadonlyMap<GraphEdge, EdgeStroke>
   edgeOffsets: ReadonlyMap<string, number>
+  undirectedEdges: ReadonlySet<string>
   activeSection: ForceSection
   activePushBucket: string | null
   activeGravityBucket: GravityHover | null
@@ -240,27 +319,30 @@ interface DrawData {
   // Set of node ids where the same underlying definition appears more than
   // once in the visible set (on different hosts). Drawn with a colored halo.
   dupNodeIds: Set<string>
-  // The definitionKey of the currently hovered or selected node, when that
-  // node belongs to a duplicate group. All visible nodes sharing this key
-  // receive the duplicate halo. Null when no dup node is active.
-  activeDupDefKey: string | null
+  // The copy keys of the hovered and selected nodes that have copies. All
+  // visible nodes sharing one receive the duplicate halo.
+  activeDupDefKeys: ReadonlySet<string>
+  // The tokens the frame draws in; undefined until the canvas mounts.
+  palette: Palette | undefined
 }
 
 export function GraphCanvas({
   nodes, edges, viewport, onViewportChange,
   onNodeDragStart, onNodeDragMove, onNodeDragEnd,
-  onDoubleClickNode, onFitView, onHoverNode, onSelectNode,
+  onDoubleClickNode, onFitView, onHoverNode, onSelectNode, onLassoSelect,
   highlightedNodes, highlightedEdges,
-  hoveredNodeId, selectedNodeId, focusedNodeId, searchMatchIds,
-  running, forceParams, resolved, overlay, theme, edgeStrokes, edgeOffsets, activeSection, activePushBucket,
-  activeGravityBucket, activePullEdge, nodeScale, groupGlows, markedEdges,
+  hoveredNodeId, hoveredEdgeId, onHoverEdge, selectedNodeIds, focusedNodeId, flashNode, searchMatchIds,
+  running, forceParams, resolved, overlay, theme, edgeStrokes, edgeOffsets, undirectedEdges, activeSection, activePushBucket,
+  activeGravityBucket, activePullEdge, nodeScale, groupGlows, ring, markedEdges,
 }: GraphCanvasProps) {
   const canvasRef = React.useRef<HTMLCanvasElement>(null)
   const containerRef = React.useRef<HTMLDivElement>(null)
   const [size, setSize] = React.useState({ w: 0, h: 0 })
-  const dragState = React.useRef<{
-    type: 'pan' | 'node'
-    startVp?: Viewport
+  const dragState = React.useRef<(
+    | { type: 'pan' | 'node'; startVp?: Viewport }
+    /** `path` is the lasso so far, in screen pixels. */
+    | { type: 'lasso'; path: Point[] }
+  ) & {
     sx: number
     sy: number
     moved: boolean
@@ -285,33 +367,28 @@ export function GraphCanvas({
     return result
   }, [nodes])
 
-  // The copy key of the currently active (hovered or selected) node, when
-  // that node has copies. Used by the draw loop to light up every copy with
-  // the halo, not just the active node itself.
-  const activeDupDefKey = React.useMemo(() => {
-    const activeId = hoveredNodeId ?? selectedNodeId
-    if (!activeId) return null
-    const activeNode = nodeMap.get(activeId)
-    if (!activeNode || !dupNodeIds.has(activeId)) return null
-    return copyKeyOf(activeNode)
-  }, [hoveredNodeId, selectedNodeId, nodeMap, dupNodeIds])
+  const activeDupDefKeys = React.useMemo(() => new Set(nodes
+    .filter(n => dupNodeIds.has(n.id) && (n.id === hoveredNodeId || selectedNodeIds.has(n.id)))
+    .map(copyKeyOf)), [nodes, hoveredNodeId, selectedNodeIds, dupNodeIds])
 
   const taxonomy = useTaxonomy()
+  const fill = useFill(taxonomy)
+  const palette = usePalette(canvasRef)
 
   // --- Ref-based draw data (updated every render, read by draw loop) ---
   const drawData = React.useRef<DrawData>({
-    taxonomy,
+    taxonomy, fill, ring,
     nodes, edges, nodeMap, viewport, groupGlows, markedEdges, highlightedNodes, highlightedEdges,
-    hoveredNodeId, selectedNodeId, focusedNodeId, searchMatchIds,
-    forceParams, resolved, overlay, theme, edgeStrokes, edgeOffsets, activeSection, activePushBucket, activeGravityBucket, activePullEdge, nodeScale, running,
-    dupNodeIds, activeDupDefKey,
+    hoveredNodeId, hoveredEdgeId, selectedNodeIds, focusedNodeId, flashNode, searchMatchIds,
+    forceParams, resolved, overlay, theme, edgeStrokes, edgeOffsets, undirectedEdges, activeSection, activePushBucket, activeGravityBucket, activePullEdge, nodeScale, running,
+    dupNodeIds, activeDupDefKeys, palette,
   })
   drawData.current = {
-    taxonomy,
+    taxonomy, fill, ring,
     nodes, edges, nodeMap, viewport, groupGlows, markedEdges, highlightedNodes, highlightedEdges,
-    hoveredNodeId, selectedNodeId, focusedNodeId, searchMatchIds,
-    forceParams, resolved, overlay, theme, edgeStrokes, edgeOffsets, activeSection, activePushBucket, activeGravityBucket, activePullEdge, nodeScale, running,
-    dupNodeIds, activeDupDefKey,
+    hoveredNodeId, hoveredEdgeId, selectedNodeIds, focusedNodeId, flashNode, searchMatchIds,
+    forceParams, resolved, overlay, theme, edgeStrokes, edgeOffsets, undirectedEdges, activeSection, activePushBucket, activeGravityBucket, activePullEdge, nodeScale, running,
+    dupNodeIds, activeDupDefKeys, palette,
   }
 
   // Resize observer
@@ -336,7 +413,7 @@ export function GraphCanvas({
       // convert to world units by dividing by scale, plus a small slop. A
       // cardinality badge (parameterized family) sits above the body, so grow
       // the target by its extent to keep the badge part of the clickable node.
-      const screenR = taxonomy.nodeStyleOf(n).size.r * mul + badgeExtent(n, mul)
+      const screenR = engineOf(taxonomy).nodeStyleOf(n).size.r * mul + badgeExtent(n, mul)
       const r = screenR / viewport.scale + 4
       if ((wx - n.x) ** 2 + (wy - n.y) ** 2 <= r * r) return n
     }
@@ -363,11 +440,15 @@ export function GraphCanvas({
       dragState.current = { type: 'node', sx, sy, moved: false }
       const [wx, wy] = screenToWorld(viewport, sx, sy)
       onNodeDragStart(node.id, wx, wy)
+    } else if (e.ctrlKey || e.metaKey) {
+      dragState.current = { type: 'lasso', path: [{ x: sx, y: sy }], sx, sy, moved: false }
+      onHoverEdge(null)
     } else {
       dragState.current = { type: 'pan', startVp: { ...viewport }, sx, sy, moved: false }
+      onHoverEdge(null)
     }
     canvasRef.current?.setPointerCapture(e.pointerId)
-  }, [viewport, hitTest, onNodeDragStart])
+  }, [viewport, hitTest, onNodeDragStart, onHoverEdge])
 
   const handlePointerMove = React.useCallback((e: React.PointerEvent) => {
     const rect = e.currentTarget.getBoundingClientRect()
@@ -378,6 +459,8 @@ export function GraphCanvas({
       // Hover detection
       const node = hitTest(cx, cy)
       onHoverNode(node?.id ?? null)
+      const edge = node ? null : edgeAt(cx, cy, edges, nodeMap, viewport, edgeOffsets, edgeStrokes)
+      onHoverEdge(edge && { id: edge.id, x: cx, y: cy })
       return
     }
 
@@ -394,8 +477,11 @@ export function GraphCanvas({
     } else if (dragState.current.type === 'node') {
       const [wx, wy] = screenToWorld(viewport, cx, cy)
       onNodeDragMove(wx, wy)
+    } else if (dragState.current.type === 'lasso') {
+      dragState.current.path.push({ x: cx, y: cy })
+      dirtyRef.current = true
     }
-  }, [viewport, hitTest, onViewportChange, onNodeDragMove, onHoverNode])
+  }, [viewport, hitTest, onViewportChange, onNodeDragMove, onHoverNode, onHoverEdge, edges, nodeMap, edgeOffsets, edgeStrokes])
 
   const handlePointerUp = React.useCallback((e: React.PointerEvent) => {
     const ds = dragState.current
@@ -407,15 +493,24 @@ export function GraphCanvas({
         const sx = e.clientX - rect.left
         const sy = e.clientY - rect.top
         const node = hitTest(sx, sy)
-        if (node) onSelectNode(node.id)
+        if (node) onSelectNode(node.id, e.ctrlKey || e.metaKey)
       }
     } else if (ds?.type === 'pan' && !ds.moved) {
       // Click on background → deselect
-      onSelectNode(null)
+      onSelectNode(null, false)
+    } else if (ds?.type === 'lasso' && ds.moved) {
+      onLassoSelect(lassoed(ds.path, nodes, viewport))
+      dirtyRef.current = true
     }
     dragState.current = null
     canvasRef.current?.releasePointerCapture(e.pointerId)
-  }, [onNodeDragEnd, onSelectNode, hitTest])
+  }, [onNodeDragEnd, onSelectNode, onLassoSelect, hitTest, nodes, viewport])
+
+  const handlePointerCancel = React.useCallback(() => {
+    if (dragState.current?.type === 'node') onNodeDragEnd()
+    dragState.current = null
+    dirtyRef.current = true
+  }, [onNodeDragEnd])
 
   const handleDoubleClick = React.useCallback((e: React.MouseEvent) => {
     const rect = e.currentTarget.getBoundingClientRect()
@@ -454,23 +549,14 @@ export function GraphCanvas({
 
     const drawFrame = () => {
       const d = drawData.current
+      const p = d.palette
+      if (!p) return
       const { w, h } = size
       const hasHighlight = d.highlightedNodes !== null && d.highlightedNodes.size > 0
       // Soften the dim while the group glow is on (see DIM_ALPHA_GROUPS).
       const dimAlpha = d.groupGlows.length > 0 ? DIM_ALPHA_GROUPS : DIM_ALPHA
-
-      // Resolve theme-tracking colours every frame. Cheap (CSS lookup +
-      // string trim per draw) and guarantees the canvas text follows a
-      // theme switch without needing a full effect teardown.
-      // Dedicated, high-contrast label colour (darker than --gv-color-text in
-      // light themes, brighter in dark) so node names pop off the background.
-      const labelColor = cssVar(canvas, '--gv-color-graph-label', '#0f172a')
-      // Dim variant keeps the same hue, just at low alpha. We synthesise it
-      // by appending an alpha to the resolved hex when possible; otherwise
-      // fall back to the existing rgba grey.
-      const labelDimColor = labelColor.startsWith('#') && labelColor.length === 7
-        ? labelColor + '33'  // ~20% alpha
-        : 'rgba(100,116,139,0.2)'
+      const dimmed = (id: string) =>
+        (hasHighlight && !d.highlightedNodes!.has(id)) || (d.searchMatchIds !== null && !d.searchMatchIds.has(id))
 
       // World coordinates are anchored by hierarchical gravity, so the canvas
       // can project directly through the user's viewport — no per-frame
@@ -481,6 +567,9 @@ export function GraphCanvas({
       // Hoisted so the group-glow layer (drawn first) and the node layer below
       // share one value.
       const mul = nodeSizeMul(vp.scale, d.nodeScale)
+      // A body's border: 1.25px at the lowest zoom keeps the outline visible
+      // without turning small nodes into bullseyes.
+      const bodyWidth = Math.max(1, Math.min(2, vp.scale * 1.25))
 
       ctx.setTransform(dpr, 0, 0, dpr, 0, 0)
       ctx.clearRect(0, 0, w, h)
@@ -492,9 +581,9 @@ export function GraphCanvas({
       // edge whose endpoints share a group glows as a connecting corridor.
       // Sections partition members, so a node belongs to at most one group.
       if (d.groupGlows.length > 0) {
-        const glowByNode = new Map<string, { color: string; strength: number }>()
+        const glowByNode = new Map<string, GlowGroup>()
         for (const g of d.groupGlows) {
-          for (const id of g.nodeIds) glowByNode.set(id, { color: g.color, strength: g.strength })
+          for (const id of g.nodeIds) glowByNode.set(id, g)
         }
 
         ctx.save()
@@ -513,7 +602,7 @@ export function GraphCanvas({
             Math.max(sy, ty) < -CULL_MARGIN || Math.min(sy, ty) > h + CULL_MARGIN) continue
           ctx.globalAlpha = Math.min(0.5, GROUP_GLOW_EDGE_ALPHA * gs.strength)
           ctx.strokeStyle = gs.color
-          ctx.lineWidth = GROUP_GLOW_EDGE_WIDTH * glowSwell(gs.strength)
+          ctx.lineWidth = GROUP_GLOW_EDGE_WIDTH * glowSwell(gs)
           ctx.beginPath()
           ctx.moveTo(sx, sy)
           ctx.lineTo(tx, ty)
@@ -527,7 +616,7 @@ export function GraphCanvas({
           const node = d.nodeMap.get(id)
           if (!node) continue
           const [sx, sy] = worldToScreen(vp, node.x, node.y)
-          const gr = d.taxonomy.nodeStyleOf(node).size.r * mul + GROUP_GLOW_PAD * glowSwell(g.strength)
+          const gr = engineOf(d.taxonomy).nodeStyleOf(node).size.r * mul + GROUP_GLOW_PAD * glowSwell(g)
           if (sx + gr < 0 || sx - gr > w || sy + gr < 0 || sy - gr > h) continue
           const a = Math.min(0.92, GROUP_GLOW_CENTER_ALPHA * g.strength)
           const grad = ctx.createRadialGradient(sx, sy, 0, sx, sy, gr)
@@ -543,37 +632,49 @@ export function GraphCanvas({
         ctx.globalAlpha = 1
       }
 
+      // Stacked nodes' ghosts, behind every edge and body.
+      for (const node of d.nodes) {
+        if (!node.stack) continue
+        const sx = node.x * vp.scale + vp.x, sy = node.y * vp.scale + vp.y
+        const def = engineOf(d.taxonomy).nodeStyleOf(node)
+        const r = def.size.r * mul
+        const reach = r * (1 + GHOST_ALPHA.length * GHOST_STEP)
+        if (sx + reach < 0 || sx - reach > w || sy + reach < 0 || sy - reach > h) continue
+        const { fill, border } = pairFor(d.fill, node.id, def.color)[d.theme]
+        drawGhosts(ctx, sx, sy, r, fill, border, bodyWidth, dimmed(node.id) ? dimAlpha : 1)
+      }
+      ctx.globalAlpha = 1
+
       // Draw edges
-      for (const edge of d.edges) {
+      for (const edge of hoveredLast(d.edges, d.hoveredEdgeId)) {
         const src = d.nodeMap.get(edge.sourceId)
         const tgt = d.nodeMap.get(edge.targetId)
         if (!src || !tgt) continue
 
-        const [sx0, sy0] = worldToScreen(vp, src.x, src.y)
-        const [tx0, ty0] = worldToScreen(vp, tgt.x, tgt.y)
-        const [sx, sy, tx, ty] = laneOffset(edge, d.edgeOffsets.get(edge.id) ?? 0, sx0, sy0, tx0, ty0)
+        const [sx, sy, tx, ty] = segmentOf(edge, src, tgt, vp, d.edgeOffsets)
 
         if (Math.max(sx, tx) < -CULL_MARGIN || Math.min(sx, tx) > w + CULL_MARGIN ||
           Math.max(sy, ty) < -CULL_MARGIN || Math.min(sy, ty) > h + CULL_MARGIN) continue
 
         const edgeHighlighted = d.highlightedEdges?.has(edge.id) ?? false
-        const style = d.edgeStrokes.get(edge) ?? NEUTRAL_STROKE
-        const baseAlpha = style.alpha
+        const stroke = d.edgeStrokes.get(edge) ?? NEUTRAL_STROKE
+        const baseAlpha = stroke.alpha
         // An edge is search-dimmed if a search is active and either
         // endpoint isn't a match — keeps the visible chain readable
         // without showing edges to dimmed nodes.
         const edgeSearchDimmed = d.searchMatchIds !== null &&
           (!d.searchMatchIds.has(edge.sourceId) || !d.searchMatchIds.has(edge.targetId))
-        // Highlights override the per-style alpha so the active subgraph
+        // Highlights override the per-stroke alpha so the active subgraph
         // pops; dim non-highlighted/non-matching edges down to DIM_ALPHA.
         const edgeDimmed = hasHighlight ? !edgeHighlighted : edgeSearchDimmed
-        const edgeAlpha = hasHighlight && edgeHighlighted ? 1 : edgeDimmed ? dimAlpha : baseAlpha
+        const hovered = edge.id === d.hoveredEdgeId
+        const edgeAlpha = hovered || (hasHighlight && edgeHighlighted) ? 1 : edgeDimmed ? dimAlpha : baseAlpha
 
         if (d.markedEdges.has(edge.id)) {
           ctx.globalAlpha = edgeDimmed ? dimAlpha : MARK_ALPHA
           ctx.beginPath()
           ctx.setLineDash(MARK_DASH)
-          ctx.strokeStyle = labelColor
+          ctx.strokeStyle = p.colorGraphLabel
           ctx.lineWidth = MARK_WIDTH
           ctx.moveTo(sx, sy)
           ctx.lineTo(tx, ty)
@@ -582,21 +683,21 @@ export function GraphCanvas({
 
         ctx.globalAlpha = edgeAlpha
         ctx.beginPath()
-        ctx.setLineDash([...style.dash])
-        ctx.strokeStyle = style.color[d.theme]
-        ctx.lineWidth = style.width
+        ctx.setLineDash([...stroke.dash])
+        ctx.strokeStyle = stroke.color[d.theme]
+        ctx.lineWidth = stroke.width + (hovered ? 2 : 0)
         ctx.moveTo(sx, sy)
         ctx.lineTo(tx, ty)
         ctx.stroke()
         ctx.setLineDash([])
 
-        // Arrowhead for dependency edges (containment is hierarchical, no
-        // direction is interesting to show).
-        if (!isContainment(edge)) {
+        // Arrowhead for directed dependency edges (containment is
+        // hierarchical, no direction is interesting to show).
+        if (!isContainment(edge) && !d.undirectedEdges.has(edge.id)) {
           const angle = Math.atan2(ty - sy, tx - sx)
           // Stop the arrowhead at the target's on-screen edge (screen radius =
           // def.r × nodeSizeMul(scale)) so it tracks the zoom-scaled node body.
-          const tgtR = d.taxonomy.nodeStyleOf(tgt).size.r * nodeSizeMul(vp.scale, d.nodeScale)
+          const tgtR = engineOf(d.taxonomy).nodeStyleOf(tgt).size.r * nodeSizeMul(vp.scale, d.nodeScale)
           const offset = tgtR + 2
           const ax = tx - Math.cos(angle) * offset
           const ay = ty - Math.sin(angle) * offset
@@ -611,7 +712,7 @@ export function GraphCanvas({
             ay - ARROWHEAD_SIZE * Math.sin(angle + Math.PI / 6),
           )
           ctx.closePath()
-          ctx.fillStyle = style.color[d.theme]
+          ctx.fillStyle = stroke.color[d.theme]
           ctx.fill()
         }
 
@@ -657,7 +758,7 @@ export function GraphCanvas({
           const baseAlpha = highlighted ? 0.28 : 0.05
           const stepAlpha = highlighted ? 0.06 : 0.015
 
-          const color = d.taxonomy.nodeStyleOf(node).color[d.theme].fill
+          const color = pairFor(d.fill, node.id, engineOf(d.taxonomy).nodeStyleOf(node).color)[d.theme].fill
           ctx.strokeStyle = color
 
           const effectiveCharge = Math.abs(chargeFor(d.resolved.push, node)) * pushMul
@@ -712,9 +813,6 @@ export function GraphCanvas({
         // highlight reads as part of the view, not a generic stoplight:
         // amber = stretched, cool blue = compressed, calm
         // timer-teal = near rest.
-        const tensionStretch = cssVar(canvas, '--gv-tension-stretch', '#d97706')
-        const tensionCompress = cssVar(canvas, '--gv-tension-compress', '#7CB9E8')
-        const tensionRest = cssVar(canvas, '--gv-tension-rest', '#7EC8B8')
         for (const edge of d.edges) {
           const src = d.nodeMap.get(edge.sourceId)
           const tgt = d.nodeMap.get(edge.targetId)
@@ -723,9 +821,7 @@ export function GraphCanvas({
           const cat = springFor(d.resolved.spring, edge, src, tgt)
           if (activePullKey && cat.key !== activePullKey) continue
 
-          const [sx0, sy0] = worldToScreen(vp, src.x, src.y)
-          const [tx0, ty0] = worldToScreen(vp, tgt.x, tgt.y)
-          const [sx, sy, tx, ty] = laneOffset(edge, d.edgeOffsets.get(edge.id) ?? 0, sx0, sy0, tx0, ty0)
+          const [sx, sy, tx, ty] = segmentOf(edge, src, tgt, vp, d.edgeOffsets)
           if (Math.max(sx, tx) < -CULL_MARGIN || Math.min(sx, tx) > w + CULL_MARGIN ||
             Math.max(sy, ty) < -CULL_MARGIN || Math.min(sy, ty) > h + CULL_MARGIN) continue
 
@@ -737,33 +833,33 @@ export function GraphCanvas({
 
           let tensionColor: string
           if (ratio > 1.15) {
-            tensionColor = tensionStretch
+            tensionColor = p.tensionStretch
           } else if (ratio < 0.85) {
-            tensionColor = tensionCompress
+            tensionColor = p.tensionCompress
           } else {
-            tensionColor = tensionRest
+            tensionColor = p.tensionRest
           }
 
           if (activePullKey) {
             // Border: a tension-coloured casing wider than the edge, then the
             // edge's own colour redrawn on top at full opacity.
-            const style = d.edgeStrokes.get(edge) ?? NEUTRAL_STROKE
+            const stroke = d.edgeStrokes.get(edge) ?? NEUTRAL_STROKE
             ctx.beginPath()
             ctx.moveTo(sx, sy)
             ctx.lineTo(tx, ty)
             ctx.strokeStyle = tensionColor
             ctx.globalAlpha = 0.9
-            ctx.lineWidth = style.width + 5
+            ctx.lineWidth = stroke.width + 5
             ctx.setLineDash([])
             ctx.stroke()
 
             ctx.beginPath()
             ctx.moveTo(sx, sy)
             ctx.lineTo(tx, ty)
-            ctx.strokeStyle = style.color[d.theme]
+            ctx.strokeStyle = stroke.color[d.theme]
             ctx.globalAlpha = 1
-            ctx.lineWidth = style.width
-            ctx.setLineDash([...style.dash])
+            ctx.lineWidth = stroke.width
+            ctx.setLineDash([...stroke.dash])
             ctx.stroke()
             ctx.setLineDash([])
             continue
@@ -789,7 +885,7 @@ export function GraphCanvas({
             ctx.beginPath()
             ctx.moveTo(mx1 - perpX * tickLen, my1 - perpY * tickLen)
             ctx.lineTo(mx1 + perpX * tickLen, my1 + perpY * tickLen)
-            ctx.strokeStyle = tensionRest
+            ctx.strokeStyle = p.tensionRest
             ctx.globalAlpha = 0.7
             ctx.lineWidth = 1.5
             ctx.stroke()
@@ -814,7 +910,7 @@ export function GraphCanvas({
         const hover = d.activeGravityBucket
         const fillOf = (bucket: string | undefined): string => {
           const color = bucket !== undefined ? d.overlay.colors.get(bucket) : undefined
-          return color ?? cssVar(canvas, '--gv-color-text-muted', '#94A3B8')
+          return color ?? p.colorTextMuted
         }
         const drawnOn = (axis: 'x' | 'y') => hover !== null && hover.axis === axis &&
           (axis === 'y' && d.overlay.rings.length > 0
@@ -851,8 +947,8 @@ export function GraphCanvas({
               // A scalar axis: one gradient from its 0 end to its 1 end.
               const z = toScreen(gradient.zero), o = toScreen(gradient.one)
               const g = coord === 'y' ? ctx.createLinearGradient(0, z, 0, o) : ctx.createLinearGradient(z, 0, o, 0)
-              g.addColorStop(0, cssVar(canvas, '--gv-color-text-muted', '#94A3B8'))
-              g.addColorStop(1, cssVar(canvas, '--gv-color-text', '#1E293B'))
+              g.addColorStop(0, p.colorTextMuted)
+              g.addColorStop(1, p.colorText)
               ctx.fillStyle = g
               ctx.globalAlpha = 0.12
             } else {
@@ -889,34 +985,31 @@ export function GraphCanvas({
       // label may collide with a node drawn later in the same loop.
       const nodeCircles = d.nodes.map(n => {
         const [nx, ny] = worldToScreen(vp, n.x, n.y)
-        return { x: nx, y: ny, r: d.taxonomy.nodeStyleOf(n).size.r * mul }
+        return { x: nx, y: ny, r: engineOf(d.taxonomy).nodeStyleOf(n).size.r * mul }
       })
 
       for (const node of d.nodes) {
         const [sx, sy] = worldToScreen(vp, node.x, node.y)
-        const def = d.taxonomy.nodeStyleOf(node)
+        const def = engineOf(d.taxonomy).nodeStyleOf(node)
         const r = def.size.r * mul
         const hw = r  // nodes are circles: half-width = half-height = r
 
         if (sx + hw < -CULL_MARGIN || sx - hw > w + CULL_MARGIN ||
           sy + hw < -CULL_MARGIN || sy - hw > h + CULL_MARGIN) continue
 
-        const nodeHighlighted = d.highlightedNodes?.has(node.id) ?? false
-        const searchDimmed = d.searchMatchIds !== null && !d.searchMatchIds.has(node.id)
-        const nodeDimmed = (hasHighlight && !nodeHighlighted) || searchDimmed
-        ctx.globalAlpha = nodeDimmed ? dimAlpha : 1
+        const nodeDimmed = dimmed(node.id)
+        const nodeAlpha = nodeDimmed ? dimAlpha : 1
+        ctx.globalAlpha = nodeAlpha
 
-        const { fill, border } = def.color[d.theme]
+        const { fill, border } = pairFor(d.fill, node.id, def.color)[d.theme]
         const icon   = def.icon
 
-        // Filled body + crisp border. The border is ~3 stops darker than the
-        // fill; 1.25px at the lowest zoom keeps the outline visible without
-        // turning small nodes into bullseyes.
+        // Filled body + crisp border, ~3 stops darker than the fill.
         ctx.beginPath()
         ctx.arc(sx, sy, r, 0, Math.PI * 2)
         ctx.fillStyle = fill
         ctx.fill()
-        ctx.lineWidth = Math.max(1, Math.min(2, vp.scale * 1.25))
+        ctx.lineWidth = bodyWidth
         ctx.strokeStyle = border
         ctx.stroke()
 
@@ -925,22 +1018,10 @@ export function GraphCanvas({
         // icon bleeds into the fill anyway and just adds noise.
         if (vp.scale >= LABEL_ELIDE_SCALE && icon) {
           ctx.save()
-          ctx.font = `${def.size.iconSize * mul}px ${ICON_FONT_FAMILY}`
-          ctx.fillStyle = '#FFFFFF'
-          ctx.globalAlpha = (nodeDimmed ? dimAlpha : 1) * 0.92
+          ctx.font = `${def.size.iconSize * mul}px ${p.fontSans}`
+          ctx.fillStyle = GLYPH_COLOR
+          ctx.globalAlpha = nodeAlpha * 0.92
           ctx.fillText(icon, sx, sy + 0.5)
-          ctx.restore()
-        }
-
-        // Orphan indicator — dropped at very low zoom (decorative noise at that scale)
-        if (node.ring === 'dashed' && vp.scale >= DETAIL_REDUCE_SCALE) {
-          ctx.save()
-          ctx.setLineDash([3, 3])
-          ctx.strokeStyle = fill
-          ctx.lineWidth = 1.5
-          ctx.beginPath()
-          ctx.arc(sx, sy, r + 4, 0, Math.PI * 2)
-          ctx.stroke()
           ctx.restore()
         }
 
@@ -948,56 +1029,23 @@ export function GraphCanvas({
         // DIM_ALPHA above) — the ring vocabulary is reserved for other
         // decoration.
 
-        // Duplicate halo — colored ring in the node's own fill color drawn on
-        // every visible copy of a definition whenever ANY of those copies is
-        // hovered or selected. The halo always renders at full color (alpha
-        // 0.55) — it deliberately ignores nodeDimmed so it pops even when the
-        // rest of the node is faded by the highlight system.
-        //
-        // Sits at r + 5 (same gap from the node edge as the default
-        // selection ring) and uses a slightly thinner stroke so the two rings
-        // read as distinct even when they appear together.
-        const dupHaloActive = d.activeDupDefKey !== null &&
-          copyKeyOf(node) === d.activeDupDefKey &&
-          vp.scale >= DETAIL_REDUCE_SCALE
-        if (dupHaloActive) {
-          ctx.save()
-          ctx.strokeStyle = fill
-          ctx.lineWidth = 2
-          ctx.setLineDash([])
-          ctx.globalAlpha = 0.55
-          ctx.beginPath()
-          ctx.arc(sx, sy, r + 5, 0, Math.PI * 2)
-          ctx.stroke()
-          ctx.restore()
+        // The rings, outward: the data ring, the copy halo (on every visible
+        // copy while any is hovered or selected, undimmed so it pops), the
+        // selection ring, the focus ring, and a flash's pulse expanding past them.
+        const hue = d.ring && hueFor(d.ring, node.id)
+        ctx.save()
+        let edge = r
+        if (hue || node.ring === 'dashed') {
+          edge = drawRing(ctx, sx, sy, edge, RING_WIDTH, hue ? hue[d.theme] : fill, node.ring === 'dashed' ? DATA_DASH : NO_DASH, nodeAlpha)
         }
-
-        // Selection ring — white solid ring. Expands to r + 10 when the
-        // duplicate halo is also active, keeping the two rings clearly apart.
-        if (node.id === d.selectedNodeId) {
-          const selR = dupHaloActive ? r + 10 : r + 5
-          ctx.save()
-          ctx.strokeStyle = SELECTION_RING_COLOR
-          ctx.lineWidth = 2.5
-          ctx.setLineDash([])
-          ctx.beginPath()
-          ctx.arc(sx, sy, selR, 0, Math.PI * 2)
-          ctx.stroke()
-          ctx.restore()
+        if (d.activeDupDefKeys.has(copyKeyOf(node))) edge = drawRing(ctx, sx, sy, edge, RING_WIDTH, fill, NO_DASH, 0.55)
+        if (d.selectedNodeIds.has(node.id)) edge = drawRing(ctx, sx, sy, edge, SELECTION_WIDTH, p.selectionRingColor, NO_DASH, nodeAlpha)
+        if (node.id === d.focusedNodeId) edge = drawRing(ctx, sx, sy, edge, RING_WIDTH, p.focusRingColor, FOCUS_DASH, nodeAlpha)
+        if (node.id === d.flashNode?.id) {
+          const t = (performance.now() - d.flashNode.at) / FLASH_MS
+          if (t < 1) drawRing(ctx, sx, sy, edge + 10 * t, 3, p.selectionRingColor, NO_DASH, 1 - t)
         }
-
-        // Focus ring — dropped at very low zoom (dashes too small to read).
-        // Sits at r + 9 so it clears the duplicate halo at r + 7.
-        if (node.id === d.focusedNodeId && vp.scale >= DETAIL_REDUCE_SCALE) {
-          ctx.save()
-          ctx.strokeStyle = FOCUS_RING_COLOR
-          ctx.lineWidth = 2
-          ctx.setLineDash([2, 2])
-          ctx.beginPath()
-          ctx.arc(sx, sy, r + 9, 0, Math.PI * 2)
-          ctx.stroke()
-          ctx.restore()
-        }
+        ctx.restore()
 
         ctx.globalAlpha = 1
 
@@ -1013,7 +1061,7 @@ export function GraphCanvas({
           const padX = BADGE_PAD_X * mul
           const gap = BADGE_GAP * mul
           ctx.save()
-          ctx.font = badgeFont(badgePx)
+          ctx.font = textFont(badgePx, p.fontSans)
           ctx.textAlign = 'center'
           ctx.textBaseline = 'middle'
           // Measure each chip, then centre the whole row horizontally on the node.
@@ -1024,12 +1072,12 @@ export function GraphCanvas({
           const totalW = chips.reduce((s, c) => s + c.w, 0) + gap * (chips.length - 1)
           const rowY = sy - r - BADGE_NODE_GAP * mul - chipH
           let cx = sx - totalW / 2
-          ctx.globalAlpha = nodeDimmed ? dimAlpha : 1
+          ctx.globalAlpha = nodeAlpha
           for (const chip of chips) {
             roundRectPath(ctx, cx, rowY, chip.w, chipH, chipH / 2)
-            ctx.fillStyle = BADGE_FILL
+            ctx.fillStyle = p.badgeFill
             ctx.fill()
-            ctx.fillStyle = BADGE_TEXT_COLOR
+            ctx.fillStyle = p.badgeText
             ctx.fillText(chip.text, cx + chip.w / 2, rowY + chipH / 2 + 0.5)
             cx += chip.w + gap
           }
@@ -1044,13 +1092,13 @@ export function GraphCanvas({
         // always win). Greedy in node order — which is stable — so the set of
         // shown labels doesn't flicker once the layout settles. O(n²) worst
         // case, fine at this scale.
-        const isActiveNode = node.id === d.hoveredNodeId || node.id === d.selectedNodeId
+        const isActiveNode = node.id === d.hoveredNodeId || d.selectedNodeIds.has(node.id)
         if (vp.scale >= LABEL_ELIDE_SCALE || isActiveNode) {
           // Active nodes (hovered/selected) keep a readable floor size even when
           // zoomed out, since they're deliberately surfaced; others scale freely.
           const labelPx = LABEL_FONT_PX * (isActiveNode ? Math.max(mul, 1) : mul)
           const labelY = sy + r + 4 + labelPx * 0.7
-          ctx.font = labelFont(labelPx)
+          ctx.font = textFont(labelPx, p.fontSans)
           const text = labelText(node.name)
           const tw = ctx.measureText(text).width
           const box = { x: sx - tw / 2 - 2, y: labelY - labelPx / 2 - 1, w: tw + 4, h: labelPx + 2 }
@@ -1066,13 +1114,25 @@ export function GraphCanvas({
             labelBoxes.push(box)
             // Softened + slightly translucent so names aren't the only bright
             // text on the dark canvas and edges stay visible through them.
-            // Dimmed labels already encode their fade in the colour itself.
-            ctx.globalAlpha = nodeDimmed ? 1 : LABEL_ALPHA
-            ctx.fillStyle = nodeDimmed ? labelDimColor : labelColor
+            ctx.globalAlpha = nodeDimmed ? DIM_ALPHA : LABEL_ALPHA
+            ctx.fillStyle = p.colorGraphLabel
             ctx.fillText(text, sx, labelY)
             ctx.globalAlpha = 1
           }
         }
+      }
+
+      const lasso = dragState.current?.type === 'lasso' && dragState.current.path
+      if (lasso) {
+        ctx.save()
+        ctx.strokeStyle = p.selectionRingColor
+        ctx.lineWidth = 1.5
+        ctx.setLineDash([4, 4])
+        ctx.beginPath()
+        for (const pt of lasso) ctx.lineTo(pt.x, pt.y)
+        ctx.closePath()
+        ctx.stroke()
+        ctx.restore()
       }
     }
 
@@ -1080,9 +1140,11 @@ export function GraphCanvas({
     // When paused, a single frame is drawn on demand via the dirty flag.
     const loop = () => {
       if (!active) return
-      const isRunning = drawData.current.running
-      if (isRunning || dirtyRef.current) {
-        dirtyRef.current = false
+      const { running: isRunning, flashNode } = drawData.current
+      const flashing = flashNode !== null && performance.now() - flashNode.at < FLASH_MS
+      if (isRunning || flashing || dirtyRef.current) {
+        // A flash's last frame is followed by one without it.
+        dirtyRef.current = flashing
         drawFrame()
       }
       loopId = requestAnimationFrame(loop)
@@ -1100,7 +1162,11 @@ export function GraphCanvas({
         onPointerDown={handlePointerDown}
         onPointerMove={handlePointerMove}
         onPointerUp={handlePointerUp}
+        onPointerLeave={() => { onHoverNode(null); onHoverEdge(null) }}
+        onPointerCancel={handlePointerCancel}
         onDoubleClick={handleDoubleClick}
+        // macOS raises the context menu on Ctrl+click, the selection's toggle.
+        onContextMenu={e => { if (e.ctrlKey) e.preventDefault() }}
       />
     </div>
   )

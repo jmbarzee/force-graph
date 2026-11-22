@@ -10,10 +10,12 @@
 
 import React from 'react'
 import { Simulation, retunedFor } from '../../graph/simulation'
+import { layoutFrame, resolvePhysics } from '../../graph/forces'
+import type { LayoutFrame, ResolvedPhysics } from '../../graph/forces'
 import { defaultRng } from '../../graph/rng'
 import type { ForceParams, SimNode } from '../../graph/simulation'
 import type { Graph } from '../../graph/model'
-import { graphEquals } from '../../graph/model'
+import { graphEquals, readableGraph } from '../../graph/model'
 import type { Taxonomy } from '../../graph/taxonomy'
 
 export interface SimulationController {
@@ -23,6 +25,8 @@ export interface SimulationController {
   running: boolean
   setRunning: React.Dispatch<React.SetStateAction<boolean>>
   forceParams: ForceParams
+  resolved: ResolvedPhysics
+  frame: LayoutFrame
   getNode: (id: string) => SimNode | undefined
   onParamChange: (patch: Partial<ForceParams>) => void
   onForceAdjust: () => void
@@ -40,10 +44,8 @@ export function useSimulation(
   // simulation is built; the previous simulation's positions take precedence
   // on a rebuild, so a graph update keeps the layout the user has.
   positions: ReadonlyMap<string, { x: number; y: number }> | undefined,
-  // Called after each (re)creation with whether positions were carried over,
-  // so the camera can keep its place when the layout kept its. Held in a ref
-  // so its changing identity never re-triggers the rebuild.
-  onRebuild: ((continued: boolean) => void) | undefined,
+  // Held in a ref, so a new identity each render never rebuilds.
+  onRebuild: (() => void) | undefined,
   // The force parameters as the view's layout state holds them, and the
   // writer every change goes through — the host's, when it controls the layout.
   forces: ForceParams,
@@ -71,6 +73,13 @@ export function useSimulation(
   React.useEffect(() => {
     if (forceParams !== forces) updateForces(prev => (prev === forces ? forceParams : prev))
   }, [forceParams, forces]) // eslint-disable-line react-hooks/exhaustive-deps
+  // Resolved and framed in render, once per change, so the panel and the
+  // overlay draw in the same pass as the edit — and a computed scalar's
+  // `compute` runs once for it, not once here and again in the simulation.
+  // A scalar's refused answer is the frame's diagnostic, never a throw: this
+  // runs above the pane's error boundary.
+  const resolved = React.useMemo(() => resolvePhysics(forceParams, taxonomy), [forceParams, taxonomy])
+  const frame = React.useMemo(() => layoutFrame(readableGraph(graph), resolved), [graph, resolved])
   const [simVersion, setSimVersion] = React.useState(0)
 
   const onRebuildRef = React.useRef(onRebuild)
@@ -81,6 +90,8 @@ export function useSimulation(
   // mapping has nothing left to detect.
   React.useEffect(() => {
     const prev = simRef.current
+    // StrictMode's replay of this effect, over the inputs it just built from.
+    if (prev && prevGraphRef.current === graph && prevOntologyRef.current === taxonomy) return
     // A new graph object equal to the last rebuilds the simulation for
     // nothing; said once, because the fix is on the host's side (memoise).
     if (prev && prevGraphRef.current && prevGraphRef.current !== graph && !warnedRef.current && graphEquals(prevGraphRef.current, graph)) {
@@ -103,18 +114,23 @@ export function useSimulation(
     // simulation's, so a graph update keeps the layout the user has.
     const start = new Map<string, { x: number; y: number }>(positions ?? [])
     if (prev) for (const n of prev.nodes) start.set(n.id, { x: n.x, y: n.y })
-    simRef.current = new Simulation(graph, forceParams, defaultRng, taxonomy, start.size > 0 ? start : undefined)
-    onRebuildRef.current?.(prev !== null)
+    const sim = new Simulation(graph, { params: forceParams, resolved, frame }, defaultRng, start.size > 0 ? start : undefined)
+    // A first build told where every node is opens where they rest: a reload
+    // holds still.
+    if (!prev && graph.nodes.every(n => start.has(n.id))) sim.cool()
+    simRef.current = sim
+    onRebuildRef.current?.()
     setRunning(true)
     setSimVersion(v => v + 1)
   }, [graph, taxonomy]) // eslint-disable-line react-hooks/exhaustive-deps
 
   // Every later change reaches the live simulation here, once, after the
-  // retune above — never a raw patch the taxonomy could refuse.
+  // retune above — never a raw patch the taxonomy could refuse. A new
+  // frame follows every new params, and a rebuild already holds its own.
   React.useEffect(() => {
     const sim = simRef.current
-    if (sim && sim.params !== forceParams) sim.setParams(forceParams)
-  }, [forceParams])
+    if (sim && sim.params !== forceParams) sim.setLayout({ params: forceParams, resolved, frame })
+  }, [forceParams]) // eslint-disable-line react-hooks/exhaustive-deps
 
   const getNode = React.useCallback((id: string) => simRef.current?.getNode(id), [])
 
@@ -166,7 +182,7 @@ export function useSimulation(
   }, [running])
 
   return {
-    simRef, simVersion, running, setRunning, forceParams, getNode,
+    simRef, simVersion, running, setRunning, forceParams, resolved, frame, getNode,
     onParamChange, onForceAdjust, onRelayout,
     onNodeDragStart, onNodeDragMove, onNodeDragEnd,
     onToggleRunning,

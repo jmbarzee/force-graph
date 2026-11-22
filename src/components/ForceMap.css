@@ -1,4 +1,5 @@
 /* Force map / force curves (spring + charge maps). */
+@layer gv {
 /* ── 2D force map + force curves (shared) ──────────────────────────────────
    The 2D map (control) and the force-curve viz (read-out), shared by both the
    Pull tab (spring map: split-colour edge tokens) and the Push tab (charge
@@ -36,6 +37,16 @@
 
 .gv-spring-plot-bg { fill: var(--gv-color-bg); opacity: 0.5; }
 .gv-spring-grid { stroke: var(--gv-color-border); stroke-width: 1; opacity: 0.6; }
+
+/* A chain: a ladder's rungs joined in declaration order, under the tokens. */
+.gv-spring-chain {
+  fill: none;
+  stroke: var(--gv-color-text-muted);
+  stroke-width: 1.5;
+  stroke-opacity: 0.35;
+  stroke-linejoin: round;
+  pointer-events: none;
+}
 
 /* Spring map tokens */
 .gv-spring-token { cursor: grab; }
@@ -122,4 +133,4 @@
 }
 
 .gv-spring-exp-label { color: var(--gv-color-text-muted); }
-
+}

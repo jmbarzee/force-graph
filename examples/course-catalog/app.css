@@ -1,18 +1,18 @@
-/* The shell's own chrome. It reads the library's tokens (--gv-color-*, --gv-font-*,
-   --gv-accent) and the scheme's per-value variables (--gv-node-<value>). */
+/* The shell's own chrome: the side panel is scoped by `useScheme`, so it
+   reads the library's tokens and the scheme's per-value variables
+   (--gv-node-<value>) as the pane does. */
 
 html, body, #root { height: 100%; margin: 0; }
 
+/* The pane's fonts inherit, so the shell's font is the pane's. */
 .catalog-app {
   height: 100%;
   display: flex;
-  background: var(--gv-color-bg);
-  color: var(--gv-color-text);
-  font-family: var(--gv-font-sans);
+  font-family: -apple-system, BlinkMacSystemFont, 'Segoe UI', Roboto, sans-serif;
 }
 /* The themed elements are the view's root and the side panel, not this shell:
    an ancestor's `data-theme` is what the view reads as the host's. */
-.catalog-pane [data-theme="dark"], .catalog-details[data-theme="dark"] { color-scheme: dark; }
+.catalog-app [data-gv-theme="dark"] { color-scheme: dark; }
 
 /* GraphView fills a flex column with a definite height. */
 .catalog-pane { flex: 1; min-width: 0; display: flex; flex-direction: column; }
@@ -26,7 +26,7 @@ html, body, #root { height: 100%; margin: 0; }
   background: #FEF3C7;
   border-top: 1px solid var(--gv-color-border);
 }
-[data-theme="dark"] .catalog-findings { color: #FCD34D; background: #3A2A0C; }
+[data-gv-theme="dark"] .catalog-findings { color: #FCD34D; background: #3A2A0C; }
 .catalog-findings summary { cursor: pointer; }
 .catalog-findings ul { margin: 6px 0 2px; padding-left: 18px; }
 

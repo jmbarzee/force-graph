@@ -6,7 +6,7 @@
 //   ForceMap2D  — a 2D map of draggable tokens on shared axes, with a global
 //                 "scale all" slider on each axis. A token with a single
 //                 colour renders a solid dot (Push); two colours render a
-//                 split dot (Pull).
+//                 split dot (Pull). Chains join tokens by a faint line.
 //   ForceCurves — a boxed read-out plot that renders pre-computed polylines
 //                 (per item), an optional baseline, and per-item vertical
 //                 markers, with one global `exp` slider beneath.
@@ -17,6 +17,8 @@ import React from 'react'
 import './ForceMap.css'
 import { Plot } from './controls/Plot'
 import { Slider } from './controls/Slider'
+import { NothingVisible } from './controls/NothingVisible'
+import { useStrings } from './graph-view/strings'
 
 const clamp = (v: number, lo: number, hi: number) => Math.max(lo, Math.min(hi, v))
 const snap = (v: number, step: number) => Math.round(v / step) * step
@@ -64,14 +66,18 @@ export interface MapToken {
   // Solid outline (dependency) vs dashed outline (containment), mirroring the
   // canvas edge styling. For Push every token is solid.
   outline: 'solid' | 'dashed'
+  // A second ring: the token stands for several (a collapsed ladder).
+  stacked?: boolean
   label: string
   tooltip?: string
 }
 
 export function ForceMap2D({
-  tokens, xAxis, yAxis, onDrag, hoveredId, onHover, xSlider, ySlider, ariaLabel,
+  tokens, chains = [], xAxis, yAxis, onDrag, hoveredId, onHover, xSlider, ySlider, ariaLabel,
 }: {
   tokens: MapToken[]
+  // Token ids to join by a faint polyline under the tokens, one list per chain.
+  chains?: readonly (readonly string[])[]
   xAxis: AxisSpec
   yAxis: AxisSpec
   onDrag: (id: string, x: number, y: number) => void
@@ -138,6 +144,7 @@ export function ForceMap2D({
   // chosen axis — is still a set of tokens a pointer can tell apart. Only the
   // drawn position moves; a drag still writes the token's own value.
   const placed = spreadCoincident(tokens.map(t => ({ cx: xForVal(t.x), cy: yForVal(t.y) })))
+  const placedById = new Map(tokens.map((t, i) => [t.id, placed[i]]))
 
   return (
     <Plot
@@ -167,7 +174,7 @@ export function ForceMap2D({
         </>
       }
     >
-      <svg
+      {tokens.length === 0 ? <NothingVisible /> : <svg
         ref={svgRef}
         className="gv-spring-map-svg"
         viewBox={`0 0 ${MAP_W} ${MAP_H}`}
@@ -180,6 +187,13 @@ export function ForceMap2D({
         ))}
         {hGrid.map(y => (
           <line key={`gy${y}`} x1={0} y1={y} x2={MAP_W} y2={y} className="gv-spring-grid" />
+        ))}
+        {chains.map(chain => (
+          <polyline
+            key={chain.join(' ')}
+            points={chain.flatMap(id => placedById.get(id) ?? []).map(p => `${p.cx.toFixed(1)},${p.cy.toFixed(1)}`).join(' ')}
+            className="gv-spring-chain"
+          />
         ))}
 
         {tokens.map((token, i) => {
@@ -212,11 +226,12 @@ export function ForceMap2D({
                 className="gv-spring-token-outline"
                 strokeDasharray={token.outline === 'dashed' ? '2 2' : undefined}
               />
+              {token.stacked && <circle r={TOKEN_R + 2.5} fill="none" className="gv-spring-token-outline" />}
               <text y={TOKEN_R + 11} textAnchor="middle" className="gv-spring-token-label">{token.label}</text>
             </g>
           )
         })}
-      </svg>
+      </svg>}
     </Plot>
   )
 }
@@ -282,21 +297,20 @@ export function niceStep(max: number, target: number): number {
 }
 
 export function ForceCurves({
-  curves, baselineY, hoveredId, onHover, xLabel, yLabel, exp, ariaLabel, xMax,
+  curves, baselineY, hoveredId, onHover, exp, ariaLabel, xMax,
 }: {
   curves: CurveItem[]
   // y of an optional horizontal baseline; omit for none.
   baselineY?: number
   hoveredId: string | null
   onHover: (id: string | null) => void
-  xLabel: string
-  yLabel: string
-  exp: GlobalSlider & { label?: string }
+  exp: GlobalSlider
   ariaLabel: string
   // The x-axis domain max (in data units). When set, draws value-anchored
   // gridlines at a nice step — they re-space as the domain changes while tuning.
   xMax?: number
 }) {
+  const s = useStrings()
   const gridXs: number[] = []
   if (xMax !== undefined && xMax > 0) {
     const step = niceStep(xMax, 6)
@@ -304,66 +318,68 @@ export function ForceCurves({
   }
   return (
     <div className="gv-spring-curves">
-      <div className="gv-spring-axis-label gv-spring-curves-axis-y">{yLabel}</div>
+      {curves.length > 0 && <>
+        <div className="gv-spring-axis-label gv-spring-curves-axis-y">{s.curveForce}</div>
 
-      <svg
-        className="gv-spring-curves-svg"
-        viewBox={`0 0 ${CURVE_W} ${CURVE_H}`}
-        role="img"
-        aria-label={ariaLabel}
-      >
-        <rect x={0} y={0} width={CURVE_W} height={CURVE_H} className="gv-spring-curve-frame" />
-        {gridXs.map((px, i) => (
-          <line key={`g${i}`} x1={px.toFixed(1)} y1={0} x2={px.toFixed(1)} y2={CURVE_H} className="gv-ctl-grid-line" />
-        ))}
-        {baselineY !== undefined && (
-          <line x1={0} y1={baselineY} x2={CURVE_W} y2={baselineY} className="gv-spring-curve-baseline" />
-        )}
+        <svg
+          className="gv-spring-curves-svg"
+          viewBox={`0 0 ${CURVE_W} ${CURVE_H}`}
+          role="img"
+          aria-label={ariaLabel}
+        >
+          <rect x={0} y={0} width={CURVE_W} height={CURVE_H} className="gv-spring-curve-frame" />
+          {gridXs.map((px, i) => (
+            <line key={`g${i}`} x1={px.toFixed(1)} y1={0} x2={px.toFixed(1)} y2={CURVE_H} className="gv-ctl-grid-line" />
+          ))}
+          {baselineY !== undefined && (
+            <line x1={0} y1={baselineY} x2={CURVE_W} y2={baselineY} className="gv-spring-curve-baseline" />
+          )}
 
-        {curves.filter(c => c.id === hoveredId && c.markerX !== undefined).map(c => (
-          <line key={`m${c.id}`} x1={c.markerX} y1={0} x2={c.markerX} y2={CURVE_H} className="gv-spring-curve-restmark" />
-        ))}
+          {curves.filter(c => c.id === hoveredId && c.markerX !== undefined).map(c => (
+            <line key={`m${c.id}`} x1={c.markerX} y1={0} x2={c.markerX} y2={CURVE_H} className="gv-spring-curve-restmark" />
+          ))}
 
-        {curves.map(c => {
-          const dim = hoveredId !== null && hoveredId !== c.id
-          const active = hoveredId === c.id
-          return (
-            <g key={c.id} className={`gv-spring-curve${dim ? ' dim' : ''}${active ? ' active' : ''}`}>
-              <polyline
-                points={c.points}
-                className="gv-spring-curve-hit"
-                onPointerEnter={() => onHover(c.id)}
-                onPointerLeave={() => onHover(null)}
-              />
-              <polyline
-                points={c.points}
-                className="gv-spring-curve-line"
-                style={{ stroke: c.color }}
-              />
-              {c.label && (() => {
-                const p = lastPoint(c.points)
-                if (!p) return null
-                return (
-                  <text
-                    x={Math.min(p.x + 4, CURVE_W - 2)}
-                    y={clamp(p.y, 9, CURVE_H - 2)}
-                    className="gv-spring-curve-label"
-                    style={{ fill: c.color }}
-                    textAnchor="end"
-                  >
-                    {c.label}
-                  </text>
-                )
-              })()}
-            </g>
-          )
-        })}
-      </svg>
+          {curves.map(c => {
+            const dim = hoveredId !== null && hoveredId !== c.id
+            const active = hoveredId === c.id
+            return (
+              <g key={c.id} className={`gv-spring-curve${dim ? ' dim' : ''}${active ? ' active' : ''}`}>
+                <polyline
+                  points={c.points}
+                  className="gv-spring-curve-hit"
+                  onPointerEnter={() => onHover(c.id)}
+                  onPointerLeave={() => onHover(null)}
+                />
+                <polyline
+                  points={c.points}
+                  className="gv-spring-curve-line"
+                  style={{ stroke: c.color }}
+                />
+                {c.label && (() => {
+                  const p = lastPoint(c.points)
+                  if (!p) return null
+                  return (
+                    <text
+                      x={Math.min(p.x + 4, CURVE_W - 2)}
+                      y={clamp(p.y, 9, CURVE_H - 2)}
+                      className="gv-spring-curve-label"
+                      style={{ fill: c.color }}
+                      textAnchor="end"
+                    >
+                      {c.label}
+                    </text>
+                  )
+                })()}
+              </g>
+            )
+          })}
+        </svg>
 
-      <div className="gv-spring-axis-label gv-spring-curves-axis-x">{xLabel}</div>
+        <div className="gv-spring-axis-label gv-spring-curves-axis-x">{s.curveDistance}</div>
+      </>}
 
       <div className="gv-spring-curves-exp" title={exp.title}>
-        <span className="gv-spring-exp-label">{exp.label ?? 'exp'}</span>
+        <span className="gv-spring-exp-label">{s.exp}</span>
         <Slider
           min={exp.min} max={exp.max} step={exp.step}
           value={exp.value}

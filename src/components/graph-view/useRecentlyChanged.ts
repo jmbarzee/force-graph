@@ -1,34 +1,37 @@
 // The chip-flash set: per axis, the values that just turned on in the filter,
-// cleared ~450ms later. Derived from the filter alone, so it is the view's and
-// not the host's, and keyed by axis and value rather than a joined string, so
-// a value containing the separator cannot be mistaken for another's.
+// cleared ~450ms later. Derived from the filter and the values each axis
+// presents, so it is the view's and not the host's, and keyed by axis and
+// value rather than a joined string, so a value containing the separator
+// cannot be mistaken for another's.
 
 import React from 'react'
 import type { FilterState } from '../../filter/types'
-import { filterStatesEqual, selectionFor } from '../../filter/types'
-import { useStable } from './useControllable'
+import { filterStatesEqual, namedBy, chosenOn, selects } from '../../filter/types'
+import { useLatest, useStable } from './useControllable'
 
 /** The values that just turned on, per axis. */
 export type RecentlyChanged = ReadonlyMap<string, ReadonlySet<string>>
 const NONE: RecentlyChanged = new Map()
 
-/** The values that just turned on in a filter, per axis, for about 450 ms — the bar's chip flash — derived from the filter alone. */
-export function useRecentlyChanged(rawFilter: FilterState): RecentlyChanged {
+/** The values that just turned on in a filter, per axis, for about 450 ms — the bar's chip flash — derived from the filter and the values each axis presents. */
+export function useRecentlyChanged(rawFilter: FilterState, valuesByAxis: ReadonlyMap<string, readonly string[]>): RecentlyChanged {
   // One object per content change, so the effect below re-runs — and its
   // cleanup cancels the timer — only for a real change: a host rebuilding an
   // equal filter each render once cancelled the flash's timer and left the
   // chips lit until the next real change.
   const filter = useStable(rawFilter, filterStatesEqual)
   const prevFilterRef = React.useRef<FilterState>(filter)
+  const valuesRef = useLatest(valuesByAxis)
   const [recentlyChanged, setRecentlyChanged] = React.useState<RecentlyChanged>(NONE)
   React.useEffect(() => {
     const prev = prevFilterRef.current
     if (filterStatesEqual(prev, filter)) return
     const changed = new Map<string, Set<string>>()
-    for (const [axis, values] of filter) {
-      const before = selectionFor(prev, axis)
-      for (const v of values) {
-        if (before.has(v)) continue
+    for (const [axis, after] of filter) {
+      const before = chosenOn(prev, axis)
+      // An axis's presented values too: a change of kind turns on values neither choice names.
+      for (const v of new Set([...namedBy(after), ...namedBy(before), ...(valuesRef.current.get(axis) ?? [])])) {
+        if (!selects(after, v) || selects(before, v)) continue
         const set = changed.get(axis) ?? new Set<string>()
         set.add(v)
         changed.set(axis, set)

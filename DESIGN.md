@@ -32,8 +32,8 @@ library holds and why.
 ## The forces
 
 - **`ForceParams` and the force kernels are not part of any surface.** The
-  layout a host holds (`LayoutState`) is opaque, and its plain-data form
-  (`LayoutJSON`) spells every field out, so the shipped declarations never
+  tuning a host holds (`Tuning`) is opaque, and its plain-data form
+  (`TuningJSON`) spells every field out, so the shipped declarations never
   reach the engine's types.
 - **Per-bucket tuning is one constructed value, and sparse**: the mapping with
   only the overrides the user set. Everything else resolves to the taxonomy's
@@ -54,7 +54,7 @@ library holds and why.
 - **The filter is axis-keyed, copy-on-write and compared by content.**
   Removing an axis from the bar unfilters it. Re-seeding on a new graph follows
   the axes the user has not touched — explicit state the bar reports with
-  every write, never an inference from the previous graph's opening selection.
+  every write, never an inference from the previous graph's opening choice.
 - **Each axis's reheat follows from `keepCamera`**: an axis that refits (an
   allow-list's default) seeds revealed nodes at their ancestors; one that
   keeps the camera reheats in place.

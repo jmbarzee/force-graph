@@ -1,0 +1,31 @@
+/* The colour legend: anchored under the bar inside the pane, in the pane's theme.
+   It ends clear of the counts at the pane's foot, and past that its sections
+   scroll under the host's controls. */
+@layer gv {
+.gv-color-legend {
+  color: var(--gv-color-text);
+  position: absolute;
+  top: calc(var(--gv-toolbar-height, 0px) + 12px);
+  left: 12px;
+  max-height: calc(100% - var(--gv-toolbar-height, 0px) - 12px - 48px);
+  box-sizing: border-box;
+  display: flex;
+  flex-direction: column;
+  z-index: 9;
+  padding: 8px 10px;
+  font-family: var(--gv-font-sans);
+  font-size: 12px;
+  background: var(--gv-color-surface);
+  border: 1px solid var(--gv-color-border);
+  border-radius: 8px;
+  box-shadow: var(--gv-tooltip-shadow);
+}
+.gv-color-legend-items { min-height: 0; overflow-y: auto; }
+.gv-color-legend-section + .gv-color-legend-section { margin-top: 6px; }
+.gv-color-legend-title { font-weight: 600; margin-bottom: 4px; }
+.gv-color-legend-row { display: flex; align-items: center; gap: 6px; padding: 2px 0; }
+label.gv-color-legend-row { cursor: pointer; }
+.gv-color-legend-row.off .gv-color-legend-label { color: var(--gv-color-text-muted); }
+.gv-color-legend-swatch { width: 10px; height: 10px; border-radius: 50%; border: 1px solid var(--gv-color-border); flex: none; }
+.gv-color-legend-note { color: var(--gv-color-text-muted); font-size: 11px; }
+}

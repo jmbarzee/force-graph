@@ -1,14 +1,14 @@
 import React from 'react'
 import { createRoot } from 'react-dom/client'
-import { GraphView, createTaxonomy } from '@jmbarzee/force-graph'
-import type { Graph } from '@jmbarzee/force-graph'
+import { ColorLegend, FilterBar, GraphView, createTaxonomy, initialFilter } from '@jmbarzee/force-graph'
+import type { DerivedGroups, Graph } from '@jmbarzee/force-graph'
 
 const AXES = ['Region', 'Team', 'Product', 'Language', 'Week']
 const VALUES = 30
 
 const taxonomy = createTaxonomy({
   styleAxis: 'kind',
-  styles: [{
+  values: [{
     id: 'item',
     label: 'Item',
     icon: '•',
@@ -18,6 +18,18 @@ const taxonomy = createTaxonomy({
   }],
   // One axis wears tags, so both presentations are measured.
   filterAxes: AXES.map((id, k) => ({ id, emptyMeans: 'all', presentation: k === 0 ? 'tag' : 'chip' })),
+  // Thirty regions are past the push/pull ceiling; folded into three, they key the pair forces.
+  pairMappings: [{
+    id: 'thirds',
+    label: 'Region thirds',
+    axis: 'Region',
+    buckets: [1, 2, 3].map(third => ({
+      id: `third ${third}`,
+      label: `Regions ${10 * third - 9}–${10 * third}`,
+      abbreviation: `R${third}`,
+      values: Array.from({ length: 10 }, (_, i) => `Region ${10 * third - 9 + i}`),
+    })),
+  }],
 })
 
 // Every node takes a value on every axis, so each axis presents all thirty.
@@ -30,8 +42,45 @@ const graph: Graph = {
   edges: [],
 }
 
+const BY_TEAM = { fill: { by: 'axis', axis: 'Team' } } as const
+
+/** A group per value of `axis`. */
+const groupsOn = (axis: string): DerivedGroups => ({
+  keys: Array.from({ length: VALUES }, (_, v) => ({ id: `${axis} ${v + 1}`, label: `${axis} ${v + 1}` })),
+  of: node => [node.values[axis]!],
+})
+
+function App() {
+  const [shown, setShown] = React.useState(false)
+  const [filter, setFilter] = React.useState(() => initialFilter(taxonomy, graph))
+  const [axis, setAxis] = React.useState(AXES[0]!)
+  const groups = React.useMemo(() => groupsOn(axis), [axis])
+  return (
+    <>
+      <button onClick={() => setShown(!shown)}>{shown ? 'Hide' : 'Show'} the second bar</button>
+      <div style={{ display: shown ? 'block' : 'none' }}>
+        <FilterBar graph={graph} taxonomy={taxonomy} filter={filter} onFilterChange={setFilter} />
+      </div>
+      <GraphView
+        graph={graph}
+        taxonomy={taxonomy}
+        coloring={BY_TEAM}
+        groups={groups}
+        strings={{ counts: (nodes, edges) => `${nodes} Knoten, ${edges} Kanten` }}
+        legend={(channels, control) => (
+          <ColorLegend channels={channels} control={control} titles={{ fill: 'Team', glow: axis }}>
+            <select value={axis} onChange={e => setAxis(e.target.value)}>
+              {AXES.map(a => <option key={a}>{a}</option>)}
+            </select>
+          </ColorLegend>
+        )}
+      />
+    </>
+  )
+}
+
 createRoot(document.getElementById('root')!).render(
   <React.StrictMode>
-    <GraphView graph={graph} taxonomy={taxonomy} />
+    <App />
   </React.StrictMode>,
 )

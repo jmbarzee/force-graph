@@ -9,7 +9,7 @@ import type { ReadableGraph } from './model'
 import { isContainment } from './model'
 
 /** A computed scalar a layout axis may key on: a number per node, read off the graph and mapped onto [0, 1]. */
-export interface ScalarAxis {
+export interface Scalar {
   /** Stable id — the tuning names the scalar by it. */
   readonly id: string
   /** The control's label. Default: the id. */
@@ -23,11 +23,22 @@ export interface ScalarAxis {
    * on this axis and rests at the axis's centre, the same answer as a node
    * in no bucket on a mapped axis. A true 0 is a value, and the built-ins
    * answer it as one.
+   *
+   * It is handed the whole graph, not what the filter shows: the host's
+   * nodes and edges as error diagnostics leave them (a duplicated id's later
+   * node and a refused edge dropped, a refused `parentId` cleared), and the
+   * containment edges derived from `parentId`. It reruns whenever the graph, the taxonomy or
+   * the forces' tuning changes. An answer not finite, or outside [0, 1] once
+   * normalized, is refused: the node rests at the axis's centre, and a
+   * `scalar-answer-refused` diagnostic names the scalar, the node and the
+   * answer. A throw from here rests every node there, as
+   * `scalar-compute-threw`.
    */
   compute(graph: ReadableGraph): Map<string, number>
   /**
    * How the frame maps the answers onto [0, 1]: `max` (the default) divides
-   * by the largest, so 0 stays 0 and a negative answer is refused, loudly;
+   * by the largest, so 0 stays 0 and, when some answer is positive, a
+   * negative one is refused (with none positive, every node scores 0);
    * `range` puts the smallest at 0 and the largest at 1, whatever their
    * sign; `none` says the answers already lie in [0, 1], and the frame
    * refuses one outside it.
@@ -35,14 +46,16 @@ export interface ScalarAxis {
   readonly normalize?: 'max' | 'range' | 'none'
 }
 
-/** A scalar with its words filled in — what `Taxonomy.scalars` carries. */
-export interface ResolvedScalarAxis extends ScalarAxis {
+/** A scalar with its words filled in: what a layout axis keys on. */
+export interface ResolvedScalar extends Scalar {
+  /** The declared label, else the id. */
   readonly label: string
+  /** The declared tooltip, else the label. */
   readonly tooltip: string
 }
 
 /** A declared scalar with its defaults filled in: the id as label, the label as tooltip. */
-export function resolveScalarAxis(scalar: ScalarAxis): ResolvedScalarAxis {
+export function resolveScalar(scalar: Scalar): ResolvedScalar {
   const label = scalar.label ?? scalar.id
   return { id: scalar.id, label, tooltip: scalar.tooltip ?? label, normalize: scalar.normalize, compute: graph => scalar.compute(graph) }
 }
@@ -54,7 +67,9 @@ export function resolveScalarAxis(scalar: ScalarAxis): ResolvedScalarAxis {
  * past each other.
  */
 export interface ScalarSpan {
+  /** Where a score of 0 rests. */
   readonly zero: number
+  /** Where a score of 1 rests. */
   readonly one: number
 }
 
@@ -65,11 +80,13 @@ export interface ScalarSpan {
  * declared bands do; the tuning stores what the user decided, nothing else.
  */
 export interface ScalarTuning {
+  /** The scalar's id. */
   readonly scalar: string
+  /** The span the user dragged to; absent, the taxonomy's. */
   readonly span?: ScalarSpan
 }
 
-/** The guard on a layout tuning: scalar, or a mapping with its overrides. */
+/** The guard on a band-axis tuning: scalar, or a mapping with its overrides. */
 export function isScalarTuning<T extends object>(t: ScalarTuning | T): t is ScalarTuning {
   return 'scalar' in t
 }
@@ -191,7 +208,7 @@ export function rangeNormalized(values: Map<string, number>): Map<string, number
 }
 
 /** The built-in reach scalar. */
-export const downstreamReach: ScalarAxis = {
+export const downstreamReach: Scalar = {
   id: 'reach',
   label: 'Reach',
   tooltip: 'Downstream reach: how many dependency levels deep a node’s subtree runs, propagated up containment; leaves at 0',
@@ -200,7 +217,7 @@ export const downstreamReach: ScalarAxis = {
 }
 
 /** The built-in degree scalar. */
-export const degree: ScalarAxis = {
+export const degree: Scalar = {
   id: 'degree',
   label: 'Degree',
   tooltip: 'Dependency edges in and out, as a fraction of the busiest node’s',
@@ -209,7 +226,7 @@ export const degree: ScalarAxis = {
 }
 
 /** The built-in depth scalar. */
-export const containmentDepth: ScalarAxis = {
+export const containmentDepth: Scalar = {
   id: 'depth',
   label: 'Depth',
   tooltip: 'Containment depth: 0 at the top of the hierarchy, 1 at the deepest node',
@@ -218,4 +235,4 @@ export const containmentDepth: ScalarAxis = {
 }
 
 /** The scalars every host gets: structural, so they need no domain knowledge. */
-export const BUILT_IN_SCALARS: readonly ScalarAxis[] = [downstreamReach, degree, containmentDepth]
+export const BUILT_IN_SCALARS: readonly Scalar[] = [downstreamReach, degree, containmentDepth]

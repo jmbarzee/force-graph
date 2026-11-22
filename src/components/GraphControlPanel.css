@@ -1,4 +1,5 @@
 /* Graph control panel: panel chrome, force tabs, equations, sliders, switch, dual-range. */
+@layer gv {
 /* Graph Control Panel */
 .gv-graph-control-panel {
   position: absolute;
@@ -7,7 +8,7 @@
   background: var(--gv-color-surface);
   border: 1px solid var(--gv-color-border);
   border-radius: 8px;
-  box-shadow: 0 2px 8px rgba(0, 0, 0, 0.1);
+  box-shadow: var(--gv-panel-shadow);
   z-index: 10;
   max-width: calc(100vw - 24px);
   max-height: calc(100% - 70px);
@@ -163,7 +164,7 @@
      the controls rather than floating text. */
   background: color-mix(in srgb, var(--gv-color-text-muted) 7%, transparent);
   border: 1px solid var(--gv-color-border);
-  border-radius: 6px;
+  border-radius: var(--gv-radius);
 }
 
 .gv-graph-control-equation-body {
@@ -207,7 +208,7 @@
   width: 10px;
   height: 10px;
   border-radius: 50%;
-  background: #fff;
+  background: var(--gv-on-accent);
   transition: left 0.15s ease;
 }
 .gv-switch.on .gv-switch-knob { left: 14px; }
@@ -261,30 +262,6 @@
   padding: 0 4px;
   line-height: 1.3;
   text-align: center;
-}
-
-/* ── Type colour theming ───────────────────────────────────────────────────
-   Per-type rows (charges, bands, edge endpoints) read from --gv-type-color,
-   which each typed row sets inline from the pane's --gv-node-<suffix>.
-*/
-
-/* Rows that carry a single node type get a coloured left-accent and tint
-   their label + slider thumb to match. Applied to both per-type charge
-   sliders (PUSH section) and gravity Y-band sliders (GRAVITY section). */
-.gv-graph-control-typed-row {
-  padding-left: 6px;
-  border-left: 2px solid var(--gv-type-color, transparent);
-}
-
-.gv-graph-control-typed-row input[type="range"] {
-  accent-color: var(--gv-type-color);
-}
-
-.gv-graph-control-typed-row .gv-graph-control-slider-label,
-.gv-graph-control-typed-row .gv-graph-control-band-label {
-  color: var(--gv-type-color);
-  opacity: 0.95;
-  font-weight: 500;
 }
 
 /* Gravity Y-band row — label, dual-handle slider, two readouts. */
@@ -414,12 +391,14 @@
 .gv-pushpull-controls { display: flex; flex-direction: column; gap: 6px; }
 .gv-axis-row { display: flex; justify-content: center; align-items: center; gap: 6px; }
 .gv-axis-label { font-size: 12px; color: var(--gv-color-text-muted); font-family: var(--gv-font-sans); }
+.gv-preset-row { margin-top: 8px; }
 .gv-axis-select {
   font-size: 12px;
   font-family: var(--gv-font-sans);
   color: var(--gv-color-text);
   background: transparent;
   border: 1px solid var(--gv-color-border);
-  border-radius: 6px;
+  border-radius: var(--gv-radius);
   padding: 3px 8px;
+}
 }

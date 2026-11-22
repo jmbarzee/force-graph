@@ -5,18 +5,22 @@ import React from 'react'
 import './GraphControlPanel.css'
 import type { ForceParams } from '../graph/simulation'
 import type { ResolvedPhysics } from '../graph/forces'
-import type { AxisValue } from '../graph/axis'
-
+import { nodeSizeMul } from '../graph/node-scale'
 import type { NodeScaleParams } from '../graph/node-scale'
 import { PushPullControls } from './PushPullControls'
 import { GravityControls } from './GravityControls'
 import type { GravityHover } from './GravityControls'
 import { Slider } from './controls/Slider'
 import { EquationSection } from './controls/EquationSection'
-import { PopProvider } from './controls/PopContext'
+import { PopProvider, FormulaValue } from './controls/PopContext'
+import { HiddenByContext } from './controls/NothingVisible'
+import type { HiddenBy } from './controls/NothingVisible'
+import { Curve } from './controls/Curve'
+import type { Span } from './controls/Curve'
 import type { AxisOption, LayoutAxisOption } from '../graph/simulation'
-import { useTaxonomy } from './graph-view/useTaxonomy'
 import type { AxisMapping } from '../graph/axis'
+import type { PresetMenu } from './graph-view/usePresets'
+import { useStrings } from './graph-view/strings'
 
 export type ForceSection = 'push' | 'pull' | 'gravity' | 'dynamics' | null
 
@@ -28,10 +32,10 @@ export type ForceSection = 'push' | 'pull' | 'gravity' | 'dynamics' | null
 // dynamics sub-section driving the 'dynamics' preview.
 type ControlTab = 'forces' | 'gravity' | 'misc'
 
-const CONTROL_TABS: { id: ControlTab; label: string }[] = [
-  { id: 'forces', label: 'Push/Pull' },
-  { id: 'gravity', label: 'Gravity' },
-  { id: 'misc', label: 'Misc' },
+const CONTROL_TABS: { id: ControlTab; label: 'tabPushPull' | 'tabGravity' | 'tabMisc' }[] = [
+  { id: 'forces', label: 'tabPushPull' },
+  { id: 'gravity', label: 'tabGravity' },
+  { id: 'misc', label: 'tabMisc' },
 ]
 
 export type { PresentSets } from './graph-view/present'
@@ -58,6 +62,8 @@ interface GraphControlPanelProps {
   layoutAxes: readonly LayoutAxisOption[]
   /** What the post-filter visible set holds, per control: the only buckets and categories worth a token or a column. */
   present: PresentSets
+  /** The control a force tab names when nothing is visible. */
+  hiddenBy: HiddenBy
   onAxisChange: (mapping: AxisMapping) => void
   onActiveSection: (section: ForceSection) => void
   onActivePushBucket: (bucket: string | null) => void
@@ -70,6 +76,8 @@ interface GraphControlPanelProps {
   // are drawn at a given zoom.
   nodeScale: NodeScaleParams
   onNodeScaleChange: (patch: Partial<NodeScaleParams>) => void
+  presets: PresetMenu
+  onPreset: (index: number) => void
 }
 
 // Keys of ForceParams whose value is a number (ForceParams now also has the
@@ -80,13 +88,13 @@ type NumericForceKey = {
 
 // Shared shape for a labelled range row. Key types differ per param family
 // (force params vs. node-scale params), so the key lives on the extending
-// interfaces and SliderRow itself only needs the range/label/tooltip.
+// interfaces and SliderRow itself only needs the range and its words.
 interface RangeDef {
-  label: string
+  /** Its label's key in the strings; its tooltip's is this with `Title`. */
+  text: 'friction' | 'cooling' | 'threshold' | 'size' | 'growCap' | 'shrinkFloor'
   min: number
   max: number
   step: number
-  tooltip: string
 }
 
 interface SliderDef extends RangeDef {
@@ -109,43 +117,49 @@ interface NodeScaleSliderDef extends RangeDef {
 // same per-axis surface, Y carrying the Radial switch) and Topological. Center
 // gravity is the unexplained baseline.
 
-// --- DYNAMICS section sliders ---
-//
-// Tightened ranges so each default sits well inside its slider:
-//   friction default 0.40 in 0.05–0.95
-//   cooling  default 0.005 in 0.0005–0.02
-//   threshold default 0.001 in 0–0.005
+const FRICTION: SliderDef = { key: 'velocityDecay', text: 'friction', min: 0.05, max: 0.95, step: 0.05 }
+const COOLING: SliderDef = { key: 'alphaDecay', text: 'cooling', min: 0.0005, max: 0.02, step: 0.0005 }
+const THRESHOLD: SliderDef = { key: 'alphaMin', text: 'threshold', min: 0, max: 0.005, step: 0.0001 }
 
-const DYNAMICS_SLIDERS: SliderDef[] = [
-  { key: 'velocityDecay', label: 'friction', min: 0.05, max: 0.95, step: 0.05,
-    tooltip: 'Damping factor per tick. Higher = more friction' },
-  { key: 'alphaDecay', label: 'cooling', min: 0.0005, max: 0.02, step: 0.0005,
-    tooltip: 'Energy lost per tick. Higher = settles faster' },
-  { key: 'alphaMin', label: 'threshold', min: 0, max: 0.005, step: 0.0001,
-    tooltip: 'Energy level below which simulation pauses' },
-]
+// The stop and α's run follow Simulation.tick.
+const TICKS: Span = [10, 4000]
+const ALPHA: Span = [1e-8, 1]
+const TICK_SAMPLES = 48
 
-// --- NODE SCALING section sliders ---
-//
-// Render-time controls for how big nodes are drawn. On-screen size is
-// `baseR × size × clamp(zoom, shrink-floor, grow-cap)`. Lowering "grow cap"
-// makes nodes start shrinking sooner as the user zooms out (the common fix for
-// "nodes are too big when zoomed out").
-const NODE_SCALE_SLIDERS: NodeScaleSliderDef[] = [
-  { key: 'baseMul', label: 'size', min: 0.3, max: 2.0, step: 0.05,
-    tooltip: 'Overall node + label size. 1 = default.' },
-  { key: 'maxZoomMul', label: 'grow cap', min: 0.5, max: 3.0, step: 0.05,
-    tooltip: 'Zoom past which nodes stop growing. Lower = nodes start shrinking sooner as you zoom out.' },
-  { key: 'minZoomMul', label: 'shrink floor', min: 0.1, max: 1.0, step: 0.05,
-    tooltip: 'Smallest nodes may get when zoomed all the way out.' },
-]
+const DYNAMICS_EQUATION = (
+  <>
+    <div className="gv-eq-line">v ×= <FormulaValue id={FRICTION.key}>friction</FormulaValue></div>
+    <div className="gv-eq-line">
+      α −= <FormulaValue id={COOLING.key}>cooling</FormulaValue>, stop at <FormulaValue id={THRESHOLD.key}>threshold</FormulaValue>
+    </div>
+  </>
+)
+
+const SIZE: NodeScaleSliderDef = { key: 'baseMul', text: 'size', min: 0.3, max: 2.0, step: 0.05 }
+const GROW_CAP: NodeScaleSliderDef = { key: 'maxZoomMul', text: 'growCap', min: 0.5, max: 3.0, step: 0.05 }
+const SHRINK_FLOOR: NodeScaleSliderDef = { key: 'minZoomMul', text: 'shrinkFloor', min: 0.1, max: 1.0, step: 0.05 }
+
+// Log axes: zoom a decade either side of 1, past every floor and cap, and
+// scale across every value the sliders reach. On them the clamp's three runs are
+// straight, so its corners are the curve's only points.
+const ZOOM: Span = [0.1, 10]
+const SCALE: Span = [SIZE.min * SHRINK_FLOOR.min, SIZE.max * GROW_CAP.max]
+
+const NODE_SCALE_EQUATION = (
+  <div className="gv-eq-line">
+    scale = <FormulaValue id={SIZE.key}>size</FormulaValue> × clamp(zoom,{' '}
+    <FormulaValue id={SHRINK_FLOOR.key}>shrink floor</FormulaValue>,{' '}
+    <FormulaValue id={GROW_CAP.key}>grow cap</FormulaValue>)
+  </div>
+)
 
 export function GraphControlPanel({
-  params, resolved, onParamChange, onAdjust, onRelayout, axes, layoutAxes, present, onAxisChange,
+  params, resolved, onParamChange, onAdjust, onRelayout, axes, layoutAxes, present, hiddenBy, onAxisChange,
   onActiveSection,
   onActivePushBucket, onActiveGravityBucket, onActivePullEdge,
-  nodeScale, onNodeScaleChange,
+  nodeScale, onNodeScaleChange, presets, onPreset,
 }: GraphControlPanelProps) {
+  const s = useStrings()
   const [open, setOpen] = React.useState(false)
   const [activeTab, setActiveTab] = React.useState<ControlTab>('forces')
   // Links the spring map and the force-curve viz: hovering a token in one
@@ -190,14 +204,17 @@ export function GraphControlPanel({
       <button
         className="gv-graph-control-panel-toggle"
         onClick={() => setOpen(!open)}
-        title="Toggle control panel"
+        title={s.controlsTitle}
       >
-        {open ? '▼ Controls' : '▶ Controls'}
+        {open ? '▼' : '▶'} {s.controls}
       </button>
 
       {open && (
         <PopProvider>
+        <HiddenByContext.Provider value={hiddenBy}>
         <div className="gv-graph-control-panel-body">
+          <PresetRow menu={presets} onPreset={onPreset} />
+
           {/* Control tabs — only one section is shown at a time. */}
           <div className="gv-graph-control-tabs" role="tablist">
             {CONTROL_TABS.map(t => (
@@ -208,7 +225,7 @@ export function GraphControlPanel({
                 className={`gv-graph-control-tab${activeTab === t.id ? ' active' : ''}`}
                 onClick={() => setActiveTab(t.id)}
               >
-                {t.label}
+                {s[t.label]}
               </button>
             ))}
           </div>
@@ -255,30 +272,44 @@ export function GraphControlPanel({
               </EquationSection>
             </SectionSlot>
 
-            {/* MISC section — non-force controls: simulation dynamics and
-                render-time node scaling, each in its own labelled sub-section. */}
             <SectionSlot active={activeTab === 'misc'}>
-              <div className="gv-graph-control-subsection">
-                <div className="gv-graph-control-subsection-title">Dynamics</div>
-                <EquationSection subtitle="" equation={'v \u00D7= friction\n\u03B1 \u2212= cooling, stop at threshold'} onHover={h => onActiveSection(h ? 'dynamics' : null)}>
-                  {DYNAMICS_SLIDERS.map(s => (
-                    <SliderRow key={s.key} def={s} value={params[s.key]} onChange={v => emitParamChange({ [s.key]: v } as Partial<ForceParams>)} />
-                  ))}
-                </EquationSection>
-              </div>
-              <div className="gv-graph-control-subsection">
-                <div className="gv-graph-control-subsection-title">Node scaling</div>
-                <EquationSection subtitle="" equation={'size = base \u00D7 clamp(zoom, floor, cap)'} onHover={() => {}}>
-                  {NODE_SCALE_SLIDERS.map(s => (
-                    <SliderRow key={s.key} def={s} value={nodeScale[s.key]} onChange={v => onNodeScaleChange({ [s.key]: v } as Partial<NodeScaleParams>)} />
-                  ))}
-                </EquationSection>
-              </div>
+              <MiscControls
+                params={params}
+                nodeScale={nodeScale}
+                onParamChange={emitParamChange}
+                onNodeScaleChange={onNodeScaleChange}
+                onActiveSection={onActiveSection}
+              />
             </SectionSlot>
           </div>
         </div>
+        </HiddenByContext.Provider>
         </PopProvider>
       )}
+    </div>
+  )
+}
+
+/** The preset row: every preset, one this taxonomy refuses listed disabled with why, and `custom` while the tuning is none of them. No presets, no row. */
+export function PresetRow({ menu, onPreset }: { menu: PresetMenu; onPreset: (index: number) => void }) {
+  const s = useStrings()
+  const id = React.useId()
+  if (menu.choices.length === 0) return null
+  return (
+    <div className="gv-axis-row gv-preset-row">
+      <label className="gv-axis-label" htmlFor={id}>{s.preset}</label>
+      <select
+        id={id}
+        className="gv-axis-select"
+        value={menu.selected}
+        title={s.presetTitle}
+        onChange={e => onPreset(Number(e.target.value))}
+      >
+        {menu.selected < 0 && <option value={-1} disabled>{s.presetCustom}</option>}
+        {menu.choices.map((c, i) => 'reason' in c
+          ? <option key={i} value={i} disabled title={c.reason}>{`${c.label} — ${c.reason}`}</option>
+          : <option key={i} value={i}>{c.label}</option>)}
+      </select>
     </div>
   )
 }
@@ -296,23 +327,65 @@ function SectionSlot({ active, children }: { active: boolean; children: React.Re
   )
 }
 
-function SliderRow({ def, value, onChange, nodeType }: {
-  def: RangeDef
+/** The Misc tab: simulation dynamics and render-time node scaling, each an equation over a curve of what its sliders do. */
+export function MiscControls({ params, nodeScale, onParamChange, onNodeScaleChange, onActiveSection }: {
+  params: ForceParams
+  nodeScale: NodeScaleParams
+  onParamChange: (patch: Partial<ForceParams>) => void
+  onNodeScaleChange: (patch: Partial<NodeScaleParams>) => void
+  onActiveSection: (section: ForceSection) => void
+}) {
+  const { alphaDecay: cooling, alphaMin: threshold } = params
+  const stop = (1 - threshold) / cooling
+  // Log-spaced ticks from the axis's start to the stop, where α = threshold.
+  const ticks = Array.from({ length: TICK_SAMPLES + 1 }, (_, i) => TICKS[0] * (stop / TICKS[0]) ** (i / TICK_SAMPLES))
+  const { minZoomMul: floor, maxZoomMul: cap } = nodeScale
+  const s = useStrings()
+  return <>
+    <div className="gv-graph-control-subsection">
+      <div className="gv-graph-control-subsection-title">{s.dynamics}</div>
+      <EquationSection subtitle="" equation={DYNAMICS_EQUATION} onHover={h => onActiveSection(h ? 'dynamics' : null)}>
+        <Curve
+          points={ticks.map(t => [t, Math.max(1 - cooling * t, threshold)] as const)}
+          x={TICKS} y={ALPHA}
+          marks={[{ x: stop, label: s.dynamicsStop(Math.round(stop)) }]}
+          xLabel={s.dynamicsTicks} yLabel="α"
+          ariaLabel={s.dynamicsCurve}
+        />
+        {[FRICTION, COOLING, THRESHOLD].map(s => (
+          <SliderRow key={s.key} def={s} value={params[s.key]} onChange={v => onParamChange({ [s.key]: v })} />
+        ))}
+      </EquationSection>
+    </div>
+    <div className="gv-graph-control-subsection">
+      <div className="gv-graph-control-subsection-title">{s.nodeScaling}</div>
+      <EquationSection subtitle="" equation={NODE_SCALE_EQUATION} onHover={() => {}}>
+        <Curve
+          points={[ZOOM[0], floor, cap, ZOOM[1]].map(z => [z, nodeSizeMul(z, nodeScale)] as const)}
+          x={ZOOM} y={SCALE}
+          marks={[{ x: floor }, { x: cap }]}
+          xLabel={s.nodeScalingZoom} yLabel={s.nodeScalingScale}
+          ariaLabel={s.nodeScalingCurve}
+        />
+        {[SIZE, GROW_CAP, SHRINK_FLOOR].map(s => (
+          <SliderRow key={s.key} def={s} value={nodeScale[s.key]} onChange={v => onNodeScaleChange({ [s.key]: v })} />
+        ))}
+      </EquationSection>
+    </div>
+  </>
+}
+
+function SliderRow({ def, value, onChange }: {
+  def: RangeDef & { key: string }
   value: number
   onChange: (v: number) => void
-  nodeType?: AxisValue
 }) {
-  const taxonomy = useTaxonomy()
+  const s = useStrings()
   const display = def.step < 1 ? String(value) : String(Math.round(value))
-  // A typed row reads its colour from the pane's inline variables.
-  const typed = nodeType
-    ? { className: 'gv-graph-control-slider gv-graph-control-typed-row', style: { ['--gv-type-color' as string]: `var(${taxonomy.colorVar(nodeType)})` } as React.CSSProperties }
-    : { className: 'gv-graph-control-slider', style: undefined }
-
   return (
-    <div className={typed.className} style={typed.style} title={def.tooltip}>
-      <label className="gv-graph-control-slider-label">{def.label}</label>
-      <Slider min={def.min} max={def.max} step={def.step} value={value} onChange={onChange} />
+    <div className="gv-graph-control-slider" title={s[`${def.text}Title`]}>
+      <label className="gv-graph-control-slider-label">{s[def.text]}</label>
+      <Slider min={def.min} max={def.max} step={def.step} value={value} onChange={onChange} popId={def.key} />
       <span className="gv-graph-control-slider-value">{display}</span>
     </div>
   )

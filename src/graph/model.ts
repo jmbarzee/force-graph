@@ -2,7 +2,7 @@
 
 import type { AxisValues, Relation } from './axis'
 
-/** A node of the host's graph: an opaque id, a name, its values on the host's axes, and an optional parent, copy key, ring, badges and payload. */
+/** A node of the host's graph: an opaque id, a name, its values on the host's axes, and an optional parent, copy key, ring, badges, stack and payload. */
 export interface GraphNode {
   /**
    * Stable identity, owned by whoever produced the graph.
@@ -19,6 +19,7 @@ export interface GraphNode {
    * one axis each and read it from here; nothing composes across axes.
    */
   values: AxisValues
+  /** The node's display name. */
   name: string
   /**
    * Metadata the host owns and the library does not interpret.
@@ -59,6 +60,12 @@ export interface GraphNode {
    * tag, a count. Display only, never identity. Absent or empty, no chips.
    */
   badges?: readonly string[]
+
+  /**
+   * Whether the node stands for many members: drawn as a stack, two fading
+   * copies of its body behind it. A mark, never a count. Absent, one body.
+   */
+  stack?: boolean
 }
 
 /** The key a node's copies share: its `copyKey`, or its own id. */
@@ -106,10 +113,13 @@ export function payloadNumber(
   return typeof value === 'number' ? value : undefined
 }
 
-/** An edge of the host's graph: two node ids, a relation, the edge's own axis values and an opaque payload. */
+/** An edge of the host's graph. */
 export interface GraphEdge {
+  /** Stable identity, opaque like a node's. */
   id: string
+  /** The node the edge runs from. */
   sourceId: string
+  /** The node the edge runs to. */
   targetId: string
   /**
    * What the edge means to the engine: a `containment` edge runs from a node
@@ -128,6 +138,43 @@ export interface GraphEdge {
    * and not an axis lives here.
    */
   payload?: Readonly<Record<string, unknown>>
+  /** How heavy the edge is, in `[0, 1]`: its stroke is drawn up to twice as wide. Absent, 0. The spring does not read it. */
+  weight?: number
+  /** One count per bucket of the graph's `window`, which the playhead plays the stroke through. Absent, the edge draws its static stroke at every playhead. */
+  series?: readonly number[]
+}
+
+/** The edge's weight as drawn: absent or not finite, 0; else clamped to `[0, 1]`. A weight out of range is `validateGraph`'s to name. */
+export function unitWeight(edge: Pick<GraphEdge, 'weight'>): number {
+  const w = edge.weight
+  return w === undefined || !Number.isFinite(w) ? 0 : Math.min(1, Math.max(0, w))
+}
+
+/** The graph's window when it is one: finite bounds, `since` before `until`, and a positive whole number of buckets. */
+export function windowOf(graph: Pick<Graph, 'window'>): TimeWindow | undefined {
+  const w = graph.window
+  return w && Number.isFinite(w.since) && Number.isFinite(w.until) && w.since < w.until && Number.isInteger(w.buckets) && w.buckets > 0 ? w : undefined
+}
+
+/** The edge's series when it reads against `window`: one finite count of at least 0 per bucket. */
+export function seriesOf(edge: Pick<GraphEdge, 'series'>, window: TimeWindow | undefined): readonly number[] | undefined {
+  const s = edge.series
+  return s && window && s.length === window.buckets && s.every(c => Number.isFinite(c) && c >= 0) ? s : undefined
+}
+
+/** The heaviest bucket over every edge's series: what an intensity is read against. */
+export function peakOf(edges: readonly Pick<GraphEdge, 'series'>[], window: TimeWindow | undefined): number {
+  let peak = 0
+  for (const edge of edges) for (const c of seriesOf(edge, window) ?? []) peak = Math.max(peak, c)
+  return peak
+}
+
+/** The series at fractional bucket `p`, interpolated between its neighbours, over `peak`: in `[0, 1]`, and 0 at a peak of 0. */
+export function intensityAt(series: readonly number[], p: number, peak: number): number {
+  const i = Math.floor(p)
+  const lo = series[i] ?? 0
+  const hi = series[i + 1] ?? lo
+  return peak > 0 ? (lo + (hi - lo) * (p - i)) / peak : 0
 }
 
 /** The edge's relation: as declared, or `dependency`. A misspelt relation is `validateGraph`'s to name. */
@@ -175,17 +222,20 @@ export function withContainmentEdges(graph: Graph): Graph {
     ids.add(id)
     added.push({ id, sourceId: node.id, targetId: node.parentId, relation: 'containment' })
   }
-  return added.length === 0 ? graph : { nodes: graph.nodes, edges: [...graph.edges, ...added] }
+  return added.length === 0 ? graph : { ...graph, edges: [...graph.edges, ...added] }
 }
 
 /**
- * A graph as a reader sees it — its nodes, its edges, and a lookup by id —
- * the shape a computed scalar, the layout frame and the view's visible-graph
- * derivation all read. A `Simulation` satisfies it structurally.
+ * A graph as a reader sees it: the shape a computed scalar, the layout frame
+ * and the view's visible-graph derivation all read. A `Simulation` satisfies
+ * it structurally.
  */
 export interface ReadableGraph {
+  /** The nodes, in the graph's order. */
   readonly nodes: readonly GraphNode[]
+  /** The edges, each naming its two nodes by id. */
   readonly edges: readonly GraphEdge[]
+  /** The node with this id, if any — a lookup, not a scan of `nodes`. */
   getNode(id: string): GraphNode | undefined
 }
 
@@ -196,12 +246,26 @@ export function readableGraph(graph: Graph): ReadableGraph {
 }
 
 /**
- * The host's graph: its nodes, in the order they are laid out, and its edges.
- * Read, never written, by the view, which indexes the nodes itself.
+ * The host's graph. Read, never written, by the view, which indexes the
+ * nodes itself.
  */
 export interface Graph {
+  /** The nodes, in the order they are laid out. */
   readonly nodes: readonly GraphNode[]
+  /** The edges, each naming its two nodes by id. */
   readonly edges: readonly GraphEdge[]
+  /** The time window every edge's `series` is counted over. Absent, the graph draws its static strokes and shows no scrubber. */
+  readonly window?: TimeWindow
+}
+
+/** A span of time in equal buckets: `buckets` of them from `since` to `until`, in epoch milliseconds. */
+export interface TimeWindow {
+  /** The window's start. */
+  since: number
+  /** The window's end, after `since`. */
+  until: number
+  /** How many equal buckets the window is cut into: a positive whole number. */
+  buckets: number
 }
 
 const sameValues = (a: AxisValues | undefined, b: AxisValues | undefined): boolean => {
@@ -212,29 +276,31 @@ const sameValues = (a: AxisValues | undefined, b: AxisValues | undefined): boole
   for (const k of keys) if (a[k] !== b[k]) return false
   return true
 }
-const sameList = (a: readonly string[] | undefined, b: readonly string[] | undefined): boolean =>
+const sameList = <T>(a: readonly T[] | undefined, b: readonly T[] | undefined): boolean =>
   a === b || (a !== undefined && b !== undefined && a.length === b.length && a.every((v, i) => v === b[i]))
 
 /**
  * Whether two graphs say the same thing: the same nodes in the same order
- * with the same fields, and the same edges — values compared, payloads by
- * identity. A new graph object equal to the last is the sign of a host
- * rebuilding what it could have kept; the view says so once.
+ * with the same fields, the same edges and the same window — values,
+ * weights, series and the window compared, payloads by identity. A new graph object equal to
+ * the last is the sign of a host rebuilding what it could have kept; the
+ * view says so once.
  */
 export function graphEquals(a: Graph, b: Graph): boolean {
   if (a === b) return true
+  if (a.window !== b.window && (a.window?.since !== b.window?.since || a.window?.until !== b.window?.until || a.window?.buckets !== b.window?.buckets)) return false
   if (a.nodes.length !== b.nodes.length || a.edges.length !== b.edges.length) return false
   for (let i = 0; i < a.nodes.length; i++) {
     const x = a.nodes[i], y = b.nodes[i]
     if (x === y) continue
-    if (x.id !== y.id || x.name !== y.name || x.parentId !== y.parentId || x.copyKey !== y.copyKey || x.ring !== y.ring || x.payload !== y.payload) return false
+    if (x.id !== y.id || x.name !== y.name || x.parentId !== y.parentId || x.copyKey !== y.copyKey || x.ring !== y.ring || x.stack !== y.stack || x.payload !== y.payload) return false
     if (!sameValues(x.values, y.values) || !sameList(x.badges, y.badges)) return false
   }
   for (let i = 0; i < a.edges.length; i++) {
     const x = a.edges[i], y = b.edges[i]
     if (x === y) continue
     if (x.id !== y.id || x.sourceId !== y.sourceId || x.targetId !== y.targetId || x.relation !== y.relation || x.payload !== y.payload) return false
-    if (!sameValues(x.values, y.values)) return false
+    if (x.weight !== y.weight || !sameValues(x.values, y.values) || !sameList(x.series, y.series)) return false
   }
   return true
 }

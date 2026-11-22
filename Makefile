@@ -1,11 +1,11 @@
-.PHONY: help check typecheck typecheck-example test build release
+.PHONY: help check typecheck typecheck-example test build docs react-types readme colours release
 
 ## help — print the targets
 help:
 	@sed -n 's/^## //p' Makefile
 
 ## check — everything CI runs
-check: typecheck typecheck-example test build
+check: typecheck typecheck-example test build docs react-types readme colours
 
 ## typecheck — the library's types
 typecheck:
@@ -15,6 +15,7 @@ typecheck:
 typecheck-example:
 	npx tsc --noEmit -p examples/course-catalog/tsconfig.json
 	npx tsc --noEmit -p examples/many-axes/tsconfig.json
+	npx tsc --noEmit -p examples/branded/tsconfig.json
 
 ## test — the unit tests
 test:
@@ -23,6 +24,23 @@ test:
 ## build — the library artifact in dist-lib/
 build:
 	npm run build:lib
+
+## docs — every declaration the build ships carries a doc comment
+docs: build
+	node verify/dts-docs.mjs
+
+## react-types — a host compiles against the shipped declarations under React 18's types and React 19's
+react-types: build
+	npx tsc --noEmit -p verify/react-types/tsconfig.18.json
+	npx tsc --noEmit -p verify/react-types/tsconfig.19.json
+
+## readme — the README names nothing src/ exports that the entry does not
+readme:
+	node verify/readme-names.mjs
+
+## colours — no colour literal in the library's CSS or src/components/ outside tokens.css
+colours:
+	node verify/colour-literals.mjs
 
 TYPE ?= minor
 

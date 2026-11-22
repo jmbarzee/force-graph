@@ -2,6 +2,7 @@
 // Nothing here knows about graphs: `graph.ts` is the translation step.
 
 export type Campus = 'north' | 'south' | 'online'
+export const CAMPUS_LABEL: Record<Campus, string> = { north: 'North campus', south: 'South campus', online: 'Online' }
 export type Term = 'Autumn' | 'Spring' | 'Summer'
 export type RequirementKind = 'prerequisite' | 'corequisite' | 'recommended'
 
@@ -28,6 +29,8 @@ export interface Lab {
   code: string
   title: string
   credits: number
+  /** How many sections run; more than one is drawn as a stack. */
+  sections?: number
   requires?: Requirement[]
 }
 
@@ -38,6 +41,8 @@ export interface Course {
   /** Every code the course is listed under; the subject prefix names its department. */
   listings: string[]
   credits: number
+  /** How many sections run; more than one is drawn as a stack. */
+  sections?: number
   campus: Campus
   term: Term
   requires?: Requirement[]
@@ -127,9 +132,10 @@ export const catalog: Catalog = {
       title: 'General Chemistry',
       listings: ['CHEM 101'],
       credits: 4,
+      sections: 6,
       campus: 'north',
       term: 'Autumn',
-      labs: [{ code: 'CHEM 101L', title: 'General Chemistry Lab', credits: 1 }],
+      labs: [{ code: 'CHEM 101L', title: 'General Chemistry Lab', credits: 1, sections: 12 }],
     },
     {
       id: 'orgchem',
@@ -276,11 +282,11 @@ export const catalog: Catalog = {
       requires: [pre('COMP 240'), pre('MATH 210'), pre('MATH 220')],
     },
 
-    // Listed under a subject no department owns.
+    // Listed under a subject no department owns, and cross-listed in Philosophy.
     {
       id: 'ethicsai',
       title: 'Ethics of AI',
-      listings: ['IDST 300'],
+      listings: ['IDST 300', 'PHIL 300'],
       credits: 2,
       campus: 'online',
       term: 'Summer',

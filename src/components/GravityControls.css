@@ -1,4 +1,5 @@
 /* Gravity controls. */
+@layer gv {
 /* ── Gravity tab ────────────────────────────────────────────────────────────
    Three sub-tabs: X Axis and Y Axis (the same per-axis surface: a mapping, a
    column per bucket with its rest band as two handles, the strength, the force
@@ -84,3 +85,4 @@
 /* A scalar axis: the span's gradient and its two end handles. */
 .gv-gravity-scalar-gradient { pointer-events: none; }
 .gv-gravity-scalar-dot { fill: var(--gv-color-text); }
+}

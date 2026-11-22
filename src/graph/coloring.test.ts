@@ -1,0 +1,209 @@
+import { describe, expect, it, vi } from 'vitest'
+import { colorChannels, coloringsEqual, fillOf, glowOf, hueFor, pairFor, resolveColoring } from './coloring'
+import type { Coloring, SetColoring } from './coloring'
+import { groupSlotsOf } from './groups'
+import type { NodeGroup } from './groups'
+import type { GraphEdge, GraphNode } from './model'
+import { PALETTE, pairOf } from './scheme'
+import type { ValueSpec } from './shapes'
+import { createTaxonomy } from './taxonomy'
+
+const style = (id: string, label: string, light: string, dark: string): ValueSpec => ({
+  id, label, color: { light: { fill: light, border: light }, dark: { fill: dark, border: dark } },
+})
+const taxonomy = createTaxonomy({
+  styleAxis: 'kind',
+  values: [style('service', 'Service', '#111111', '#eeeeee'), style('queue', 'Queue', '#222222', '#dddddd'), style('store', 'Store', '#333333', '#cccccc')],
+  filterAxes: [
+    { id: 'kind', emptyMeans: 'all' },
+    { id: 'team', emptyMeans: 'all', labelFor: v => v.toUpperCase(), chipsFor: values => [...values].sort().map(v => ({ id: v, label: v, values: [v] })) },
+  ],
+})
+const node = (id: string, values: Record<string, string>, sets: string[] = []): GraphNode => ({ id, name: id, values, payload: { sets } })
+const nodes = [node('a', { kind: 'queue', team: 'red' }, ['x']), node('b', { kind: 'service', team: 'blue' }, ['x', 'y']), node('c', { kind: 'service', team: 'green' }), node('d', {})]
+const resolve = (coloring: SetColoring, of = nodes) => resolveColoring(coloring, { nodes: of, edges: [] }, taxonomy, [])
+
+describe('resolveColoring by axis', () => {
+  it('defaults the keys to the graph’s values in chip order, labelled by labelFor, each in its slot', () => {
+    const { keys, of } = resolve({ by: 'axis', axis: 'team' })
+    expect([...keys]).toEqual([
+      ['blue', { label: 'BLUE', hue: PALETTE[0] }],
+      ['green', { label: 'GREEN', hue: PALETTE[1] }],
+      ['red', { label: 'RED', hue: PALETTE[2] }],
+    ])
+    expect(nodes.map(n => of.get(n.id))).toEqual([['red'], ['blue'], ['green'], []])
+  })
+
+  it('defaults the style axis to its declared order and fills', () => {
+    expect([...resolve({ by: 'axis', axis: 'kind' }).keys]).toEqual([
+      ['service', { label: 'Service', hue: { light: '#111111', dark: '#eeeeee' } }],
+      ['queue', { label: 'Queue', hue: { light: '#222222', dark: '#dddddd' } }],
+    ])
+  })
+
+  it('names the keys through labels, on a declared axis, the style axis and an undeclared one', () => {
+    const labels = { team: { red: 'Crimson' }, kind: { queue: 'Line' }, site: { x: 'Ex' } }
+    const named = (axis: string) => [...resolveColoring({ by: 'axis', axis }, { nodes: [...nodes, node('e', { site: 'x' })], edges: [] }, taxonomy, [], labels).keys].map(([id, k]) => [id, k.label])
+    expect(named('team')).toEqual([['blue', 'BLUE'], ['green', 'GREEN'], ['red', 'Crimson']])
+    expect(named('kind')).toEqual([['service', 'Service'], ['queue', 'Line']])
+    expect(named('site')).toEqual([['x', 'Ex']])
+  })
+
+  it('takes declared keys over the defaults, and a value outside them resolves to none silently', () => {
+    const { keys, of, diagnostics } = resolve({ by: 'axis', axis: 'team', keys: [{ id: 'red', label: 'Red' }] })
+    expect([...keys.keys()]).toEqual(['red'])
+    expect(of.get('b')).toEqual([])
+    expect(diagnostics).toEqual([])
+  })
+})
+
+describe('resolveColoring by node', () => {
+  const keys = [{ id: 'red', label: 'Red' }, { id: 'blue', label: 'Blue', color: '#123456' }, { id: 'green', label: 'Green', color: { light: '#010101', dark: '#fefefe' } }]
+  const coloring = (of: (node: GraphNode) => string | undefined): Coloring => ({ by: 'node', keys, of })
+
+  it('serves a string key in both themes and a hue key per theme', () => {
+    const resolved = resolve(coloring(n => n.values.team))
+    expect(resolved.keys.get('blue')!.hue).toEqual({ light: '#123456', dark: '#123456' })
+    expect(resolved.keys.get('green')!.hue).toEqual({ light: '#010101', dark: '#fefefe' })
+  })
+
+  it('keeps every slot when nodes are removed', () => {
+    const all = resolve(coloring(n => n.values.team)).keys
+    expect(resolve(coloring(n => n.values.team), nodes.slice(2)).keys).toEqual(all)
+  })
+
+  it('asks for each node’s key once, and shares one array per key and one empty array among the keyless', () => {
+    const of = vi.fn((n: GraphNode) => (n.id === 'd' ? undefined : 'red'))
+    const resolved = resolve(coloring(of))
+    expect(of).toHaveBeenCalledTimes(nodes.length)
+    expect(resolved.of.get('a')).toBe(resolved.of.get('b'))
+    expect(resolved.of.get('d')).toEqual([])
+    expect(resolve({ by: 'groups' }).of.get('d')).toBe(resolved.of.get('d'))
+  })
+
+  it('resolves an undeclared key to none and reports it once', () => {
+    const { of, diagnostics } = resolve(coloring(() => 'mauve'))
+    expect(of.get('a')).toEqual([])
+    expect(diagnostics).toEqual([expect.objectContaining({ severity: 'warning', code: 'key-undeclared', nodeId: 'a' })])
+  })
+
+  it('gives a colour it cannot read its slot, warned once', () => {
+    const { keys: resolved, diagnostics } = resolve({ by: 'node', keys: [keys[0], { id: 'bad', label: 'Bad', color: { light: '#fff', dark: 'nope' } }], of: () => 'bad' })
+    expect(resolved.get('bad')!.hue).toBe(PALETTE[1])
+    expect(diagnostics.map(d => d.code)).toEqual(['key-color-invalid'])
+  })
+})
+
+describe('resolveColoring by groups', () => {
+  it('reads derived groups with their labels and listed groups by id, many keys per node', () => {
+    const derived = resolveColoring({ by: 'groups' }, { nodes, edges: [] }, taxonomy, {
+      keys: [{ id: 'x', label: 'Ex' }, { id: 'y', label: 'Why' }],
+      of: n => n.payload?.sets as string[],
+    })
+    expect([...derived.keys]).toEqual([['x', { label: 'Ex', hue: PALETTE[0] }], ['y', { label: 'Why', hue: PALETTE[1] }]])
+    expect(derived.of.get('b')).toEqual(['x', 'y'])
+    const listed = resolveColoring({ by: 'groups' }, { nodes, edges: [] }, taxonomy, [{ id: 'x', nodeIds: new Set(['a']) }])
+    expect(listed.keys.get('x')!.label).toBe('x')
+  })
+
+  it('leaves the groups’ own warnings to nodeGroupsOf', () => {
+    expect(resolveColoring({ by: 'groups' }, { nodes, edges: [] }, taxonomy, [{ id: 'x', nodeIds: new Set(['a']), color: 'nope' }]).diagnostics).toEqual([])
+  })
+})
+
+describe('glowOf', () => {
+  it('follows the groups when absent, each in its groupSlotsOf slot and carrying its weight', () => {
+    const groups: NodeGroup[] = Array.from({ length: 11 }, (_, i) => ({ id: `g${i}`, nodeIds: new Set([`n${i}`]), weight: i / 10 }))
+    const edges: GraphEdge[] = [{ id: 'e', sourceId: 'n0', targetId: 'n10' }]
+    const { sources } = glowOf(undefined, { nodes: groups.map(g => node([...g.nodeIds][0]!, {})), edges }, taxonomy, groups)
+    const slots = groupSlotsOf(groups, edges)
+    expect(slots[10]).toBe(1)
+    expect(sources.map(s => [s.id, [...s.nodeIds], s.color, s.weight])).toEqual(groups.map((g, i) => [g.id, [...g.nodeIds], PALETTE[slots[i]!], g.weight]))
+  })
+
+  it('glows each axis value’s nodes as one source, in its slot', () => {
+    const { sources } = glowOf({ by: 'axis', axis: 'team' }, { nodes, edges: [] }, taxonomy, [])
+    expect(sources.map(s => [s.id, [...s.nodeIds], s.color])).toEqual([['blue', ['b'], PALETTE[0]], ['green', ['c'], PALETTE[1]], ['red', ['a'], PALETTE[2]]])
+  })
+
+  it('glows each node key’s nodes as one source, with its weight, and reports what resolving reports', () => {
+    const { sources, diagnostics } = glowOf({ by: 'node', keys: [{ id: 'service', label: 'Service', weight: 0.5 }], of: n => n.values.kind }, { nodes, edges: [] }, taxonomy, [])
+    expect(sources.map(s => [s.id, [...s.nodeIds], s.weight])).toEqual([['service', ['b', 'c'], 0.5]])
+    expect(diagnostics.map(d => d.code)).toEqual(['key-undeclared'])
+  })
+})
+
+describe('coloringsEqual', () => {
+  it('holds the groups equal, and keys apart by weight', () => {
+    expect(coloringsEqual({ by: 'groups' }, { by: 'groups' })).toBe(true)
+    expect(coloringsEqual({ by: 'groups' }, { by: 'axis', axis: 'team' })).toBe(false)
+    const keyed = (weight: number): Coloring => ({ by: 'axis', axis: 'team', keys: [{ id: 'red', label: 'Red', weight }] })
+    expect(coloringsEqual(keyed(0.5), keyed(0.5))).toBe(true)
+    expect(coloringsEqual(keyed(0.5), keyed(1))).toBe(false)
+  })
+})
+
+describe('fillOf', () => {
+  it('follows the style axis when absent, in the values’ own colours, a node of no declared style keyless', () => {
+    const fill = fillOf(undefined, { nodes, edges: [] }, taxonomy)
+    expect(fill.axis).toBe('kind')
+    expect([...fill.keys.keys()]).toEqual(['service', 'queue', 'store'])
+    expect(fill.keys.get('queue')).toEqual({ label: 'Queue', color: taxonomy.styleOf('queue').color, cssVar: taxonomy.colorVar('queue') })
+    expect(nodes.map(n => fill.of.get(n.id))).toEqual(['queue', 'service', 'service', undefined])
+    expect(fillOf({ by: 'axis', axis: 'kind' }, { nodes, edges: [] }, taxonomy)).toEqual(fill)
+    expect(fillOf(undefined, { nodes, edges: [] }, taxonomy, { kind: { queue: 'Line' } }).keys.get('queue')!.label).toBe('Line')
+  })
+
+  it('pairs each key’s hue as fill and border on another axis', () => {
+    const fill = fillOf({ by: 'axis', axis: 'team' }, { nodes, edges: [] }, taxonomy)
+    expect(fill.axis).toBe('team')
+    expect(fill.keys.get('blue')).toEqual({ label: 'BLUE', color: pairOf(PALETTE[0]), cssVar: '--gv-node-blue' })
+    expect(fill.of.get('a')).toBe('red')
+    expect(fill.of.has('d')).toBe(false)
+  })
+})
+
+describe('colorChannels', () => {
+  const graph = { nodes, edges: [] }
+  const fill = fillOf({ by: 'axis', axis: 'team' }, graph, taxonomy)
+  const { sources } = glowOf({ by: 'axis', axis: 'kind' }, graph, taxonomy, [])
+  const ring = resolve({ by: 'node', keys: [{ id: 'red', label: 'Red', color: { light: '#010101', dark: '#fefefe' } }], of: n => n.values.team })
+
+  it('gives each key its label and its colour in the theme, visible while a visible node wears it', () => {
+    const channels = colorChannels(fill, sources, ring, new Set(['b', 'c']), 'dark')
+    expect(channels.fill).toEqual([
+      { id: 'blue', label: 'BLUE', color: PALETTE[0].dark, visible: true },
+      { id: 'green', label: 'GREEN', color: PALETTE[1].dark, visible: true },
+      { id: 'red', label: 'RED', color: PALETTE[2].dark, visible: false },
+    ])
+    expect(channels.glow).toEqual([
+      { id: 'service', label: 'Service', color: '#eeeeee', visible: true },
+      { id: 'queue', label: 'Queue', color: '#dddddd', visible: false },
+    ])
+    expect(channels.ring).toEqual([{ id: 'red', label: 'Red', color: '#fefefe', visible: false }])
+  })
+
+  it('leaves out a glow and a ring not given', () => {
+    const channels = colorChannels(fill, undefined, null, new Set(), 'light')
+    expect([channels.fill!.length, channels.glow, channels.ring]).toEqual([3, undefined, undefined])
+  })
+})
+
+describe('pairFor', () => {
+  it('answers a keyed node its key’s colour and a keyless one the fallback', () => {
+    const fill = fillOf({ by: 'axis', axis: 'team' }, { nodes, edges: [] }, taxonomy)
+    const fallback = taxonomy.styleOf(undefined).color
+    expect(pairFor(fill, 'a', fallback)).toBe(fill.keys.get('red')!.color)
+    expect(pairFor(fill, 'd', fallback)).toBe(fallback)
+  })
+})
+
+describe('hueFor', () => {
+  it('answers a keyed node its key’s hue, and a keyless or undeclared one none', () => {
+    const keys = [{ id: 'red', label: 'Red', color: '#123456' }]
+    const ring = resolve({ by: 'node', keys, of: n => (n.id === 'c' ? 'mauve' : n.values.team) })
+    expect(hueFor(ring, 'a')).toEqual({ light: '#123456', dark: '#123456' })
+    expect(hueFor(ring, 'c')).toBeUndefined()
+    expect(hueFor(ring, 'd')).toBeUndefined()
+  })
+})

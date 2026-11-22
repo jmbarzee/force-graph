@@ -1,11 +1,12 @@
 /* Shared filter bar: canvas header, chips, search. The findings bars rendered under it are the host's. */
+@layer gv {
 /* === Canvas Header === */
 .gv-canvas-header {
   background: var(--gv-color-surface);
   border: 1px solid var(--gv-color-border);
   border-radius: 10px;
   margin-bottom: 20px;
-  box-shadow: 0 1px 4px rgba(0, 0, 0, 0.06);
+  box-shadow: var(--gv-bar-shadow);
   /* No overflow clip: the add-axis menu hangs below the bar. */
 }
 
@@ -15,9 +16,9 @@
 }
 
 @keyframes refreshFlash {
-  0% { box-shadow: 0 1px 4px rgba(0, 0, 0, 0.06); }
-  30% { box-shadow: 0 0 0 2px color-mix(in srgb, var(--gv-accent) var(--gv-accent-tint-ring), transparent), 0 1px 4px rgba(0, 0, 0, 0.06); }
-  100% { box-shadow: 0 1px 4px rgba(0, 0, 0, 0.06); }
+  0% { box-shadow: var(--gv-bar-shadow); }
+  30% { box-shadow: 0 0 0 2px color-mix(in srgb, var(--gv-accent) var(--gv-accent-tint-ring), transparent), var(--gv-bar-shadow); }
+  100% { box-shadow: var(--gv-bar-shadow); }
 }
 
 
@@ -51,7 +52,7 @@
   padding: 5px 10px;
   background: transparent;
   border: 1px solid var(--gv-color-border);
-  border-radius: 6px;
+  border-radius: var(--gv-radius);
   font-family: var(--gv-font-mono);
   font-size: 13px;
   color: var(--gv-color-text-muted);
@@ -74,7 +75,7 @@
   font-weight: 500;
 }
 
-/* Third state: no files selected → all files implicitly included */
+/* Third state: no files chosen → all files implicitly included */
 .gv-tag.all-included {
   border-color: color-mix(in srgb, var(--gv-accent) var(--gv-accent-tint-ring), transparent);
   background: color-mix(in srgb, var(--gv-accent) var(--gv-accent-tint-weak), transparent);
@@ -117,7 +118,7 @@
   display: flex;
   align-items: center;
   gap: 0;
-  border-radius: 6px;
+  border-radius: var(--gv-radius);
   transition: all 0.2s ease;
   overflow: hidden;
   border: 1px solid transparent;
@@ -139,7 +140,7 @@
   background: transparent;
   color: var(--gv-color-text-muted);
   cursor: pointer;
-  border-radius: 6px;
+  border-radius: var(--gv-radius);
   transition: all 0.15s ease;
   flex-shrink: 0;
 }
@@ -212,7 +213,7 @@
   padding: 5px 10px;
   background: transparent;
   border: 1px solid var(--gv-color-border);
-  border-radius: 6px;
+  border-radius: var(--gv-radius);
   font-family: var(--gv-font-sans);
   font-size: 13px;
   color: var(--gv-color-text-muted);
@@ -259,7 +260,7 @@
   font-weight: 500;
 }
 
-/* A chip's tint is the style value it borrows (inline `--gv-chip-tint`, set by
+/* A chip's tint is the fill key it wears (inline `--gv-chip-tint`, set by
    the bar from the themed root's --gv-node-<suffix>); its hover and active
    backgrounds are that tint mixed down to the theme's tint percentages, so
    the bar needs no per-kind rule, no literal palette and no dark rule. */
@@ -282,8 +283,8 @@
   font-family: var(--gv-font-mono);
   font-size: 10px;
   font-weight: 600;
-  color: #F59E0B;
-  background: rgba(245, 158, 11, 0.16);
+  color: var(--gv-color-attention);
+  background: color-mix(in srgb, var(--gv-color-attention) 16%, transparent);
   border-radius: 8px;
   line-height: 1;
 }
@@ -350,7 +351,7 @@
   padding: 4px;
   background: var(--gv-color-surface);
   border: 1px solid var(--gv-color-border);
-  border-radius: 6px;
+  border-radius: var(--gv-radius);
   box-shadow: var(--gv-tooltip-shadow);
 }
 
@@ -410,7 +411,7 @@
   flex: 0 0 auto;
   align-self: flex-start;
   border: 1px dashed var(--gv-color-border);
-  border-radius: 6px;
+  border-radius: var(--gv-radius);
   background: transparent;
   color: var(--gv-color-text-muted);
   font-family: var(--gv-font-mono);
@@ -436,7 +437,7 @@
 }
 
 /* The same third state on a chip-presentation axis: an `emptyMeans: 'all'`
-   axis with nothing selected is matching everything, whichever look it wears. */
+   axis with nothing chosen is matching everything, whichever look it wears. */
 .gv-chip.all-included {
   border-color: color-mix(in srgb, var(--gv-accent) var(--gv-accent-tint-ring), transparent);
   background: color-mix(in srgb, var(--gv-accent) var(--gv-accent-tint-weak), transparent);
@@ -446,4 +447,5 @@
   border-color: var(--gv-accent);
   background: color-mix(in srgb, var(--gv-accent) var(--gv-accent-tint-active), transparent);
   color: var(--gv-accent);
+}
 }

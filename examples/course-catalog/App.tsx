@@ -1,21 +1,24 @@
 // The host shell, leaning on the view's defaults. It controls the state its own
 // panel writes (the filter) or follows (the selection, which closing the panel
 // clears), hands the theme choice in from the URL, asks the view to reveal a
-// node by naming it (`focus`), and leaves the axes, the locks and the search to
-// the view. It supplies what only the host can know — chip counts, findings,
-// programme groups, and what "Open details" does.
+// node by naming it (`focus`), keeps where the nodes came to rest across a
+// reload, and leaves the axes, the locks and the search to the view. It
+// supplies what only the host can know — findings, programme groups, a preset
+// of its own, and what "Open details" does — glows by programme or campus, and
+// rings by term.
 
 import React from 'react'
 import {
-  GraphView, GroupLegend, TaxonomyContext, copyGroups, initialFilter, nodesById, payloadNumber, payloadString, schemeVars, selectionFor, useFocusRequest, withSelection,
+  ColorLegend, GraphView, TUNING_PRESETS, TaxonomyContext, copyGroups, copyKeyOf, initialFilter, nodesById, payloadNumber, payloadString, useFocusRequest, useScheme, withChosen,
 } from '@jmbarzee/force-graph'
 import type {
-  AxisSelection, FilterState, Graph, GraphNode, NodeGroup, Theme, ThemeChoice,
+  Coloring, FilterState, GraphNode, SetColoring, ThemeChoice, TuningPreset,
 } from '@jmbarzee/force-graph'
-import { catalog } from './data'
-import type { Campus, Catalog } from './data'
-import { buildGraph } from './graph'
-import { CAMPUS, CAMPUS_LABEL, ENTITY, taxonomy } from './taxonomy'
+import { CAMPUS_LABEL, catalog } from './data'
+import type { Campus, Catalog, Term } from './data'
+import { buildGraph, programmeGroups } from './graph'
+import { loadPositions, savePositions } from './positions'
+import { CAMPUS, ENTITY, taxonomy } from './taxonomy'
 import type { Entity } from './taxonomy'
 import './app.css'
 
@@ -23,26 +26,16 @@ const graph = buildGraph(catalog)
 const nodeById = nodesById(graph.nodes)
 const nodeByCode = new Map(graph.nodes.map(n => [payloadString(n, 'code') ?? n.id, n]))
 const copies = copyGroups(graph)
-
-/** Chip badges: distinct catalog entries per value — a cross-listed course counts once. */
-function countsOf(data: Catalog, campuses: AxisSelection): ReadonlyMap<string, ReadonlyMap<string, number>> {
-  const entity = new Map<string, number>([
-    ['faculty', data.faculties.length],
-    ['department', data.departments.length],
-  ])
-  const campus = new Map<string, number>()
-  const bump = (m: Map<string, number>, k: string, by = 1) => m.set(k, (m.get(k) ?? 0) + by)
-  for (const c of data.courses) {
-    bump(campus, c.campus)
-    if (campuses.size > 0 && !campuses.has(c.campus)) continue
-    bump(entity, 'course')
-    bump(entity, 'lab', c.labs?.length ?? 0)
-  }
-  return new Map([
-    [ENTITY, entity],
-    [CAMPUS, campus],
-  ])
-}
+const groups = programmeGroups(catalog)
+const labels = { [CAMPUS]: CAMPUS_LABEL }
+/** What the glow can follow: the programmes, or the campus axis while the programmes stay declared. */
+const GLOW = { programmes: { by: 'groups' }, campus: { by: 'axis', axis: CAMPUS } } satisfies Record<string, SetColoring>
+type GlowBy = keyof typeof GLOW
+const TERMS: readonly Term[] = ['Autumn', 'Spring', 'Summer']
+/** Each course and lab ringed by its term. */
+const RING: Coloring = { by: 'node', keys: TERMS.map(t => ({ id: t, label: t })), of: n => payloadString(n, 'term') }
+/** Opens selected: ringed by term, dashed (no department owns IDST) and a copy of PHIL 300. */
+const OPENING = [nodeByCode.get('IDST 300')!]
 
 /** Data-quality warnings the registrar should see. */
 function findingsOf(data: Catalog): string[] {
@@ -58,44 +51,40 @@ function findingsOf(data: Catalog): string[] {
 }
 const FINDINGS = findingsOf(catalog)
 
-/** The legend's rows: every programme the catalog offers, drawn or not. */
-const PROGRAMMES = catalog.programmes.map(p => ({ id: p.id, label: p.name }))
+/** The library's presets, and the catalog's own: courses in rows by level. */
+export const PRESETS: readonly TuningPreset[] = [
+  ...TUNING_PRESETS,
+  { label: 'By level', tuning: { forces: { bandY: { scalar: 'level' } } } },
+]
 
-/** A programme glows over every copy of its courses and their labs. */
-function programmeGroups(g: Graph, enabled: ReadonlySet<string>): NodeGroup[] {
-  const copies = copyGroups(g)
-  return catalog.programmes.filter(p => enabled.has(p.id)).map(p => {
-    const ids = new Set<string>()
-    for (const code of p.courses) {
-      const node = nodeByCode.get(code)
-      if (node) for (const copy of copies.get(node.copyKey ?? node.id) ?? []) ids.add(copy)
-    }
-    for (const n of g.nodes) if (n.parentId && ids.has(n.parentId)) ids.add(n.id)
-    return { id: p.id, nodeIds: ids }
-  })
-}
-
-export function App({ initialTheme = 'system' }: { initialTheme?: ThemeChoice }) {
+export function App({ initialTheme = 'system', initialFocus }: { initialTheme?: ThemeChoice; initialFocus?: string | null }) {
   // Controlled: the details panel's "Show only <campus>" writes the filter.
   const [filter, setFilter] = React.useState<FilterState>(() => initialFilter(taxonomy, graph))
   const [themeChoice, setThemeChoice] = React.useState<ThemeChoice>(initialTheme)
-  const [enabled, setEnabled] = React.useState<ReadonlySet<string>>(() => new Set(catalog.programmes.map(p => p.id)))
   const [details, setDetails] = React.useState<GraphNode | null>(null)
   // Controlled: the panel's close clears it, and the view selects what it says.
-  const [selected, setSelected] = React.useState<GraphNode | null>(null)
+  const [selected, setSelected] = React.useState<readonly GraphNode[]>(OPENING)
   // A request, not a state: the view applies it when it changes, and each ask
   // is a fresh one, so asking again for the same node asks again.
   const [focus, requestFocus] = useFocusRequest()
+  React.useEffect(() => { if (initialFocus) requestFocus(initialFocus) }, [initialFocus, requestFocus])
+  // Where the nodes last came to rest: a reload opens there.
+  const [kept] = React.useState(() => loadPositions(localStorage))
+  const [glowBy, setGlowBy] = React.useState<GlowBy>('programmes')
 
-  // The side panel follows the pane's theme: the view reports the one it drew in.
-  const [theme, setTheme] = React.useState<Theme>('light')
 
-  const counts = React.useMemo(() => countsOf(catalog, selectionFor(filter, CAMPUS)), [filter])
-  const groups = React.useMemo(() => programmeGroups(graph, enabled), [enabled])
-
-  /** Ask the view to reveal `node`: it widens the filter just enough, centres and selects. */
+  /** Ask the view to reveal `node`: it widens the filter just enough, frames and selects. */
   const reveal = (node: GraphNode) => requestFocus(node.id)
-  const onlyCampus = (campus: string) => setFilter(f => withSelection(f, CAMPUS, new Set([campus])))
+  const onlyCampus = (campus: string) => setFilter(f => withChosen(f, CAMPUS, new Set([campus])))
+  const glowSwitch = (
+    <label>
+      Glow by{' '}
+      <select value={glowBy} onChange={e => setGlowBy(e.target.value as GlowBy)}>
+        <option value="programmes">Programmes</option>
+        <option value="campus">Campus</option>
+      </select>
+    </label>
+  )
 
   return (
     <TaxonomyContext.Provider value={taxonomy}>
@@ -103,49 +92,43 @@ export function App({ initialTheme = 'system' }: { initialTheme?: ThemeChoice })
         <div className="catalog-pane">
           <GraphView
             graph={graph}
-            counts={counts}
+            labels={labels}
+            counts="faceted"
             findings={FINDINGS.length > 0 && <Findings messages={FINDINGS} />}
             groups={groups}
-            groupsControl={(active, control) => (
-              <GroupLegend
-                title="Degree programmes"
-                items={PROGRAMMES}
-                active={active}
-                enabled={enabled}
-                onToggle={id => setEnabled(prev => toggled(prev, id))}
-                onEmphasize={control.emphasize}
-              />
+            coloring={{ glow: GLOW[glowBy], ring: RING }}
+            legend={(channels, control) => (
+              <ColorLegend channels={channels} control={control} titles={{ fill: 'Kind', glow: glowBy === 'programmes' ? 'Degree programmes' : 'Campus', ring: 'Term' }}>
+                {glowSwitch}
+              </ColorLegend>
             )}
+            presets={PRESETS}
             nodeAction={{ label: 'Open details', onSelect: setDetails }}
             onNodeActivate={setDetails}
+            onEdgeHover={edge => console.log('edge hover', edge)}
             theme={themeChoice}
             onThemeChange={setThemeChoice}
-            onThemeResolved={setTheme}
             filter={filter}
             onFilterChange={setFilter}
-            selectedId={selected?.id ?? null}
+            selectedIds={new Set(selected.map(n => n.id))}
             onSelectionChange={setSelected}
             focus={focus}
+            defaultPositions={kept}
+            onSettled={positions => savePositions(localStorage, positions)}
           />
         </div>
         {details && (
           <Details
             node={details}
-            theme={theme}
+            themeChoice={themeChoice}
             onReveal={reveal}
             onOnlyCampus={onlyCampus}
-            onClose={() => { setDetails(null); setSelected(null) }}
+            onClose={() => { setDetails(null); setSelected([]) }}
           />
         )}
       </div>
     </TaxonomyContext.Provider>
   )
-}
-
-function toggled(set: ReadonlySet<string>, id: string): ReadonlySet<string> {
-  const next = new Set(set)
-  if (!next.delete(id)) next.add(id)
-  return next
 }
 
 function Findings({ messages }: { messages: readonly string[] }) {
@@ -161,27 +144,26 @@ function Findings({ messages }: { messages: readonly string[] }) {
  * What "Open details" shows: the node the view hands over, and its listings —
  * the nodes that share its copy key — for the records the node does not carry.
  *
- * The panel sits beside the view, not above it, so it carries the theme the
- * view reported on its own element. On an ancestor of the view it would be the
- * "host theme" the view reads for `system`, and the choice would stop following
- * the OS.
+ * The panel sits beside the view, not above it, and resolves the view's choice
+ * itself. On an ancestor of the view its theme would be the "host theme" the
+ * view reads for `system`, and the choice would stop following the OS.
  */
-function Details({ node, theme, onReveal, onOnlyCampus, onClose }: {
+function Details({ node, themeChoice, onReveal, onOnlyCampus, onClose }: {
   node: GraphNode
-  theme: Theme
+  themeChoice: ThemeChoice
   onReveal: (node: GraphNode) => void
   onOnlyCampus: (campus: string) => void
   onClose: () => void
 }) {
   const entity = node.values[ENTITY] as Entity | undefined
   const campus = node.values[CAMPUS] as Campus | undefined
-  const scheme = React.useMemo(() => schemeVars(taxonomy, theme) as React.CSSProperties, [theme])
-  const listings = [...(copies.get(node.copyKey ?? node.id) ?? [node.id])].flatMap(id => nodeById.get(id) ?? [])
+  const { scopeProps } = useScheme(taxonomy, { choice: themeChoice })
+  const listings = [...(copies.get(copyKeyOf(node)) ?? [node.id])].flatMap(id => nodeById.get(id) ?? [])
   const first = listings[0]
   const course = catalog.courses.find(c => c.id === (first && payloadString(first, 'courseId')))
   const credits = first && payloadNumber(first, 'credits')
   return (
-    <aside className="catalog-details" data-theme={theme} style={scheme}>
+    <aside className="catalog-details" {...scopeProps}>
       <button className="catalog-close" onClick={onClose} aria-label="Close details">×</button>
       <div className="catalog-muted">{entity ? taxonomy.styleOf(entity).label : 'Unknown'}</div>
       <h2>{node.name}</h2>

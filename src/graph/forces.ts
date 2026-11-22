@@ -15,17 +15,19 @@ import type { AxisId, AxisValue } from './axis'
 import { isIdentityMapping } from './axis'
 import type { GraphEdge } from './model'
 import { relationOf } from './model'
-import type { ChargeParams, LinkParams, GravityParams, SimNode, PairTuning, PushPhysics, BandRange, LayoutTuning } from './simulation'
-import type { ResolvedScalarAxis, ScalarAxis, ScalarSpan } from './scalar'
+import type { ChargeParams, LinkParams, GravityParams, SimNode, PairTuning, PushPhysics, BandRange, BandAxisTuning } from './simulation'
+import type { ResolvedScalar, Scalar, ScalarSpan } from './scalar'
 import { normalized, rangeNormalized } from './scalar'
 import { isScalarTuning } from './scalar'
 import type { ReadableGraph } from './model'
 import type { Taxonomy } from './taxonomy'
+import { engineOf } from './taxonomy'
 import type { AxisMapping } from './axis'
 import type { EdgeTypeId, ResolvedEdgeType, SpringPhysics } from './shapes'
 import { MIDDLING_SPRING } from './shapes'
 import type { Relation } from './axis'
 import type { Rng } from './rng'
+import type { GraphDiagnostic } from './validate'
 
 /** The minimum a force needs of a node in order to look up its physics. */
 export type PhysicsSubject = { values: Readonly<Record<AxisId, AxisValue>> }
@@ -86,17 +88,17 @@ export interface ResolvedAxis<T> {
 
 /** A layout axis backed by a scalar: the scalar itself, and where its 0 and 1 rest. */
 export interface ResolvedScalarLayout {
-  readonly scalar: ResolvedScalarAxis
+  readonly scalar: ResolvedScalar
   readonly span: ScalarSpan
 }
 
 /** A layout axis as the kernels see it: per-bucket bands, or a scalar over a span. */
-export type ResolvedLayoutAxis = ResolvedAxis<BandRange> | ResolvedScalarLayout
+export type ResolvedBandAxis = ResolvedAxis<BandRange> | ResolvedScalarLayout
 
-export const isScalarAxis = (a: ResolvedLayoutAxis): a is ResolvedScalarLayout => 'scalar' in a
+export const isScalarAxis = (a: ResolvedBandAxis): a is ResolvedScalarLayout => 'scalar' in a
 
 /** The mapped half of a layout axis; loud where a caller expects buckets and meets a scalar. */
-export function mappedAxis(a: ResolvedLayoutAxis): ResolvedAxis<BandRange> {
+export function mappedAxis(a: ResolvedBandAxis): ResolvedAxis<BandRange> {
   if (isScalarAxis(a)) throw new Error(`expected a mapped axis, got scalar ${JSON.stringify(a.scalar.id)}`)
   return a
 }
@@ -107,8 +109,8 @@ export type LayoutSubject = PhysicsSubject & { id: string }
 export interface ResolvedPhysics {
   push: ResolvedAxis<PushPhysics>
   /** The two layout axes — the same shape, resolved the same way; either may be a scalar. */
-  bandX: ResolvedLayoutAxis
-  bandY: ResolvedLayoutAxis
+  bandX: ResolvedBandAxis
+  bandY: ResolvedBandAxis
   spring: ResolvedSprings
 }
 
@@ -151,7 +153,7 @@ function declaredBand(taxonomy: Taxonomy, values: readonly AxisValue[], axis: 'x
  * downward) and at the right.
  */
 export function defaultSpan(taxonomy: Taxonomy, axis: 'x' | 'y'): ScalarSpan {
-  const extent = declaredBand(taxonomy, taxonomy.styleValues, axis)
+  const extent = declaredBand(taxonomy, taxonomy.styleValues(), axis)
   const half = (extent.max - extent.min) / 2
   return axis === 'y' ? { zero: half, one: -half } : { zero: -half, one: half }
 }
@@ -177,13 +179,13 @@ export function resolvePhysics(params: ChargeParams & GravityParams & LinkParams
   const style = taxonomy.styleAxis()
   const pushFor = (m: AxisMapping) => m.axis === style
     ? (values: readonly AxisValue[]) => declaredPush(taxonomy, values)
-    : () => declaredPush(taxonomy, taxonomy.styleValues)
+    : () => declaredPush(taxonomy, taxonomy.styleValues())
   const bandOn = (m: AxisMapping, axis: 'x' | 'y') => m.axis === style
     ? (values: readonly AxisValue[]) => declaredBand(taxonomy, values, axis)
-    : () => declaredBand(taxonomy, taxonomy.styleValues, axis)
-  const layout = (t: LayoutTuning, axis: 'x' | 'y'): ResolvedLayoutAxis => {
+    : () => declaredBand(taxonomy, taxonomy.styleValues(), axis)
+  const layout = (t: BandAxisTuning, axis: 'x' | 'y'): ResolvedBandAxis => {
     if (!isScalarTuning(t)) return resolveAxis(t.mapping, t.overrides, bandOn(t.mapping, axis))
-    const scalar = taxonomy.scalars.find(sc => sc.id === t.scalar)
+    const scalar = engineOf(taxonomy).scalars.find(sc => sc.id === t.scalar)
     // Loud: a tuning naming a scalar the taxonomy does not know is a host bug.
     // The view never holds one — it reads params retuned for the taxonomy
     // (`retunedFor` falls the axis back on a swap), so this is unreachable
@@ -302,6 +304,8 @@ export interface LayoutFrame {
   readonly centerY: number
   /** Ring radius per Y bucket (mapped Y only; a scalar Y rings per node). */
   readonly rings: ReadonlyMap<string, number>
+  /** Each scalar answer the frame refused, and each scalar that threw. */
+  readonly diagnostics: readonly GraphDiagnostic[]
   /** A node's rest interval on an axis — a re-centred band, a scalar's point, or the centre itself for a node with no value there. */
   rest(axis: 'x' | 'y', node: LayoutSubject): { lo: number; hi: number }
   /** A node's ring radius in radial mode: its bucket's ring, its scalar's, or the centre (0) for a node with no value on Y. */
@@ -311,32 +315,52 @@ export interface LayoutFrame {
 const AT_CENTRE = { lo: 0, hi: 0 }
 
 // A scalar's answer, checked once per frame: every value finite and in [0, 1].
-// Loud, because a value outside the contract would become a rest point or a
-// ring radius and nothing downstream could tell it from a real one.
-function checkedScores(scalar: ScalarAxis, graph: ReadableGraph): Map<string, number> {
-  const raw = scalar.compute(graph)
-  for (const [id, s] of raw) {
-    if (!Number.isFinite(s)) throw new Error(`scalar ${JSON.stringify(scalar.id)} answered ${String(s)} for node ${JSON.stringify(id)}; a scalar answers a finite number`)
+// A refused answer is dropped, and said: the node rests at the axis's centre,
+// as one the scalar left out does, and a diagnostic names it — a value outside
+// the contract would become a rest point or a ring radius that nothing
+// downstream could tell from a real one, and a throw would leave the pane.
+function checkedScores(scalar: Scalar, graph: ReadableGraph, out: GraphDiagnostic[]): Map<string, number> {
+  let raw: Map<string, number>
+  try {
+    raw = scalar.compute(graph)
+  } catch (e) {
+    out.push({ severity: 'warning', code: 'scalar-compute-threw', message: `scalar ${JSON.stringify(scalar.id)} threw: ${e instanceof Error ? e.message : String(e)}; every node rests at the axis's centre` })
+    return new Map()
   }
-  const scores = scalar.normalize === 'none' ? raw : scalar.normalize === 'range' ? rangeNormalized(raw) : normalized(raw)
+  const refuse = (id: string, s: number, contract: string) => {
+    out.push({ severity: 'warning', code: 'scalar-answer-refused', nodeId: id, message: `scalar ${JSON.stringify(scalar.id)} answered ${String(s)} for node ${JSON.stringify(id)}; a scalar answers ${contract}; the node rests at the axis's centre` })
+  }
+  const finite = new Map<string, number>()
+  for (const [id, s] of raw) {
+    if (Number.isFinite(s)) finite.set(id, s)
+    else refuse(id, s, 'a finite number')
+  }
+  const scores = scalar.normalize === 'none' ? finite : scalar.normalize === 'range' ? rangeNormalized(finite) : normalized(finite)
   for (const [id, s] of scores) {
-    if (!(Number.isFinite(s) && s >= 0 && s <= 1)) {
-      throw new Error(`scalar ${JSON.stringify(scalar.id)} answered ${String(s)} for node ${JSON.stringify(id)}; a scalar answers in [0, 1]`)
-    }
+    if (s >= 0 && s <= 1) continue
+    scores.delete(id)
+    refuse(id, raw.get(id)!, 'in [0, 1]')
   }
   return scores
 }
 
 export function layoutFrame(graph: ReadableGraph, resolved: ResolvedPhysics): LayoutFrame {
   const all = [...graph.nodes]
-  const centerFor = (a: ResolvedLayoutAxis) => (isScalarAxis(a) ? 0 : medianBandCenter(all, a))
-  const scoresFor = (a: ResolvedLayoutAxis) => (isScalarAxis(a) ? checkedScores(a.scalar, graph) : undefined)
+  const centerFor = (a: ResolvedBandAxis) => (isScalarAxis(a) ? 0 : medianBandCenter(all, a))
+  const diagnostics: GraphDiagnostic[] = []
+  const checked = new Map<Scalar, Map<string, number>>()
+  const scoresFor = (a: ResolvedBandAxis) => {
+    if (!isScalarAxis(a)) return undefined
+    let scores = checked.get(a.scalar)
+    if (!scores) checked.set(a.scalar, scores = checkedScores(a.scalar, graph, diagnostics))
+    return scores
+  }
   const centerX = centerFor(resolved.bandX)
   const centerY = centerFor(resolved.bandY)
   const scoresX = scoresFor(resolved.bandX)
   const scoresY = scoresFor(resolved.bandY)
   const rings = isScalarAxis(resolved.bandY) ? new Map<string, number>() : ringRadii(all, resolved.bandY)
-  const restOn = (a: ResolvedLayoutAxis, center: number, scores: Map<string, number> | undefined, node: LayoutSubject) => {
+  const restOn = (a: ResolvedBandAxis, center: number, scores: Map<string, number> | undefined, node: LayoutSubject) => {
     if (isScalarAxis(a)) {
       const s = scores?.get(node.id)
       if (s === undefined) return AT_CENTRE
@@ -348,7 +372,7 @@ export function layoutFrame(graph: ReadableGraph, resolved: ResolvedPhysics): La
     return band === undefined ? AT_CENTRE : { lo: band.min - center, hi: band.max - center }
   }
   return {
-    centerX, centerY, rings,
+    centerX, centerY, rings, diagnostics,
     rest: (axis, node) => axis === 'x' ? restOn(resolved.bandX, centerX, scoresX, node) : restOn(resolved.bandY, centerY, scoresY, node),
     ringOf: node => {
       if (isScalarAxis(resolved.bandY)) {
@@ -373,7 +397,7 @@ export function bandAxesActing(params: GravityParams): boolean {
 }
 
 export function topologicalActing(params: GravityParams): boolean {
-  return params.topologicalEnabled && params.gravityTopological > 0
+  return params.gravityTopological > 0
 }
 
 /**
@@ -437,7 +461,7 @@ export function bandOverlay(
     }
     return { acting, x: [], y: [], rings: [...byRadius].map(([radius, buckets]) => ({ radius, buckets })), colors }
   }
-  const stripesOn = (a: ResolvedLayoutAxis, center: number): BandStripe[] =>
+  const stripesOn = (a: ResolvedBandAxis, center: number): BandStripe[] =>
     isScalarAxis(a)
       ? [{ lo: Math.min(a.span.zero, a.span.one), hi: Math.max(a.span.zero, a.span.one), buckets: [], gradient: a.span }]
       : withColors(a, bandStripes(all, a, center))
@@ -480,12 +504,12 @@ export function bandStripes(nodes: Iterable<PhysicsSubject>, axis: ResolvedAxis<
 export const ABSENT_EDGE_PHYSICS: SpringPhysics = { strength: 0, distance: 0 }
 
 /**
- * What a control token needs of a spring category: its identity, its two
- * endpoint buckets, its kind and its words. A declared edge type satisfies it;
- * a pair category synthesises it — and neither needs physics or a stroke here
- * (physics is `physicsFor`, and a pair is a spring, never a stroke).
+ * What a control token needs of a spring category: its identity, its swatch,
+ * its kind and its words. A declared edge type satisfies it; a pair or untyped
+ * category synthesises it — and none needs physics or a stroke here (physics
+ * is `physicsFor`, and a category is a spring, never a stroke).
  */
-export type EdgeCategoryDescription = Pick<ResolvedEdgeType, 'id' | 'label' | 'sourceValue' | 'targetValue' | 'relation' | 'tooltip'>
+export type EdgeCategoryDescription = Pick<ResolvedEdgeType, 'id' | 'label' | 'swatch' | 'relation' | 'tooltip'>
 
 
 /**
@@ -507,6 +531,16 @@ function parsePairId(id: EdgeTypeId): [Relation, string, string] | undefined {
   return undefined
 }
 
+/** The category of an edge no declared type claims, one per relation, encoded as `pairId` is so no type id collides with it. */
+function untypedId(relation: Relation): EdgeTypeId {
+  return JSON.stringify(['untyped', relation])
+}
+
+function describeUntyped(id: EdgeTypeId): EdgeCategoryDescription | undefined {
+  const relation = (['containment', 'dependency'] as const).find(r => untypedId(r) === id)
+  return relation && { id, label: 'untyped', swatch: [null, null], relation, tooltip: `untyped ${relation}` }
+}
+
 /**
  * The spring table, resolved from the pair tuning and the taxonomy.
  *
@@ -514,7 +548,7 @@ function parsePairId(id: EdgeTypeId): [Relation, string, string] | undefined {
  * edge. On the style axis bucketed by identity, the host's declared table and
  * its prioritized rule apply verbatim: the hand-tuned springs, and a
  * precedence no pair rule reproduces — two of its categories share endpoint
- * values and differ only on the edge's own dispatch. On any other
+ * values and differ only on the edge's own kind. On any other
  * (axis, mapping) the library's pair rule applies: one category per unordered
  * bucket pair per relation, each the middling spring until tuned. The
  * pair rule enumerates nothing: a category exists when an edge falls in it,
@@ -524,34 +558,31 @@ export interface ResolvedSprings {
   readonly mapping: AxisMapping
   /**
    * The category of an edge from its endpoints' bucket ids, or undefined when
-   * an endpoint is unbucketed, or — on the style axis — when no declared type
-   * of the edge's relation runs between its endpoint values and the
-   * taxonomy's `classifyEdge` names none; such an edge pulls nothing and
-   * draws in its relation's default stroke.
+   * an endpoint is unbucketed and no declared type claims it. On the style
+   * axis, a bucketed edge no declared type of its relation claims falls in
+   * its relation's untyped category; the pair rule leaves no edge untyped.
    */
   classify(edge: GraphEdge, src: string | undefined, tgt: string | undefined): EdgeTypeId | undefined
-  /** Effective physics: the override where one exists, else the declared spring — the middling spring, on a pair axis. */
+  /** Effective physics: the override where one exists, else the declared spring — the middling spring, for an untyped or pair category. */
   physicsFor(id: EdgeTypeId): SpringPhysics
-  /** What a control surface shows for a category — the declared entry, or one synthesized from a pair id. */
+  /** What a control surface shows for a category — the declared entry, or one synthesized from an untyped or pair id. */
   describe(id: EdgeTypeId): EdgeCategoryDescription | undefined
 }
 
 export function resolveSprings(pair: PairTuning, taxonomy: Taxonomy): ResolvedSprings {
   const { mapping, spring: overrides } = pair
   if (mapping.axis === taxonomy.styleAxis() && isIdentityMapping(mapping)) {
-    const table = new Map(taxonomy.edgeTypes.map(e => [e.id, e]))
+    const table = new Map(taxonomy.edgeTypes().map(e => [e.id, e]))
     return {
       mapping,
-      // An edge no declared type of its relation claims has no category here:
-      // it pulls nothing and draws in its relation's stroke, and the
-      // diagnostics have named it.
       classify: (edge, src, tgt) => {
-        const id = taxonomy.edgeTypeOf(edge, src, tgt)
-        const type = id === undefined ? undefined : table.get(id)
-        return type !== undefined && type.relation === relationOf(edge) ? id : undefined
+        const relation = relationOf(edge)
+        const id = engineOf(taxonomy).edgeTypeOf(edge, src, tgt)
+        if (id !== undefined && table.get(id)?.relation === relation) return id
+        return src === undefined || tgt === undefined ? undefined : untypedId(relation)
       },
-      physicsFor: id => overrides.get(id) ?? table.get(id)?.physics ?? ABSENT_EDGE_PHYSICS,
-      describe: id => table.get(id),
+      physicsFor: id => overrides.get(id) ?? table.get(id)?.physics ?? MIDDLING_SPRING,
+      describe: id => table.get(id) ?? describeUntyped(id),
     }
   }
   // Every pair category starts from the middling spring: the same start a
@@ -574,10 +605,8 @@ export function resolveSprings(pair: PairTuning, taxonomy: Taxonomy): ResolvedSp
       return {
         id,
         label: `${A.abbreviation}↔${B.abbreviation}`,
-        sourceValue: a,
-        targetValue: b,
+        swatch: [a, b],
         relation,
-        physics: typical,
         tooltip: `${A.label} ↔ ${B.label} ${relation}`,
       }
     },
@@ -596,8 +625,9 @@ export interface EdgeCategory {
 }
 
 export function springFor(spring: ResolvedSprings, edge: GraphEdge, src: PhysicsSubject, tgt: PhysicsSubject): EdgeCategory {
-  const key = spring.classify(edge, bucketOf(spring, src), bucketOf(spring, tgt))
-  const ph = key === undefined ? ABSENT_EDGE_PHYSICS : spring.physicsFor(key)
+  const a = bucketOf(spring, src), b = bucketOf(spring, tgt)
+  const key = spring.classify(edge, a, b)
+  const ph = key !== undefined ? spring.physicsFor(key) : ABSENT_EDGE_PHYSICS
   return { strength: ph.strength, distance: ph.distance, key }
 }
 

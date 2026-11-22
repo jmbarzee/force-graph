@@ -1,0 +1,56 @@
+/* The scrubber: its own slot above the transport cluster. */
+@layer gv {
+.gv-scrubber {
+  position: absolute;
+  bottom: 48px;
+  left: 50%;
+  transform: translateX(-50%);
+  z-index: 10;
+  width: min(520px, calc(100% - 24px));
+  display: flex;
+  align-items: center;
+  gap: 8px;
+  padding: 4px 8px;
+  border: 1px solid var(--gv-color-border);
+  border-radius: 6px;
+  background: color-mix(in srgb, var(--gv-color-surface) 85%, transparent);
+  backdrop-filter: blur(8px);
+  -webkit-backdrop-filter: blur(8px);
+  pointer-events: auto;
+}
+
+.gv-scrubber-btn {
+  flex: 0 0 auto;
+  display: inline-flex;
+  align-items: center;
+  justify-content: center;
+  width: 24px;
+  height: 24px;
+  padding: 0;
+  color: var(--gv-color-text-muted);
+  background: transparent;
+  border: 1px solid transparent;
+  border-radius: 4px;
+  cursor: pointer;
+}
+
+.gv-scrubber-btn:hover,
+.gv-scrubber-btn.active {
+  color: var(--gv-accent);
+  border-color: var(--gv-accent);
+}
+
+.gv-scrubber-seek {
+  flex: 1;
+  min-width: 0;
+  accent-color: var(--gv-accent);
+}
+
+.gv-scrubber-time {
+  flex: 0 0 auto;
+  font-size: 12px;
+  font-family: var(--gv-font-mono);
+  color: var(--gv-color-text-muted);
+  white-space: nowrap;
+}
+}
