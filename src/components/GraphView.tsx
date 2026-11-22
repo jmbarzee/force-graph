@@ -178,7 +178,7 @@ export interface GraphViewProps {
   groups?: Groups
   /** A multiplier on the stiffness of every edge whose two ends share a visible group, so members drift together. Default 1, off. */
   groupCohesion?: number
-  /** The host's legend (`ColorLegend`, or its own), rendered inside the pane — which sets `--gv-toolbar-height` on its root so a legend can anchor under the bar — and handed each channel's keys as drawn and the view's control over the glow's. */
+  /** The host's legend (`ColorLegend`, or its own), rendered inside the pane — which sets `--gv-toolbar-height` on its root so a legend can anchor under the bar, and frames clear of it — and handed each channel's keys as drawn and the view's control over the glow's. */
   legend?: (channels: ColorChannels, control: GroupsHandle) => React.ReactNode
   /**
    * Where the nodes' colours come from. `fill` colours each node's body by

@@ -6,21 +6,22 @@ import type { SimNode } from '../../graph/simulation'
 import { createTaxonomy } from '../../graph/taxonomy'
 import { readableGraph } from '../../graph/model'
 import type { Graph } from '../../graph/model'
-import { frameQueue, frameView } from './frame'
+import { chromeInsets, frameQueue, frameView } from './frame'
 import type { FrameRequest } from './frame'
 
 const node = (id: string, x: number, y: number) => ({ id, x, y }) as SimNode
 const drawn = [node('a', -100, -50), node('b', 200, 80), node('c', 40, 300)]
-const area = { width: 800, height: 600, overlay: 120 }
+const area = { width: 800, height: 600, insets: { top: 120, right: 100, bottom: 80, left: 150 } }
 const vp = { x: 10, y: 20, scale: 0.5 }
 
 describe('frameView', () => {
-  it('places every drawn node, and no hidden one, inside the canvas below the overlay', () => {
+  it('places every drawn node, and no hidden one, inside the canvas the chrome leaves clear', () => {
     const hidden = node('h', 5000, -5000)
     const next = frameView(vp, { ids: ['a', 'b', 'c', 'h'] }, drawn, area)
+    const { top, right, bottom, left } = area.insets
     const inside = (n: SimNode) => {
       const [x, y] = worldToScreen(next, n.x, n.y)
-      return x >= 60 && x <= area.width - 60 && y >= area.overlay + 60 && y <= area.height - 60
+      return x >= left + 60 && x <= area.width - right - 60 && y >= top + 60 && y <= area.height - bottom - 60
     }
     expect(drawn.every(inside)).toBe(true)
     expect(inside(hidden)).toBe(false)
@@ -40,8 +41,34 @@ describe('frameView', () => {
   it('centres at the current scale raised to minScale', () => {
     const next = frameView(vp, { ids: ['b'], minScale: 1.2 }, drawn, area)
     expect(next.scale).toBe(1.2)
-    expect(worldToScreen(next, 200, 80)).toEqual([400, 360])
+    expect(worldToScreen(next, 200, 80)).toEqual([425, 320])
     expect(frameView(vp, { ids: ['b'], minScale: 0 }, drawn, area).scale).toBe(vp.scale)
+  })
+
+  it.each([
+    ['across', { top: 100, right: 400, bottom: 0, left: 300 }, [400, 350]],
+    ['down', { top: 300, right: 0, bottom: 200, left: 100 }, [450, 300]],
+  ])('frames %s the whole pane where the insets leave twice the padding or less, and the other axis inside them', (_, insets, centre) => {
+    const next = frameView(vp, { ids: ['b'], minScale: 1 }, drawn, { width: 800, height: 600, insets })
+    expect(worldToScreen(next, 200, 80)).toEqual(centre)
+    expect(frameView(vp, { ids: ['a', 'b', 'c'] }, drawn, { width: 800, height: 600, insets }).scale).toBeGreaterThan(0)
+  })
+})
+
+describe('chromeInsets', () => {
+  it('clears each rect from its cheapest side, keeping the deepest on each side', () => {
+    // course-catalog's chrome at 1280×800, plus a hidden panel and one off the pane.
+    const rect = (left: number, top: number, right: number, bottom: number) => ({ left, top, right, bottom })
+    const chrome = [
+      rect(0, 0, 1280, 164), // the overlay
+      rect(12, 176, 208, 507), // the legend
+      rect(371, 718, 909, 752), // the scrubber
+      rect(528, 765, 752, 788), // Fit, Auto, Play
+      rect(1180, 759, 1268, 788), // Controls
+      rect(0, 0, 0, 0),
+      rect(1300, 0, 1500, 800),
+    ]
+    expect(chromeInsets({ width: 1280, height: 800 }, chrome)).toEqual({ top: 164, right: 0, bottom: 82, left: 208 })
   })
 })
 
@@ -174,7 +201,7 @@ describe('a held frame over a settling layout', () => {
     nodes: Array.from({ length: 300 }, (_, i) => ({ id: `n${i}`, name: `n${i}`, values: { kind: 'item' } })),
     edges: Array.from({ length: 299 }, (_, i) => ({ id: `e${i}`, sourceId: `n${i + 1}`, targetId: `n${Math.floor(i / 3)}` })),
   }
-  const area = { width: 1200, height: 800, overlay: 120 }
+  const area = { width: 1200, height: 800, insets: { top: 120, right: 0, bottom: 0, left: 0 } }
 
   // A cluster revealed at one point and reheated, as a refit seeds it, framed
   // with no padding so any spread after the frame shows.
@@ -191,11 +218,11 @@ describe('a held frame over a settling layout', () => {
     while (!sim.isStable()) { sim.tick(); queue.tick() }
     return sim.nodes.every(n => {
       const [x, y] = worldToScreen(vp, n.x, n.y)
-      return x > -0.5 && x < area.width + 0.5 && y > area.overlay - 0.5 && y < area.height + 0.5
+      return x > -0.5 && x < area.width + 0.5 && y > area.insets.top - 0.5 && y < area.height + 0.5
     })
   }
 
-  it('keeps every node in view below the overlay once settled, which one frame does not', () => {
+  it('keeps every node in view below the chrome once settled, which one frame does not', () => {
     expect(settledInView(true)).toBe(true)
     expect(settledInView(false)).toBe(false)
   })

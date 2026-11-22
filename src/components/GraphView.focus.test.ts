@@ -8,7 +8,7 @@ import type { FilterState } from '../filter/types'
 import { createTaxonomy } from '../graph/taxonomy'
 import type { Graph } from '../graph/model'
 import type { SimNode } from '../graph/simulation'
-import { DEFAULT_VIEWPORT, type Viewport } from '../graph/viewport'
+import { DEFAULT_VIEWPORT, worldToScreen, type Viewport } from '../graph/viewport'
 import { frameView } from './graph-view/frame'
 
 interface CanvasProps { viewport: Viewport; flashNode: { id: string } | null; onViewportChange: (vp: Viewport) => void }
@@ -18,14 +18,18 @@ vi.mock('./GraphCanvas', () => ({
 }))
 
 const area = { width: 800, height: 600 }
+// The pane's chrome, its rects by class; the rest measure empty.
+let chrome: Record<string, DOMRect> = {}
 let frames = new Map<number, FrameRequestCallback>()
 let nextFrame = 0
 beforeEach(() => {
   ;(globalThis as { IS_REACT_ACT_ENVIRONMENT?: boolean }).IS_REACT_ACT_ENVIRONMENT = true
   window.matchMedia = () => ({ matches: false }) as MediaQueryList
   window.ResizeObserver = class { observe() {} unobserve() {} disconnect() {} }
+  chrome = {}
   Element.prototype.getBoundingClientRect = function (this: Element) {
-    return new DOMRect(0, 0, ...(this.classList.contains('gv-graph-view') ? [area.width, area.height] : [0, 0]))
+    if (this.classList.contains('gv-graph-view')) return new DOMRect(0, 0, area.width, area.height)
+    return Object.entries(chrome).find(([c]) => this.classList.contains(c))?.[1] ?? new DOMRect()
   }
   frames = new Map()
   window.requestAnimationFrame = cb => { frames.set(++nextFrame, cb); return nextFrame }
@@ -48,17 +52,17 @@ const graph: Graph = {
 // The two pairs start far apart, so a frame of one is not a frame of both.
 const defaultPositions = new Map([['a', { x: 0, y: 0 }], ['b', { x: 100, y: 0 }], ['c', { x: 2000, y: 1500 }], ['d', { x: 2100, y: 1500 }]])
 
-async function mount() {
+async function mount(props: Partial<GraphViewProps> = {}) {
   const ref = React.createRef<GraphViewHandle>()
   const selections: string[] = []
   const root = createRoot(document.createElement('div'))
   await act(async () => {
-    root.render(React.createElement(GraphView, { ref, graph, taxonomy, defaultPositions, onSelectionChange: n => selections.push(n.map(x => x.id).join()) }))
+    root.render(React.createElement(GraphView, { ref, graph, taxonomy, defaultPositions, onSelectionChange: n => selections.push(n.map(x => x.id).join()), ...props }))
   })
   await tick()
   const frame = (ids: string[]) => {
     const nodes = [...ref.current!.getPositions()].map(([id, p]) => ({ id, ...p }))
-    return frameView(canvas.viewport, { ids }, nodes as SimNode[], { ...area, overlay: 0 })
+    return frameView(canvas.viewport, { ids }, nodes as SimNode[], { ...area, insets: { top: 0, right: 0, bottom: 0, left: 0 } })
   }
   return { ref, selections, frame }
 }
@@ -76,6 +80,19 @@ it('frames the target with its neighbors, holds, selects it, and flashes it once
   expect(view.frame(['a', 'b'])).toBe(canvas.viewport)
   expect(canvas.flashNode?.id).toBe('a')
   expect(view.selections).toEqual(['a'])
+})
+
+it('fits inside what the overlay and a host legend leave clear', async () => {
+  chrome = { 'gv-graph-overlay': new DOMRect(0, 0, 800, 100), 'host-legend': new DOMRect(0, 100, 250, 500) }
+  const { ref } = await mount({ legend: () => React.createElement('div', { className: 'host-legend' }) })
+  await act(async () => ref.current!.fit())
+  for (const p of ref.current!.getPositions().values()) {
+    const [x, y] = worldToScreen(canvas.viewport, p.x, p.y)
+    expect(x).toBeGreaterThan(250 + 60 - 0.5)
+    expect(x).toBeLessThan(800 - 60 + 0.5)
+    expect(y).toBeGreaterThan(100 + 60 - 0.5)
+    expect(y).toBeLessThan(600 - 60 + 0.5)
+  }
 })
 
 it('selects the target of a focus the user lets go before it frames', async () => {
