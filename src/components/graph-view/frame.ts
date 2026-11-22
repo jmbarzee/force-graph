@@ -8,8 +8,9 @@ import type { SimNode } from '../../graph/simulation'
  * `requestFrame`: the nodes to bring into view. Only the drawn ones among
  * `ids` count, and a request naming none, or framing them less than half a
  * pixel from where they are, leaves the viewport as it is. The
- * frame fits them `padding` px inside the canvas below the overlay, or,
- * given `minScale`, centres them there at the current scale raised to it.
+ * frame fits them `padding` px inside the canvas the pane's chrome leaves
+ * clear, or, given `minScale`, centres them there at the current scale raised
+ * to it.
  *
  * It frames at once, or when `when` says: `'drawn'`, once the pane measured
  * and one of its ids drew, however hot the layout; `'next'`, the loop's next
@@ -89,7 +90,27 @@ export function frameQueue(apply: (request: FrameRequest) => boolean) {
   }
 }
 
-export function frameView(vp: Viewport, request: FrameRequest, drawn: readonly SimNode[], area: PaneSize & { overlay: number }): Viewport {
+/** How far the pane's chrome reaches in from each side; a frame lies inside what it leaves clear. */
+export interface Insets { top: number; right: number; bottom: number; left: number }
+
+/**
+ * The insets that clear each of `chrome`, rects relative to the pane. Each is
+ * cleared from the side that gives up the least canvas: the filter bar from the
+ * top, the scrubber from the bottom, a tall legend at the left from the left.
+ */
+export function chromeInsets(pane: PaneSize, chrome: Iterable<{ left: number; top: number; right: number; bottom: number }>): Insets {
+  const insets = { top: 0, right: 0, bottom: 0, left: 0 }
+  for (const r of chrome) {
+    if (r.right <= 0 || r.bottom <= 0 || r.left >= pane.width || r.top >= pane.height || r.right <= r.left || r.bottom <= r.top) continue
+    const reach = { top: r.bottom, right: pane.width - r.left, bottom: pane.height - r.top, left: r.right }
+    const cost = { top: reach.top * pane.width, right: reach.right * pane.height, bottom: reach.bottom * pane.width, left: reach.left * pane.height }
+    const side = (Object.keys(cost) as (keyof Insets)[]).reduce((a, b) => (cost[b] < cost[a] ? b : a))
+    insets[side] = Math.max(insets[side], reach[side])
+  }
+  return insets
+}
+
+export function frameView(vp: Viewport, request: FrameRequest, drawn: readonly SimNode[], area: PaneSize & { insets: Insets }): Viewport {
   const ids = new Set(request.ids)
   let minX = Infinity, maxX = -Infinity, minY = Infinity, maxY = -Infinity
   for (const n of drawn) {
@@ -99,13 +120,16 @@ export function frameView(vp: Viewport, request: FrameRequest, drawn: readonly S
   }
   if (minX === Infinity) return vp
 
-  const height = area.height - area.overlay
   const padding = request.padding ?? 60
+  // An axis its insets leave less than twice the padding is framed across the whole pane.
+  const clear = (span: number, a: number, b: number) => (span - a - b > padding * 2 ? [a, span - a - b] : [0, span])
+  const [left, width] = clear(area.width, area.insets.left, area.insets.right)
+  const [top, height] = clear(area.height, area.insets.top, area.insets.bottom)
   const scale = request.minScale !== undefined
     ? Math.max(vp.scale, request.minScale)
-    : Math.min((area.width - padding * 2) / (maxX - minX || 1), (height - padding * 2) / (maxY - minY || 1), 2)
-  const x = area.width / 2 - (minX + maxX) / 2 * scale
-  const y = area.overlay + height / 2 - (minY + maxY) / 2 * scale
+    : Math.min((width - padding * 2) / (maxX - minX || 1), (height - padding * 2) / (maxY - minY || 1), 2)
+  const x = left + width / 2 - (minX + maxX) / 2 * scale
+  const y = top + height / 2 - (minY + maxY) / 2 * scale
   const ds = scale - vp.scale
   const moved = Math.max(
     Math.abs(x - vp.x + ds * minX), Math.abs(x - vp.x + ds * maxX),

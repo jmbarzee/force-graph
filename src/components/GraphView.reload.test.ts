@@ -59,7 +59,7 @@ async function mount(start: Graph, defaultPositions?: ReadonlyMap<string, { x: n
   await render(start)
   const frame = (ids: string[]) => {
     const nodes = [...ref.current!.getPositions()].map(([id, p]) => ({ id, ...p }))
-    return frameView(viewport, { ids }, nodes as SimNode[], { ...area, overlay: 0 })
+    return frameView(viewport, { ids }, nodes as SimNode[], { ...area, insets: { top: 0, right: 0, bottom: 0, left: 0 } })
   }
   return { ref, render, selections, frame }
 }

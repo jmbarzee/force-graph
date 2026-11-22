@@ -1,14 +1,13 @@
 // useViewport — the camera concern for the Graph View.
 //
 // Owns the viewport, which follows a pane resize, and every framing: each
-// lands in the canvas below the overlay.
+// lands in the canvas the pane's chrome leaves clear.
 
 import React from 'react'
 import { DEFAULT_VIEWPORT, followResize } from '../../graph/viewport'
 import type { PaneSize, Viewport } from '../../graph/viewport'
 import type { SimNode } from '../../graph/simulation'
-import { frameQueue, frameView } from './frame'
-import { useLatest } from './useControllable'
+import { chromeInsets, frameQueue, frameView } from './frame'
 import { useIsomorphicLayoutEffect } from './useIsomorphicLayoutEffect'
 import type { FrameRequest } from './frame'
 
@@ -33,11 +32,10 @@ export function useViewport(drawn: React.RefObject<readonly SimNode[]>): Viewpor
 
   // The overlay (filter chips, search, the host's findings, the pane's
   // diagnostics, the search results) floats over the full-bleed canvas, and
-  // its height is dynamic. It is measured whole, so a frame and a host control
-  // anchored at `--gv-toolbar-height` sit under everything it shows, the open
-  // search results included.
+  // its height is dynamic. It is measured whole, so a host control anchored at
+  // `--gv-toolbar-height` sits under everything it shows, the open search
+  // results included.
   const [overlayHeight, setOverlayHeight] = React.useState(0)
-  const overlayHeightRef = useLatest(overlayHeight)
   useIsomorphicLayoutEffect(() => {
     const el = overlayRef.current
     if (!el || typeof ResizeObserver === 'undefined') return
@@ -67,10 +65,18 @@ export function useViewport(drawn: React.RefObject<readonly SimNode[]>): Viewpor
     if (!nodes.some(n => ids.has(n.id))) return false
     const size = measure()
     if (!size?.width || !size.height) return false
-    const area = { ...size, overlay: overlayHeightRef.current }
+    // Every child of the pane but the canvas is chrome floating over it: the
+    // overlay, a host's legend, the scrubber, the controls and their panels.
+    const container = containerRef.current!
+    const pane = container.getBoundingClientRect()
+    const chrome = [...container.children].filter(c => !c.classList.contains('gv-graph-canvas-area')).map(c => {
+      const r = c.getBoundingClientRect()
+      return { left: r.left - pane.left, top: r.top - pane.top, right: r.right - pane.left, bottom: r.bottom - pane.top }
+    })
+    const area = { ...size, insets: chromeInsets(size, chrome) }
     setViewport(vp => frameView(vp, request, nodes, area))
     return true
-  }, [measure, drawn, overlayHeightRef])
+  }, [measure, drawn])
 
   const queue = React.useMemo(() => frameQueue(apply), [apply])
   React.useEffect(() => {
