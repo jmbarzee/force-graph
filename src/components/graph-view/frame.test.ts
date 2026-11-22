@@ -46,18 +46,16 @@ describe('frameView', () => {
 })
 
 describe('frameQueue', () => {
-  const queued = () => {
+  const queued = (drawn = () => true) => {
     const framed: FrameRequest[] = []
-    return { framed, queue: frameQueue(request => { framed.push(request); return true }) }
+    return { framed, queue: frameQueue(request => { if (!drawn()) return false; framed.push(request); return true }) }
   }
-  const opening = { ids: ['a'], when: 'warm', hold: true } as const
+  const opening = { ids: ['a'], when: 'drawn', hold: true } as const
 
-  it('holds a frame from the first warm tick', () => {
+  it('holds a frame from the first tick, however hot', () => {
     const { framed, queue } = queued()
     queue.request(opening)
-    queue.tick(0.5)
-    expect(framed).toEqual([])
-    queue.tick(0.29); queue.tick(0.2); queue.tick(0.1)
+    queue.tick(0.9); queue.tick(0.5); queue.tick(0.1)
     expect(framed).toHaveLength(3)
   })
 
@@ -73,7 +71,7 @@ describe('frameQueue', () => {
     expect(framed).toHaveLength(1)
   })
 
-  it('keeps, past a release, a cooled warm frame the pane holds up, and frames it once when the pane measures', () => {
+  it('keeps, past a release, a cooled drawn frame the pane holds up, and frames it once when the pane measures', () => {
     let measured = false
     const framed: FrameRequest[] = []
     const queue = frameQueue(request => { if (measured) framed.push(request); return measured })
@@ -89,35 +87,38 @@ describe('frameQueue', () => {
     expect(framed).toHaveLength(1)
   })
 
-  it('drops at a release a warm frame the layout has not cooled for, and frames nothing when the pane measures before the layout cools', () => {
-    const { framed, queue } = queued()
+  it('drops at a release a drawn frame the pane holds up on a hot layout, and frames nothing when the pane then measures', () => {
+    let measured = false
+    const { framed, queue } = queued(() => measured)
     queue.request(opening)
-    queue.retry()
     queue.tick(0.5)
+    queue.release()
+    measured = true
+    queue.retry()
+    queue.tick(0.1)
+    expect(framed).toEqual([])
+  })
+
+  it('drops a refit\'s drawn frame at a pan before the next tick, though the last tick was cool', () => {
+    const { framed, queue } = queued()
+    queue.tick(0.1)
+    queue.request(opening)
     queue.release()
     queue.retry()
     queue.tick(0.1)
     expect(framed).toEqual([])
   })
 
-  it('drops a refit\'s warm frame at a pan before the next tick, though the last tick was cool', () => {
-    const { framed, queue } = queued()
-    queue.tick(0.1)
-    queue.request(opening)
-    queue.release()
-    queue.retry()
-    queue.tick(0.1)
-    expect(framed).toEqual([])
-  })
-
-  it('frames nothing at a resize before the next tick on a hot layout, though the last tick was cool', () => {
-    const { framed, queue } = queued()
-    queue.tick(0.1)
+  it('frames a drawn frame at the first resize or commit that draws one of its ids, before any tick, and holds it', () => {
+    let measured = false
+    const { framed, queue } = queued(() => measured)
     queue.request(opening)
     queue.retry()
     expect(framed).toEqual([])
-    queue.tick(0.5)
-    expect(framed).toEqual([])
+    measured = true
+    queue.retry()
+    queue.tick(0.9)
+    expect(framed).toEqual([opening, opening])
   })
 
   it('releases a held frame for a newer request, and for a next one acting after it', () => {
@@ -134,13 +135,15 @@ describe('frameQueue', () => {
     expect(framed).toEqual([opening, fit, opening, focus])
   })
 
-  it('keeps a next frame waiting to hold behind a newer warm one, and holds it after', () => {
-    const { framed, queue } = queued()
+  it('keeps a next frame waiting to hold behind a newer drawn one, and holds it after', () => {
+    let measured = false
+    const { framed, queue } = queued(() => measured)
     const focus = { ids: ['c'], when: 'next', hold: true } as const
     queue.request(focus)
     queue.request(opening)
     queue.tick(0.5)
-    queue.tick(0.1); queue.tick(0.1)
+    measured = true
+    queue.tick(0.5); queue.tick(0.1)
     expect(framed).toEqual([opening, focus, focus])
   })
 
@@ -185,7 +188,7 @@ describe('a held frame over a settling layout', () => {
     sim.reheat(0.5)
     let vp = DEFAULT_VIEWPORT
     const queue = frameQueue(request => { vp = frameView(vp, request, sim.nodes, area); return true })
-    queue.request({ ids: sim.nodes.map(n => n.id), padding: 0, when: 'warm', hold })
+    queue.request({ ids: sim.nodes.map(n => n.id), padding: 0, when: 'drawn', hold })
     while (!sim.isStable()) { sim.tick(); queue.tick(sim.alpha) }
     return sim.nodes.every(n => {
       const [x, y] = worldToScreen(vp, n.x, n.y)
@@ -193,7 +196,7 @@ describe('a held frame over a settling layout', () => {
     })
   }
 
-  it('keeps every node in view below the overlay once settled, which one warm frame does not', () => {
+  it('keeps every node in view below the overlay once settled, which one frame does not', () => {
     expect(settledInView(true)).toBe(true)
     expect(settledInView(false)).toBe(false)
   })

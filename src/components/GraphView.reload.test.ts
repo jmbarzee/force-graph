@@ -94,12 +94,18 @@ it('carries a held frame over a reload, on the new graph\'s nodes among its ids'
   // and its pull on `a` over the reload's tick moves their frame, which a
   // dropped hold would leave behind.
   const view = await mount(first, new Map([['d', { x: 3000, y: 2000 }]]))
-  // Past the warm-up, while the opening frame still holds.
+  // Once the opening frame holds.
   while (frames.size && viewport === DEFAULT_VIEWPORT) await tick(1)
   await view.render(grown)
   await tick(1)
   expect(view.frame(first.nodes.map(n => n.id))).toBe(viewport)
   expect(view.frame(grown.nodes.map(n => n.id))).not.toBe(viewport)
+})
+
+it('frames the opening on its first tick, while the layout is hot', async () => {
+  await mount(first)
+  await tick(1)
+  expect(viewport).not.toBe(DEFAULT_VIEWPORT)
 })
 
 const kept = new Map([['a', { x: 0, y: 0 }], ['b', { x: 300, y: 100 }], ['c', { x: -200, y: 400 }]])

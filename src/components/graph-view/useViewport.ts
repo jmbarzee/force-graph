@@ -83,7 +83,7 @@ export function useViewport(drawn: React.RefObject<readonly SimNode[]>): Viewpor
     ro.observe(container)
     return () => ro.disconnect()
   }, [measure, queue])
-  // Each commit may draw what a waiting warm request names.
+  // Each commit may draw an id a waiting frame names.
   React.useEffect(() => { queue.retry() })
   const moveViewport = React.useCallback((action: React.SetStateAction<Viewport>) => {
     queue.release()

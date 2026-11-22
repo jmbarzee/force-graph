@@ -558,7 +558,7 @@ const GraphViewBody = React.forwardRef<GraphViewHandle, GraphViewProps>(function
   // The opening frame, when a rebuild follows a drawing of no node: called
   // from useSimulation's build effect, before the new simulation is drawn.
   const onSimRebuild = () => {
-    if (visibleNodesRef.current.length === 0) requestFrame({ ids: graph.nodes.map(n => n.id), when: 'warm', hold: true })
+    if (visibleNodesRef.current.length === 0) requestFrame({ ids: graph.nodes.map(n => n.id), when: 'drawn', hold: true })
   }
 
   // The tuning: the host's while `tuning` is defined, the view's own

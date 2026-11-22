@@ -148,7 +148,7 @@ export function useSimulationLoop({
       }
       sim.reheat(alpha)
       if (resume) setRunning(true)
-      if (refit) requestFrame({ ids: sim.nodes.map(n => n.id), when: 'warm', hold: true })
+      if (refit) requestFrame({ ids: sim.nodes.map(n => n.id), when: 'drawn', hold: true })
     }
     prevFilter.current = filter
   }, [filter]) // eslint-disable-line react-hooks/exhaustive-deps
