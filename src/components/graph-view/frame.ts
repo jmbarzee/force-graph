@@ -101,7 +101,7 @@ export interface Insets { top: number; right: number; bottom: number; left: numb
 export function chromeInsets(pane: PaneSize, chrome: Iterable<{ left: number; top: number; right: number; bottom: number }>): Insets {
   const insets = { top: 0, right: 0, bottom: 0, left: 0 }
   for (const r of chrome) {
-    if (r.right <= 0 || r.bottom <= 0 || r.left >= pane.width || r.top >= pane.height || r.right <= r.left || r.bottom <= r.top) continue
+    if (Math.min(r.right, pane.width) <= Math.max(r.left, 0) || Math.min(r.bottom, pane.height) <= Math.max(r.top, 0)) continue
     const reach = { top: r.bottom, right: pane.width - r.left, bottom: pane.height - r.top, left: r.right }
     const cost = { top: reach.top * pane.width, right: reach.right * pane.height, bottom: reach.bottom * pane.width, left: reach.left * pane.height }
     const side = (Object.keys(cost) as (keyof Insets)[]).reduce((a, b) => (cost[b] < cost[a] ? b : a))
@@ -121,7 +121,6 @@ export function frameView(vp: Viewport, request: FrameRequest, drawn: readonly S
   if (minX === Infinity) return vp
 
   const padding = request.padding ?? 60
-  // An axis its insets leave less than twice the padding is framed across the whole pane.
   const clear = (span: number, a: number, b: number) => (span - a - b > padding * 2 ? [a, span - a - b] : [0, span])
   const [left, width] = clear(area.width, area.insets.left, area.insets.right)
   const [top, height] = clear(area.height, area.insets.top, area.insets.bottom)

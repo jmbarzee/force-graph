@@ -102,7 +102,8 @@ refitting filter change. A pan,
 zoom, drag or newer frame lets go at once. Any other new graph keeps the
 viewport, and a frame still holding carries on over the nodes it names that
 the new graph draws.
-Every frame lands in the canvas below the filter bar.
+Every frame lands in what the pane's chrome leaves clear, or, on an axis
+where too little is left, across the whole pane.
 Resizing the pane keeps
 the world point at its centre fixed.
 

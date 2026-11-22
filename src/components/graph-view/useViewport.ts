@@ -30,11 +30,7 @@ export function useViewport(drawn: React.RefObject<readonly SimNode[]>): Viewpor
   const containerRef = React.useRef<HTMLDivElement>(null)
   const overlayRef = React.useRef<HTMLDivElement>(null)
 
-  // The overlay (filter chips, search, the host's findings, the pane's
-  // diagnostics, the search results) floats over the full-bleed canvas, and
-  // its height is dynamic. It is measured whole, so a host control anchored at
-  // `--gv-toolbar-height` sits under everything it shows, the open search
-  // results included.
+  // The overlay's height, for `--gv-toolbar-height`.
   const [overlayHeight, setOverlayHeight] = React.useState(0)
   useIsomorphicLayoutEffect(() => {
     const el = overlayRef.current
@@ -65,8 +61,6 @@ export function useViewport(drawn: React.RefObject<readonly SimNode[]>): Viewpor
     if (!nodes.some(n => ids.has(n.id))) return false
     const size = measure()
     if (!size?.width || !size.height) return false
-    // Every child of the pane but the canvas is chrome floating over it: the
-    // overlay, a host's legend, the scrubber, the controls and their panels.
     const container = containerRef.current!
     const pane = container.getBoundingClientRect()
     const chrome = [...container.children].filter(c => !c.classList.contains('gv-graph-canvas-area')).map(c => {

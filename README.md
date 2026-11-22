@@ -397,8 +397,8 @@ the console. Everything else is optional.
   judges one), `groupCohesion`
   (a multiplier, default 1, on the stiffness of every edge whose ends share a
   visible group, so members drift together), `legend` for a legend inside
-  the pane (anchor it under `--gv-toolbar-height`; a frame keeps clear of
-  it, as of all the pane's chrome), handed the
+  the pane (anchor it under `--gv-toolbar-height`; a frame keeps clear
+  of it), handed the
   `ColorChannels` — each channel's keys as drawn, `fill` always, `glow` and
   `ring` while they colour, each a `ChannelKey`, `{ id, label, color,
   visible }`, its colour in the pane's theme and `visible` while a visible
