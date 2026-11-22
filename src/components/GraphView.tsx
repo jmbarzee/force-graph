@@ -518,7 +518,7 @@ const GraphViewBody = React.forwardRef<GraphViewHandle, GraphViewProps>(function
   // Camera (viewport transform, container and overlay refs, every framing),
   // framing the visible nodes, set below once they are derived.
   const visibleNodesRef = React.useRef<SimNode[]>([])
-  const { viewport, moveViewport, containerRef, overlayRef, overlayHeight, requestFrame, tickFrame, releaseFrame } = useViewport(visibleNodesRef)
+  const { viewport, moveViewport, containerRef, overlayRef, overlayHeight, requestFrame, tickFrame, releaseFrame, settleFrame } = useViewport(visibleNodesRef)
   // The simulation instance + its handlers are owned by useSimulation, and the
   // RAF loop + fps by useSimulationLoop, both called below once `graph` and the
   // visible subgraph are available.
@@ -558,7 +558,7 @@ const GraphViewBody = React.forwardRef<GraphViewHandle, GraphViewProps>(function
   // The opening frame, when a rebuild follows a drawing of no node: called
   // from useSimulation's build effect, before the new simulation is drawn.
   const onSimRebuild = () => {
-    if (visibleNodesRef.current.length === 0) requestFrame({ ids: graph.nodes.map(n => n.id), when: 'warm', hold: true })
+    if (visibleNodesRef.current.length === 0) requestFrame({ ids: graph.nodes.map(n => n.id), when: 'drawn', hold: true })
   }
 
   // The tuning: the host's while `tuning` is defined, the view's own
@@ -859,7 +859,7 @@ const GraphViewBody = React.forwardRef<GraphViewHandle, GraphViewProps>(function
     visibleIds, downstreamScores,
     filter, axes: filterAxes, groupsOf,
     hoveredNodeId,
-    requestFrame, tickFrame, releaseFrame, taxonomy,
+    requestFrame, tickFrame, settleFrame, taxonomy,
   })
 
   const { hover: handleHoverNode, hold: holdNodeHover } = useHoverGrace(setHoveredNodeId)

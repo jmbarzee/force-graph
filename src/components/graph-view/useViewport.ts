@@ -19,9 +19,10 @@ export interface ViewportController {
   overlayRef: React.RefObject<HTMLDivElement>
   overlayHeight: number
   requestFrame: (request: FrameRequest) => void
-  // Frame what `requestFrame` left waiting or holding, as the layout's alpha allows; the loop calls it each tick.
-  tickFrame: (alpha: number) => void
+  // Frame what `requestFrame` left waiting or holding; the loop calls it each tick.
+  tickFrame: () => void
   releaseFrame: () => void
+  settleFrame: () => void
 }
 
 /** The camera, framing the nodes `drawn` holds. */
@@ -61,10 +62,13 @@ export function useViewport(drawn: React.RefObject<readonly SimNode[]>): Viewpor
     return { width, height }
   }, [])
   const apply = React.useCallback((request: FrameRequest): boolean => {
+    const nodes = drawn.current ?? []
+    const ids = new Set(request.ids)
+    if (!nodes.some(n => ids.has(n.id))) return false
     const size = measure()
     if (!size?.width || !size.height) return false
     const area = { ...size, overlay: overlayHeightRef.current }
-    setViewport(vp => frameView(vp, request, drawn.current ?? [], area))
+    setViewport(vp => frameView(vp, request, nodes, area))
     return true
   }, [measure, drawn, overlayHeightRef])
 
@@ -76,15 +80,17 @@ export function useViewport(drawn: React.RefObject<readonly SimNode[]>): Viewpor
       const prev = sizeRef.current
       const size = measure()
       if (size) setViewport(vp => followResize(vp, prev, size))
-      queue.measured()
+      queue.retry()
     })
     ro.observe(container)
     return () => ro.disconnect()
   }, [measure, queue])
+  // Each commit may draw an id a waiting frame names.
+  React.useEffect(() => { queue.retry() })
   const moveViewport = React.useCallback((action: React.SetStateAction<Viewport>) => {
     queue.release()
     setViewport(action)
   }, [queue])
 
-  return { viewport, moveViewport, containerRef, overlayRef, overlayHeight, requestFrame: queue.request, tickFrame: queue.tick, releaseFrame: queue.release }
+  return { viewport, moveViewport, containerRef, overlayRef, overlayHeight, requestFrame: queue.request, tickFrame: queue.tick, releaseFrame: queue.release, settleFrame: queue.settle }
 }

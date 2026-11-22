@@ -32,8 +32,8 @@ export interface SimulationLoopParams {
   groupsOf: ReadonlyMap<string, readonly string[]>
   hoveredNodeId: string | null
   requestFrame: (request: FrameRequest) => void
-  tickFrame: (alpha: number) => void
-  releaseFrame: () => void
+  tickFrame: () => void
+  settleFrame: () => void
   taxonomy: Taxonomy
 }
 
@@ -42,7 +42,7 @@ export function useSimulationLoop({
   visibleIds, downstreamScores,
   filter, axes, groupsOf,
   hoveredNodeId,
-  requestFrame, tickFrame, releaseFrame, taxonomy,
+  requestFrame, tickFrame, settleFrame, taxonomy,
 }: SimulationLoopParams): { fps: number } {
   // Frame-rate indicator. Updated ~2×/sec from the loop.
   const [fps, setFps] = React.useState(0)
@@ -64,7 +64,7 @@ export function useSimulationLoop({
 
       sim.tick(visibleIds, downstreamScores)
 
-      tickFrame(sim.alpha)
+      tickFrame()
 
       // FPS meter — recompute ~2×/sec; setFps only fires on change.
       const now = performance.now()
@@ -80,7 +80,7 @@ export function useSimulationLoop({
       }
 
       if (sim.isStable()) {
-        releaseFrame()
+        settleFrame()
         setRunning(false)
         onSettled()
         return
@@ -148,7 +148,7 @@ export function useSimulationLoop({
       }
       sim.reheat(alpha)
       if (resume) setRunning(true)
-      if (refit) requestFrame({ ids: sim.nodes.map(n => n.id), when: 'warm', hold: true })
+      if (refit) requestFrame({ ids: sim.nodes.map(n => n.id), when: 'drawn', hold: true })
     }
     prevFilter.current = filter
   }, [filter]) // eslint-disable-line react-hooks/exhaustive-deps

@@ -11,63 +11,67 @@ import type { SimNode } from '../../graph/simulation'
  * frame fits them `padding` px inside the canvas below the overlay, or,
  * given `minScale`, centres them there at the current scale raised to it.
  *
- * It frames at once, or when `when` says: `'warm'`, the first loop tick the
- * layout has cooled below alpha 0.3; `'next'`, the loop's next tick after any
- * warm one. A waiting request replaces the one waiting for the same `when`.
+ * It frames at once, or when `when` says: `'drawn'`, once the pane measured
+ * and one of its ids drew, however hot the layout; `'next'`, the loop's next
+ * tick after any drawn one. A waiting request replaces the one waiting for
+ * the same `when`.
  * One that `hold`s re-frames each tick after it acts, until a user's pan,
  * zoom or drag, a newer request or a settled layout releases it, and
  * `released` runs then, unless for a newer request. A release, or a newer
  * request, also drops a waiting `hold` request, which then never acts, but a
- * `'warm'` request leaves a waiting `'next'` one, which acts after it. A
- * release keeps a `'warm'` request the layout has cooled for and only the
- * pane holds up: it frames once, when the pane measures.
+ * `'drawn'` request leaves a waiting `'next'` one, which acts after it. A
+ * user's release drops any waiting `'drawn'` request, and a settled layout
+ * keeps one: it frames once, when it can.
  */
 export interface FrameRequest {
   ids: Iterable<string>
   padding?: number
   minScale?: number
-  when?: 'warm' | 'next'
+  when?: 'drawn' | 'next'
   hold?: boolean
   released?: () => void
 }
 
 /**
  * The requests the camera's owner waits on and holds. `apply` frames one, and
- * says whether the pane measured something to frame in: a warm request waits
- * for one, and the others act once, framed or not.
+ * says whether the pane measured and drew one of its ids: a drawn request
+ * waits for that, and the others act once, framed or not.
  */
 export function frameQueue(apply: (request: FrameRequest) => boolean) {
-  let warm: FrameRequest | undefined, next: FrameRequest | undefined, held: FrameRequest | undefined
-  let cooled = false
+  let pending: FrameRequest | undefined, next: FrameRequest | undefined, held: FrameRequest | undefined
   const act = (request: FrameRequest) => {
     held = request.hold ? request : undefined
   }
   const drop = () => {
-    if (warm?.hold) warm = undefined
+    if (pending?.hold) pending = undefined
     if (next?.hold) next = undefined
     held = undefined
   }
-  // A warm request acts once the layout has cooled and the pane measured.
-  const landWarm = () => {
-    if (!warm || !cooled || !apply(warm)) return false
-    const request = warm
-    warm = undefined
+  const release = () => {
+    const released = held?.released
+    drop()
+    pending = undefined
+    released?.()
+  }
+  const land = () => {
+    if (!pending || !apply(pending)) return false
+    const request = pending
+    pending = undefined
     act(request)
     return true
   }
   return {
     request(request: FrameRequest) {
-      const behind = request.when === 'warm' ? next : undefined
+      const behind = request.when === 'drawn' ? next : undefined
       drop()
       next ??= behind
-      if (request.when === 'warm') { warm = request; cooled = false }
+      if (request.when === 'drawn') pending = request
       else if (request.when === 'next') next = request
       else { apply(request); act(request) }
     },
-    tick(alpha: number) {
-      cooled = alpha < 0.3
+    tick() {
       if (held) apply(held)
-      if (warm && !landWarm()) return
+      if (pending && !land()) return
       if (next) {
         const request = next
         next = undefined
@@ -75,16 +79,12 @@ export function frameQueue(apply: (request: FrameRequest) => boolean) {
         act(request)
       }
     },
-    // The pane measured: a warm request it alone held up acts now.
-    measured() {
-      landWarm()
-    },
-    release() {
-      const released = held?.released
-      const waiting = cooled && warm ? { ...warm, hold: false } : undefined
-      drop()
-      warm ??= waiting
-      released?.()
+    retry: land,
+    release,
+    settle() {
+      const waiting = pending && { ...pending, hold: false }
+      release()
+      pending = waiting
     },
   }
 }
